@@ -311,8 +311,8 @@
               </DataTemplate>
             </ListBox.DataTemplates>
           </ListBox>
-          <c:TimelineScrubber Grid.Column="1" Name="Scrubber" Width="68" Sections="{Binding Sections}"
-                              IsVisible="{Binding HasSections}" Margin="2,0,6,10" />
+          <c:TimelineScrubber Grid.Column="1" Name="Scrubber" Width="56" Sections="{Binding Sections}"
+                              IsVisible="{Binding HasSections}" Margin="0,0,4,8" />
 
           <!-- States -->
           <StackPanel Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsLoading}">
@@ -519,6 +519,9 @@
                   <mi:MaterialIcon Kind="Heart" IsVisible="{Binding IsFavorite}" />
                   <mi:MaterialIcon Kind="HeartOutline" IsVisible="{Binding !IsFavorite}" />
                 </Panel>
+              </Button>
+              <Button Classes="viewerNav" Command="{Binding CopyImageCommand}" IsVisible="{Binding !IsVideo}" l:Tr.Tip="Copy picture (Ctrl+C)">
+                <mi:MaterialIcon Kind="ContentCopy" />
               </Button>
               <Button Classes="viewerNav" Command="{Binding ShareCommand}" IsVisible="{Binding CanEdit}" l:Tr.Tip="Share">
                 <mi:MaterialIcon Kind="ShareVariantOutline" />

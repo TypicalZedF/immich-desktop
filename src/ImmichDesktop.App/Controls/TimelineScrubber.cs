@@ -30,6 +30,7 @@ public sealed class TimelineScrubber : Control
     const double MinDotGap = 7;
 
     static readonly Typeface YearFont = new("Google Sans", FontStyle.Normal, FontWeight.Medium);
+
     static readonly Typeface BubbleFont = new("Google Sans", FontStyle.Normal, FontWeight.SemiBold);
 
     double _offset, _extent = 1, _viewport;
@@ -107,7 +108,9 @@ public sealed class TimelineScrubber : Control
         return found;
     }
 
-    T Resource<T>(string key, T fallback) where T : class => this.FindResource(key) as T ?? fallback;
+    /// <summary>A theme color for the current light/dark variant.</summary>
+    T Resource<T>(string key, T fallback) where T : class =>
+        this.TryFindResource(key, ActualThemeVariant, out var value) && value is T typed ? typed : fallback;
 
     public override void Render(DrawingContext context)
     {
@@ -116,62 +119,55 @@ public sealed class TimelineScrubber : Control
         if (!IsActive || Sections is not { } sections)
             return;
 
+        // Styled like the Immich web app: a dotted column of months on the right edge, compact year
+        // labels beside it, a line where you are, and a tag with the month under the pointer.
         var secondary = Resource<IBrush>("AppTextSecondaryBrush", Brushes.Gray);
         var tertiary = Resource<IBrush>("AppTextTertiaryBrush", Brushes.Gray);
         var primary = Resource<IBrush>("AppPrimaryBrush", Brushes.SteelBlue);
-        var onPrimary = Resource<IBrush>("AppOnPrimaryBrush", Brushes.White);
-        var hover = Resource<IBrush>("AppHoverBrush", Brushes.LightGray);
+        var text = Resource<IBrush>("AppTextBrush", Brushes.Black);
+        var card = Resource<IBrush>("AppCardBrush", Brushes.White);
+        var cardBorder = Resource<IBrush>("AppCardBorderBrush", Brushes.LightGray);
 
-        var right = Bounds.Width - 8;
-        var interacting = _hoverY is not null || _pressAt is not null;
-        if (interacting)
-        {
-            using (context.PushOpacity(0.7))
-                context.DrawRectangle(hover, null, new Rect(4, 2, Bounds.Width - 8, Bounds.Height - 4), 12, 12);
-        }
+        var dotX = Bounds.Width - 7;
+        var labelRight = Bounds.Width - 15;
 
-        // A year label where each year starts (skipping ones that would overlap), a dot for other months.
         var lastLabelY = double.NegativeInfinity;
         var lastDotY = double.NegativeInfinity;
         int? lastYear = null;
         foreach (var s in sections)
         {
             var y = ToY(s.Offset);
-            if (s.Year is { } year && year != lastYear && y - lastLabelY >= MinLabelGap)
+            if (y - lastDotY >= 4)
             {
-                var text = new FormattedText(year.ToString(CultureInfo.CurrentCulture), CultureInfo.CurrentCulture,
-                    FlowDirection.LeftToRight, YearFont, 12, secondary);
-                context.DrawText(text, new Point(right - text.Width, y - text.Height / 2));
-                lastLabelY = lastDotY = y;
-            }
-            else if (y - lastDotY >= MinDotGap && y - lastLabelY >= MinDotGap)
-            {
-                context.DrawEllipse(tertiary, null, new Point(right - 12, y), 1.75, 1.75);
+                context.DrawEllipse(tertiary, null, new Point(dotX, y), 1.2, 1.2);
                 lastDotY = y;
+            }
+            if (s.Year is { } year && year != lastYear && y - lastLabelY >= 13)
+            {
+                var label = new FormattedText(year.ToString(CultureInfo.CurrentCulture), CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight, YearFont, 11, secondary);
+                context.DrawText(label, new Point(labelRight - label.Width, y - label.Height / 2));
+                lastLabelY = y;
             }
             lastYear = s.Year;
         }
 
-        // Where you are now: a short bar on the left, clear of the year labels.
+        // Where you are now: a short line over the dots, clear of the year labels.
         var at = ToY(_offset);
-        context.DrawRectangle(primary, null, new Rect(8, at - 1.5, 16, 3), 1.5, 1.5);
+        context.FillRectangle(primary, new Rect(labelRight + 2, at - 1, Bounds.Width - labelRight - 2, 2));
 
-        // The date under the pointer (or, while scrolling, where you are).
-        var bubbleY = _hoverY ?? (_pressAt is not null || _showScrollBubble ? at : (double?)null);
-        if (bubbleY is not { } by)
+        // The month under the pointer (or, while scrolling, where you are).
+        var hovering = _hoverY is not null && _pressAt is null;
+        var tagY = hovering ? _hoverY!.Value : _pressAt is not null || _showScrollBubble ? at : (double?)null;
+        if (tagY is not { } ty || SectionAt(hovering ? ToOffset(ty) : _offset) is not { } section)
             return;
-        if (_hoverY is { } hy && _pressAt is null)
-        {
-            using (context.PushOpacity(0.55))
-                context.DrawRectangle(primary, null, new Rect(8, hy - 0.5, Bounds.Width - 16, 1), 0.5, 0.5);
-        }
-        var offsetForLabel = _hoverY is { } h && _pressAt is null ? ToOffset(h) : _offset;
-        if (SectionAt(offsetForLabel) is not { } section)
-            return;
-        var label = new FormattedText(section.Label, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, BubbleFont, 13, onPrimary);
-        var box = new Rect(-label.Width - 28 - 6, Math.Clamp(by - 15, 0, Math.Max(0, Bounds.Height - 30)), label.Width + 28, 30);
-        context.DrawRectangle(primary, null, box, 15, 15, new BoxShadows(new BoxShadow { Blur = 12, OffsetY = 2, Color = Color.FromArgb(60, 0, 0, 0) }));
-        context.DrawText(label, new Point(box.X + 14, box.Y + (box.Height - label.Height) / 2));
+        var tag = new FormattedText(section.Label, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, BubbleFont, 12.5, text);
+        var box = new Rect(Bounds.Width - 34 - tag.Width - 20, Math.Clamp(ty - 26, 0, Math.Max(0, Bounds.Height - 26)), tag.Width + 20, 26);
+        context.DrawRectangle(card, new Pen(cardBorder, 1), box, 7, 7,
+            new BoxShadows(new BoxShadow { Blur = 10, OffsetY = 2, Color = Color.FromArgb(50, 0, 0, 0) }));
+        context.DrawText(tag, new Point(box.X + 10, box.Y + (box.Height - tag.Height) / 2));
+        // A line from the tag to the rail, under the tag.
+        context.FillRectangle(primary, new Rect(box.X + 4, box.Bottom - 1.5, Bounds.Width - box.X - 4, 1.5));
     }
 
     protected override void OnPointerEntered(PointerEventArgs e)

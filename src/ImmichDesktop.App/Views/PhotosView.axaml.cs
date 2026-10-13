@@ -313,6 +313,9 @@ public partial class PhotosView : UserControl
                 case Key.I:
                     viewer.ToggleInfoCommand.Execute(null);
                     break;
+                case Key.C when e.KeyModifiers.HasFlag(KeyModifiers.Control) && !viewer.IsVideo:
+                    viewer.CopyImageCommand.Execute(null);
+                    break;
                 case Key.Delete when viewer.CanEdit:
                     viewer.TrashCommand.Execute(null);
                     break;

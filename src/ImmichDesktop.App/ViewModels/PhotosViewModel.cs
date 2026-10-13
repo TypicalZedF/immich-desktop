@@ -305,8 +305,8 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         {
             var rowCount = (bucket.Count + _columns - 1) / _columns;
             var height = HeaderHeight + rowCount * (tile + Gap);
-            var longLabel = bucket.Month is { } month ? month.ToString("MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture) : bucket.Label;
-            sections.Add(new TimelineSection(longLabel, bucket.Month?.Year, offset, height));
+            var shortLabel = bucket.Month is { } month ? month.ToString("MMM yyyy", System.Globalization.CultureInfo.CurrentCulture) : bucket.Label;
+            sections.Add(new TimelineSection(shortLabel, bucket.Month?.Year, offset, height));
             offset += height;
 
             rows.Add(new MonthHeaderViewModel(bucket.Label, Format.Plural(bucket.Count, "item")));
@@ -696,6 +696,39 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     }
 
     internal Task CopyTextAsync(string text) => _main?.CopyTextAsync(text) ?? Task.CompletedTask;
+
+    /// <summary>Copies a photo to the clipboard as a picture (full size, capped so it stays pasteable).</summary>
+    internal async Task CopyImageAsync(string assetId)
+    {
+        if (Client is not { } client)
+            return;
+        ShowNotice(Tr.T("Copying…"), sticky: true);
+        try
+        {
+            byte[] data;
+            try
+            {
+                var size = AppServices.Network.IsMetered ? AssetImageSize.Preview : AssetImageSize.Fullsize;
+                data = await client.GetAssetImageAsync(assetId, size, CancellationToken.None);
+            }
+            catch (ImmichApiException)
+            {
+                data = await client.GetAssetImageAsync(assetId, AssetImageSize.Preview, CancellationToken.None);
+            }
+            var window = _main?.GetWindowHandle?.Invoke() ?? IntPtr.Zero;
+            await Task.Run(() =>
+            {
+                using var bitmap = Images.DecodeUpright(data, 4096);
+                ImageClipboard.Copy(bitmap, window);
+            });
+            ShowNotice(Tr.T("Copied to clipboard"));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Could not copy the picture", ex);
+            ShowNotice(Tr.T("Couldn't copy the picture. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
 
     // ---- Notices ----
 

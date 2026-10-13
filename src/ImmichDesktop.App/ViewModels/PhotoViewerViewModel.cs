@@ -256,6 +256,9 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     void Share() => _owner.ShowShare([Asset.Id]);
 
     [RelayCommand]
+    Task CopyImageAsync() => _owner.CopyImageAsync(Asset.Id);
+
+    [RelayCommand]
     void AddToAlbum() => _owner.ShowAlbumPicker([Asset.Id]);
 
     [RelayCommand]
