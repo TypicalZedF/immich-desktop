@@ -64,6 +64,8 @@ OutputBaseFilename=ImmichDesktop-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 LZMANumBlockThreads=4
+; Compress in a separate 64-bit process: the 32-bit compiler runs out of memory on a bigger app.
+LZMAUseSeparateProcess=yes
 
 ; Platform
 ArchitecturesAllowed=x64compatible
