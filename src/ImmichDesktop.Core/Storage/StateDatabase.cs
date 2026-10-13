@@ -9,7 +9,7 @@ namespace ImmichDesktop.Core.Storage;
 /// </summary>
 public sealed class StateDatabase
 {
-    const int SchemaVersion = 1;
+    const int SchemaVersion = 2; // 2: privacy_scan
     const int ActivityKeep = 1000;
 
     readonly string _connectionString;
@@ -62,8 +62,94 @@ public sealed class StateDatabase
                 path    TEXT
             );
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+            -- Results of the on-device privacy check (only ever stored here, on this PC).
+            CREATE TABLE IF NOT EXISTS privacy_scan (
+                asset_id   TEXT    NOT NULL PRIMARY KEY,
+                version    INTEGER NOT NULL,
+                kinds      INTEGER NOT NULL,
+                score      REAL    NOT NULL DEFAULT 0,
+                decision   INTEGER NOT NULL DEFAULT 0,
+                scanned_at INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_privacy_open ON privacy_scan(decision, kinds);
             PRAGMA user_version = {SchemaVersion};
             """);
+    }
+
+    // ---- Privacy check (results stay on this PC) -------------------------------------------------
+
+    /// <summary>Assets already checked with this version of the checks.</summary>
+    public HashSet<string> GetPrivacyScanned(int version)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT asset_id FROM privacy_scan WHERE version >= $v";
+        cmd.Parameters.AddWithValue("$v", version);
+        using var reader = cmd.ExecuteReader();
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        while (reader.Read())
+            result.Add(reader.GetString(0));
+        return result;
+    }
+
+    /// <summary>Saves what was found in one asset; a choice already made about it is kept.</summary>
+    public void SavePrivacyScan(string assetId, int version, int kinds, double score)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO privacy_scan (asset_id, version, kinds, score, decision, scanned_at) VALUES ($id, $v, $k, $s, 0, $t)
+            ON CONFLICT(asset_id) DO UPDATE SET version = $v, kinds = $k, score = $s, scanned_at = $t
+            """;
+        cmd.Parameters.AddWithValue("$id", assetId);
+        cmd.Parameters.AddWithValue("$v", version);
+        cmd.Parameters.AddWithValue("$k", kinds);
+        cmd.Parameters.AddWithValue("$s", score);
+        cmd.Parameters.AddWithValue("$t", DateTime.UtcNow.Ticks);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>Flagged assets nobody has decided about yet, most certain first.</summary>
+    public List<(string AssetId, int Kinds, double Score)> GetPrivacySuggestions()
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT asset_id, kinds, score FROM privacy_scan WHERE decision = 0 AND kinds <> 0 ORDER BY score DESC, scanned_at DESC";
+        using var reader = cmd.ExecuteReader();
+        var result = new List<(string, int, double)>();
+        while (reader.Read())
+            result.Add((reader.GetString(0), reader.GetInt32(1), reader.GetDouble(2)));
+        return result;
+    }
+
+    public int CountPrivacySuggestions()
+    {
+        using var db = Open();
+        return Convert.ToInt32(Scalar(db, "SELECT COUNT(*) FROM privacy_scan WHERE decision = 0 AND kinds <> 0"));
+    }
+
+    /// <summary>Records a choice: 1 moved to the locked folder, 2 not sensitive (don't suggest again).</summary>
+    public void SetPrivacyDecision(IReadOnlyCollection<string> assetIds, int decision)
+    {
+        using var db = Open();
+        using var tx = db.BeginTransaction();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "UPDATE privacy_scan SET decision = $d WHERE asset_id = $id";
+        var id = cmd.Parameters.Add("$id", SqliteType.Text);
+        cmd.Parameters.AddWithValue("$d", decision);
+        foreach (var assetId in assetIds)
+        {
+            id.Value = assetId;
+            cmd.ExecuteNonQuery();
+        }
+        tx.Commit();
+    }
+
+    /// <summary>Forgets every result (e.g. when the check is turned off and its data cleared).</summary>
+    public void ClearPrivacyScans()
+    {
+        using var db = Open();
+        Exec(db, "DELETE FROM privacy_scan");
     }
 
     SqliteConnection Open()

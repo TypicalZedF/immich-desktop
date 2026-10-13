@@ -116,6 +116,18 @@ public sealed class AppSettings
     public bool MapStreetDetail { get; set; }
     public bool CheckForUpdates { get; set; } = true;
 
+    /// <summary>
+    /// Look through the library on this PC for private pictures (nudity, cards, IDs, documents…) and
+    /// suggest moving them to the locked folder. Off until you turn it on; nothing leaves the PC.
+    /// </summary>
+    public bool PrivacyScanEnabled { get; set; }
+
+    /// <summary>Use the graphics card for the privacy check (much faster); falls back to the CPU.</summary>
+    public bool PrivacyScanUseGpu { get; set; } = true;
+
+    /// <summary>Only check while the PC isn't being used, so it never slows down games or calls.</summary>
+    public bool PrivacyScanOnlyWhenIdle { get; set; }
+
     // Security: ask for Windows Hello or a password before showing the window (backup keeps running).
     public AppLockMode AppLock { get; set; } = AppLockMode.Off;
 

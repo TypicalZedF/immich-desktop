@@ -238,6 +238,41 @@ static class Screens
             Shot(main, outDir, $"16c-viewer-local-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
             photos.Viewer?.CloseCommand.Execute(null);
 
+            // The privacy check: runs the real on-device models over the demo library (on the CPU here),
+            // then shows what it suggests for the locked folder.
+            if (suffix == "light")
+            {
+                AppServices.Settings.Update(s => { s.PrivacyScanEnabled = true; s.PrivacyScanUseGpu = false; });
+                var started = DateTime.UtcNow;
+                while (AppServices.PrivacyScan.Status.State is not (ImmichDesktop.Core.Privacy.PrivacyScanState.Done or ImmichDesktop.Core.Privacy.PrivacyScanState.Error)
+                       && DateTime.UtcNow - started < TimeSpan.FromMinutes(6))
+                    Pump(TimeSpan.FromSeconds(1));
+                var scan = AppServices.PrivacyScan.Status;
+                var flagged = AppServices.Database.GetPrivacySuggestions();
+                Console.WriteLine($"Privacy check: {scan.State} {scan.Checked}/{scan.Total} in {(DateTime.UtcNow - started).TotalSeconds:0}s; flagged: {string.Join(", ", flagged.Select(f => $"{f.AssetId}={(ImmichDesktop.Core.Privacy.SensitiveKind)f.Kinds}"))} {scan.Detail}");
+            }
+            shell.Navigate(ShellPage.Utilities);
+            var privacyPage = (PhotosViewModel)Page(shell, ShellPage.Utilities);
+            privacyPage.OpenPrivacyCommand.Execute(null);
+            Shot(main, outDir, $"19p-privacy-{suffix}", height: 860, settle: TimeSpan.FromSeconds(2));
+            if (suffix == "light" && privacyPage.Privacy is { } review)
+            {
+                review.ShowPictures = true;
+                Shot(main, outDir, "19p2-privacy-shown", height: 860, settle: TimeSpan.FromSeconds(0.5));
+                // Move the card to the locked folder, mark the prescription as fine.
+                review.Items.First(i => i.Kinds.HasFlag(ImmichDesktop.Core.Privacy.SensitiveKind.PaymentCard)).IsSelected = true;
+                review.MoveToLockedCommand.Execute(null);
+                Pump(TimeSpan.FromMilliseconds(500));
+                main.Dialog?.ConfirmCommand.Execute(null);
+                Pump(TimeSpan.FromSeconds(1));
+                review.NotSensitiveCommand.Execute(null);
+                Pump(TimeSpan.FromMilliseconds(300));
+                Console.WriteLine($"Privacy review: {review.Count} left; locked requests: {demo.LockedRequests}; suggestions in database: {AppServices.Database.CountPrivacySuggestions()}");
+                if (review.Count != 0 || demo.LockedRequests != 1)
+                    throw new InvalidOperationException("Moving suggestions to the locked folder didn't work");
+            }
+            privacyPage.BackCommand.Execute(null);
+
             // Utilities: the list, the duplicates review and large files.
             shell.Navigate(ShellPage.Utilities);
             var utilities = (PhotosViewModel)Page(shell, ShellPage.Utilities);

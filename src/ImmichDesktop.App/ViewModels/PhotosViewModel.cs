@@ -112,7 +112,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         nameof(IsTrash), nameof(IsArchive), nameof(ShowTrashActions), nameof(ShowLockAction), nameof(ShowUtilities))]
     public partial GridQuery? Drill { get; set; }
 
-    public bool IsDrilledIn => Drill is not null || Duplicates is not null;
+    public bool IsDrilledIn => Drill is not null || Duplicates is not null || Privacy is not null;
 
     /// <summary>The profile picture dialog has its own title, so only show ours once you've opened something.</summary>
     public bool ShowHeading => !IsPicker || IsDrilledIn;
@@ -129,7 +129,8 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     public bool CanShareAlbum => Drill?.Album is not null && !IsPicker;
     public bool CanDeleteAlbum => Drill?.Album is { } album && !IsPicker && album.IsOwnedBy(AppServices.Settings.Current.UserId);
 
-    public string Heading => Drill?.Title ?? (Duplicates is not null ? Tr.T("Review duplicates") : null) ?? Page switch
+    public string Heading => Drill?.Title ?? (Duplicates is not null ? Tr.T("Review duplicates") : null)
+        ?? (Privacy is not null ? Tr.T("Suggest for the locked folder") : null) ?? Page switch
     {
         LibraryPage.Utilities => Tr.T("Utilities"),
         LibraryPage.Explore => Tr.T("Explore"),
@@ -146,7 +147,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     /// <summary>Back on this page after visiting others: refresh lists that other pages can change.</summary>
     internal void OnShownAgain()
     {
-        if (Drill is not null || Duplicates is not null)
+        if (Drill is not null || Duplicates is not null || Privacy is not null)
             return;
         _ = Page switch
         {
@@ -164,6 +165,13 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         {
             Duplicates = null;
             duplicates.Dispose();
+            _ = LoadUtilitiesAsync();
+            return;
+        }
+        if (Privacy is { } privacy)
+        {
+            Privacy = null;
+            privacy.Dispose();
             _ = LoadUtilitiesAsync();
             return;
         }
@@ -1401,6 +1409,9 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         foreach (var card in Albums.Cast<LibraryCardViewModel>().Concat(People).Concat(Places))
             card.Dispose();
         Duplicates?.Dispose();
+        Privacy?.Dispose();
+        if (_privacyHooked)
+            AppServices.PrivacyScan.StatusChanged -= OnPrivacyStatus;
         Thumbnails?.Dispose();
     }
 }

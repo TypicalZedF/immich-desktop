@@ -12,7 +12,7 @@ public sealed partial class PhotosViewModel
     const long LargeFileBytes = 10L * 1024 * 1024;
     const int LargeFilesShown = 250;
 
-    public bool ShowUtilities => Drill is null && Duplicates is null && Page == LibraryPage.Utilities;
+    public bool ShowUtilities => Drill is null && Duplicates is null && Privacy is null && Page == LibraryPage.Utilities;
 
     /// <summary>The duplicates review, while it's open.</summary>
     [ObservableProperty]
@@ -20,6 +20,32 @@ public sealed partial class PhotosViewModel
     public partial DuplicatesViewModel? Duplicates { get; set; }
 
     public bool ShowDuplicates => Duplicates is not null;
+
+    /// <summary>The privacy check (suggestions for the locked folder), while it's open.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowUtilities), nameof(ShowPrivacy), nameof(IsDrilledIn), nameof(Heading))]
+    public partial PrivacyReviewViewModel? Privacy { get; set; }
+
+    public bool ShowPrivacy => Privacy is not null;
+
+    [ObservableProperty]
+    public partial string PrivacyText { get; set; } = "";
+
+    void UpdatePrivacyText(Core.Privacy.PrivacyScanStatus status) => PrivacyText = status.State switch
+    {
+        Core.Privacy.PrivacyScanState.Off => Tr.T("Off · finds private photos on this PC; nothing is sent anywhere"),
+        _ when status.Suggestions > 0 => Format.Plural(status.Suggestions, Tr.T("photo to review"), Tr.T("photos to review")) + " · " + PrivacyReviewViewModel.Describe(status),
+        _ => PrivacyReviewViewModel.Describe(status),
+    };
+
+    void OnPrivacyStatus(Core.Privacy.PrivacyScanStatus status) => Avalonia.Threading.Dispatcher.UIThread.Post(() => UpdatePrivacyText(status));
+
+    [RelayCommand]
+    void OpenPrivacy()
+    {
+        Privacy?.Dispose();
+        Privacy = new PrivacyReviewViewModel(this);
+    }
 
     [ObservableProperty]
     public partial string DuplicatesText { get; set; } = "";
@@ -30,6 +56,12 @@ public sealed partial class PhotosViewModel
     async Task LoadUtilitiesAsync()
     {
         IsLoading = false;
+        if (!_privacyHooked)
+        {
+            _privacyHooked = true;
+            AppServices.PrivacyScan.StatusChanged += OnPrivacyStatus;
+        }
+        UpdatePrivacyText(AppServices.PrivacyScan.Status with { Suggestions = AppServices.PrivacyScan.Suggestions });
         DuplicatesText = Tr.T("Checking…");
         try
         {
@@ -56,6 +88,8 @@ public sealed partial class PhotosViewModel
             DuplicatesText = Tr.T("Couldn't check. {0}", NetworkErrors.Describe(ex));
         }
     }
+
+    bool _privacyHooked;
 
     internal void OnDuplicatesChanged(int groups) =>
         DuplicatesText = groups > 0

@@ -632,6 +632,21 @@
             </Border>
             <Border Classes="card" Padding="8,14,8,8" CornerRadius="20">
               <StackPanel Spacing="2">
+                <TextBlock Classes="caption" l:Tr.Text="Privacy" Margin="14,0,0,6" />
+                <Button Classes="utility" Command="{Binding OpenPrivacyCommand}">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <mi:MaterialIcon Kind="ShieldLockOutline" Classes="utilityIcon" />
+                    <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center">
+                      <TextBlock l:Tr.Text="Suggest for the locked folder" FontWeight="Medium" />
+                      <TextBlock Classes="caption" Text="{Binding PrivacyText}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <mi:MaterialIcon Grid.Column="2" Kind="ChevronRight" Width="20" Height="20" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                  </Grid>
+                </Button>
+              </StackPanel>
+            </Border>
+            <Border Classes="card" Padding="8,14,8,8" CornerRadius="20">
+              <StackPanel Spacing="2">
                 <TextBlock Classes="caption" l:Tr.Text="This PC" Margin="14,0,0,6" />
                 <Button Classes="utility" Command="{Binding OpenNotBackedUpCommand}">
                   <Grid ColumnDefinitions="Auto,*,Auto">
@@ -647,6 +662,98 @@
             </Border>
           </StackPanel>
         </ScrollViewer>
+
+        <!-- Suggest for the locked folder (on-device privacy check) -->
+        <Panel IsVisible="{Binding ShowPrivacy}">
+          <ContentControl Content="{Binding Privacy}">
+            <ContentControl.DataTemplates>
+              <DataTemplate DataType="vm:PrivacyReviewViewModel">
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Top" Spacing="12" Margin="28,0,24,14">
+                    <Border Classes="card" Padding="16,14" CornerRadius="16">
+                      <Grid ColumnDefinitions="Auto,*">
+                        <mi:MaterialIcon Kind="ShieldLockOutline" Width="26" Height="26" VerticalAlignment="Top" Margin="0,2,14,0"
+                                         Foreground="{DynamicResource AppPrimaryBrush}" />
+                        <StackPanel Grid.Column="1" Spacing="10">
+                          <TextBlock TextWrapping="Wrap"
+                                     l:Tr.Text="Finds photos you may want in the locked folder: nudity, payment cards, IDs, bank and tax papers, passwords and medical records. Everything is checked on this PC; your photos and the results are never sent anywhere, and nothing is moved without you." />
+                          <WrapPanel Orientation="Horizontal">
+                            <ToggleSwitch IsChecked="{Binding IsEnabled}" l:Tr.Content="Check my library" Margin="0,0,24,0" />
+                            <ToggleSwitch IsChecked="{Binding UseGpu}" IsVisible="{Binding OffersGpu}" l:Tr.Content="Use the graphics card" Margin="0,0,24,0" />
+                            <ToggleSwitch IsChecked="{Binding OnlyWhenIdle}" l:Tr.Content="Only when I'm not using the PC" />
+                          </WrapPanel>
+                          <StackPanel Spacing="6">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <mi:MaterialIcon Kind="Loading" Classes="spin" Width="14" Height="14" IsVisible="{Binding IsWorking}" />
+                              <TextBlock Classes="caption" Text="{Binding StatusText}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="1" IsVisible="{Binding ShowProgress}" Height="4" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasItems}">
+                      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <TextBlock Classes="h3" Text="{Binding Count, StringFormat='{}{0:N0}'}" />
+                        <TextBlock Classes="secondary" l:Tr.Text="to review" VerticalAlignment="Center" />
+                        <TextBlock Classes="secondary" Text="{Binding SelectionText}" IsVisible="{Binding HasSelection}" VerticalAlignment="Center" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <CheckBox IsChecked="{Binding ShowPictures}" l:Tr.Content="Show pictures" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <Button Classes="ghost" l:Tr.Content="Select all" Command="{Binding SelectAllCommand}" />
+                        <Button Classes="secondary" l:Tr.Content="Not sensitive" Command="{Binding NotSensitiveCommand}" />
+                        <Button Classes="primary" Command="{Binding MoveToLockedCommand}">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <mi:MaterialIcon Kind="LockOutline" Width="16" Height="16" />
+                            <TextBlock l:Tr.Text="Move to locked folder" />
+                          </StackPanel>
+                        </Button>
+                      </StackPanel>
+                    </Grid>
+                  </StackPanel>
+                  <Panel>
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="28,0,12,24" IsVisible="{Binding HasItems}">
+                      <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:PrivacySuggestionViewModel">
+                            <StackPanel Width="176" Margin="0,0,10,12" Spacing="5">
+                              <Button Classes="tile" Classes.selected="{Binding IsSelected}" Width="176" Height="176" Command="{Binding ToggleSelectCommand}">
+                                <Panel>
+                                  <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"
+                                         IsVisible="{Binding $parent[ContentControl].((vm:PrivacyReviewViewModel)DataContext).ShowPictures}" />
+                                  <Image Source="{Binding Blurred}" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"
+                                         IsVisible="{Binding !$parent[ContentControl].((vm:PrivacyReviewViewModel)DataContext).ShowPictures}" />
+                                  <mi:MaterialIcon Kind="EyeOffOutline" Width="26" Height="26" Foreground="White" Opacity="0.85"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   IsVisible="{Binding !$parent[ContentControl].((vm:PrivacyReviewViewModel)DataContext).ShowPictures}" />
+                                  <Panel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6">
+                                    <Ellipse Width="22" Height="22" Fill="White" IsVisible="{Binding IsSelected}" />
+                                    <mi:MaterialIcon Kind="CheckCircle" Width="26" Height="26" IsVisible="{Binding IsSelected}" Foreground="{DynamicResource AppPrimaryBrush}" />
+                                    <mi:MaterialIcon Kind="CheckboxBlankCircleOutline" Width="24" Height="24" Foreground="White" IsVisible="{Binding !IsSelected}" />
+                                  </Panel>
+                                  <Button Classes="ghost icon" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
+                                          Command="{Binding OpenCommand}" l:Tr.Tip="View" Background="#66000000">
+                                    <mi:MaterialIcon Kind="ArrowExpand" Width="16" Height="16" Foreground="White" />
+                                  </Button>
+                                </Panel>
+                              </Button>
+                              <TextBlock Classes="caption" Text="{Binding Reason}" TextWrapping="Wrap" Margin="2,0" />
+                            </StackPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                    <StackPanel Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420" IsVisible="{Binding ShowEmpty}">
+                      <mi:MaterialIcon Kind="ShieldCheckOutline" Width="36" Height="36" Foreground="{DynamicResource AppPrimaryBrush}" />
+                      <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center" l:Tr.Text="Nothing to review right now." />
+                    </StackPanel>
+                  </Panel>
+                </DockPanel>
+              </DataTemplate>
+            </ContentControl.DataTemplates>
+          </ContentControl>
+        </Panel>
 
         <!-- Review duplicates -->
         <Panel IsVisible="{Binding ShowDuplicates}">

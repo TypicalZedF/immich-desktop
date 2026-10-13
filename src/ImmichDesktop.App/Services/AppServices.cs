@@ -1,4 +1,5 @@
 using ImmichDesktop.Core;
+using ImmichDesktop.Core.Privacy;
 using ImmichDesktop.Core.Services;
 using ImmichDesktop.Core.Settings;
 using ImmichDesktop.Core.Storage;
@@ -18,6 +19,7 @@ public static class AppServices
     public static ProfileService Profile { get; private set; } = null!;
     public static WallpaperService Wallpaper { get; private set; } = null!;
     public static NetworkMonitor Network { get; private set; } = null!;
+    public static PrivacyScanService PrivacyScan { get; private set; } = null!;
 
     public static void Initialize()
     {
@@ -33,6 +35,7 @@ public static class AppServices
         Updates = new UpdateService();
         Profile = new ProfileService();
         Wallpaper = new WallpaperService();
+        PrivacyScan = new PrivacyScanService(Settings, Database, Account, () => Network.IsMetered, DecodeForPrivacyCheck);
         Account.SessionChanged += () =>
         {
             if (Account.IsSignedIn)
@@ -44,8 +47,27 @@ public static class AppServices
             _ = Profile.RefreshAsync();
     }
 
+    /// <summary>Decodes a preview for the on-device privacy check (upright, at most 1280 pixels).</summary>
+    static BgraImage? DecodeForPrivacyCheck(byte[] data)
+    {
+        try
+        {
+            using var decoded = Images.DecodeUpright(data, 1280);
+            using var bitmap = decoded.ColorType == SkiaSharp.SKColorType.Bgra8888 && decoded.RowBytes == decoded.Width * 4
+                ? decoded.Copy()
+                : decoded.Copy(SkiaSharp.SKColorType.Bgra8888);
+            return new BgraImage(bitmap.Width, bitmap.Height, bitmap.Bytes);
+        }
+        catch (Exception ex)
+        {
+            Log.Info($"Privacy check: couldn't decode a preview: {ex.Message}");
+            return null;
+        }
+    }
+
     public static async Task ShutdownAsync()
     {
+        PrivacyScan?.Dispose();
         Updates?.Dispose();
         Network?.Dispose();
         Wallpaper?.Dispose();

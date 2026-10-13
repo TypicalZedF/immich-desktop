@@ -58,8 +58,37 @@ sealed class DemoServer : HttpMessageHandler
     ];
 
     /// <summary>Must be called on the UI thread (renders the demo images).</summary>
+    /// <summary>Demo photos the privacy check should flag: a payment card and a prescription.</summary>
+    static readonly Dictionary<string, string> PrivateDemo = new() { ["202609-7"] = "card", ["202608-3"] = "prescription" };
+
+    static Control PrivatePicture(string kind, double width, double height)
+    {
+        var scale = width / 1200;
+        TextBlock Text(string text, double size, string color = "#FFFFFF", FontWeight weight = FontWeight.SemiBold) =>
+            new() { Text = text, FontSize = size * scale, Foreground = new SolidColorBrush(Color.Parse(color)), FontWeight = weight, Margin = new Thickness(0, 0, 0, 18 * scale) };
+        var lines = new StackPanel { Margin = new Thickness(90 * scale), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+        if (kind == "card")
+        {
+            lines.Children.Add(Text("VISA", 70));
+            lines.Children.Add(Text("4111 1111 1111 1111", 84));
+            lines.Children.Add(Text("VALID THRU 12/28", 44));
+            lines.Children.Add(Text("ALEX MORGAN", 52));
+            return new Border { Width = width, Height = height, Background = new SolidColorBrush(Color.Parse("#1E3A8A")), Child = lines };
+        }
+        lines.Children.Add(Text("PRESCRIPTION", 72, "#111111", FontWeight.Bold));
+        lines.Children.Add(Text("Patient: Alex Morgan", 48, "#222222", FontWeight.Normal));
+        lines.Children.Add(Text("Amoxicillin 500 mg, three times a day", 44, "#222222", FontWeight.Normal));
+        lines.Children.Add(Text("Dr. Rivera, Lisbon Clinic", 44, "#222222", FontWeight.Normal));
+        return new Border { Width = width, Height = height, Background = new SolidColorBrush(Color.Parse("#F7F5EF")), Child = lines };
+    }
+
     public void Prepare()
     {
+        foreach (var kind in PrivateDemo.Values.Distinct())
+        {
+            _images[$"t-{kind}"] = Render.ToPng(PrivatePicture(kind, 250, 250), 250, 250);
+            _images[$"p-{kind}"] = Render.ToPng(PrivatePicture(kind, 1200, 800), 1200, 800);
+        }
         for (var i = 0; i < 12; i++)
         {
             _images[$"t{i}"] = Render.ToPng(Scene(i, 250, 250), 250, 250);
@@ -173,6 +202,7 @@ sealed class DemoServer : HttpMessageHandler
         HttpResponseMessage response = path switch
         {
             _ when path.StartsWith("/api/albums/", StringComparison.Ordinal) && request.Method == HttpMethod.Delete => DeleteAlbum(path),
+            "/api/assets" when request.Method == HttpMethod.Put => UpdateAssets(request),
             // Like Immich v3: no ownerId, the owner is the first member, and "shared" also counts link-only albums.
             "/api/albums" => Json(Albums.Where(a => !DeletedAlbums.Contains(a.Id)).Select((a, i) => new
             {
@@ -263,6 +293,16 @@ sealed class DemoServer : HttpMessageHandler
 
     public List<string> DeletedAlbums { get; } = [];
 
+    /// <summary>Requests that moved photos to the locked folder.</summary>
+    public int LockedRequests;
+
+    HttpResponseMessage UpdateAssets(HttpRequestMessage request)
+    {
+        if (request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() is { } body && body.Contains("\"locked\"", StringComparison.Ordinal))
+            Interlocked.Increment(ref LockedRequests);
+        return new HttpResponseMessage(HttpStatusCode.NoContent);
+    }
+
     HttpResponseMessage DeleteAlbum(string path)
     {
         DeletedAlbums.Add(path.Split('/')[3]);
@@ -297,6 +337,8 @@ sealed class DemoServer : HttpMessageHandler
     HttpResponseMessage Thumbnail(string path, string query)
     {
         var id = path.Split('/')[3];
+        if (PrivateDemo.TryGetValue(id, out var kind))
+            return Bytes(_images[(query.Contains("preview") ? "p-" : "t-") + kind]);
         var index = Math.Abs(id.GetHashCode()) % 12;
         return Bytes(_images[(query.Contains("preview") ? "p" : "t") + index]);
     }
