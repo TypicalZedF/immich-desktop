@@ -226,6 +226,22 @@ static class Screens
             Shot(main, outDir, $"41-dialog-{suffix}");
             main.Dispose();
         }
+        // A translated pass (German has the longest words) to check layouts.
+        Application.Current!.RequestedThemeVariant = ThemeVariant.Light;
+        Tr.SetLanguage("de");
+        var german = new MainWindowViewModel();
+        german.ShowShell();
+        var germanShell = (ShellViewModel)german.Content;
+        Pump(TimeSpan.FromSeconds(1));
+        ((OverviewViewModel)Page(germanShell, ShellPage.Overview)).Apply(Uploading);
+        Shot(german, outDir, "90-de-overview", height: 860);
+        germanShell.Navigate(ShellPage.Photos);
+        Shot(german, outDir, "91-de-photos", height: 760, settle: TimeSpan.FromSeconds(2));
+        germanShell.Navigate(ShellPage.Settings);
+        Shot(german, outDir, "92-de-settings", height: 2300, settle: TimeSpan.FromSeconds(1));
+        german.Dispose();
+        Tr.SetLanguage("en");
+
         try { Directory.Delete(_root, recursive: true); } catch { /* best effort */ }
         Console.WriteLine($"Screenshots written to {Path.GetFullPath(outDir)}");
     }

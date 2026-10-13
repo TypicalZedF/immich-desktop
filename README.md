@@ -17,13 +17,17 @@
 
 - **Looks like Immich.** Official Immich logo, Google Sans, Immich's colors and layout (top bar, sidebar, storage meter and server status).
 - **Light, dark or follow Windows.** One click on the sun/moon in the top bar, or choose in Settings.
-- **Browse your library.** Your Immich timeline right in the app: grouped by month, thumbnails load as you scroll, full-size viewer with arrow keys (videos open in Immich).
+- **Your library, like the web app.** Timeline with a date rail to jump through the years, Favorites, Albums, People, Places and a heat map of where photos were taken, plus smart search. A sharp full-screen viewer with zoom, favorite, download, add to album, trash and photo info.
+- **Share.** Select photos (or a whole album) and create a share link with an expiry date, copied straight to your clipboard.
+- **Desktop picture frame.** Your desktop background can rotate through photos from your favorites, an album or the whole library.
 - **Your profile picture.** Shown from Immich. Change it in Settings by picking a photo from your Immich library (or your PC), then move, zoom and rotate it in the circle, just like the web app.
 - **Every way to sign in.** Email & password, **SSO / OAuth** (Authentik, Keycloak, Google, …) through your browser, or an API key.
 - **App lock.** Require **Windows Hello** (face, fingerprint, PIN) or an app password to open the window. Backup keeps running while it's locked; it re-locks when the window closes or after 5 minutes idle.
 - **Choose exactly what syncs.** Per folder: photos and/or videos, subfolders, skip patterns (`Screenshots`, `*.png`, `Trips/2019/**`), and an optional album.
 - **Lives in the tray, like Google Drive.** The tray icon shows backed up / syncing (animated) / paused / offline / needs attention. Right-click to pause (1 h, 8 h, until tomorrow, indefinitely), resume, sync now, open Immich, or quit.
 - **Never uploads twice.** Files are hashed and checked against your library first, exactly like the mobile app.
+- **Home and away.** Automatic server switching like the mobile app: a local address on your home network, any number of external addresses elsewhere. Data saving on metered connections (photos only, or pause).
+- **Your language.** English, Deutsch, Español, Français and Português; dates and numbers follow.
 - **Light on your PC.** About 30 MB of memory in the tray, low CPU priority, optional speed limit and pause on battery. Skips cloud-only OneDrive files.
 - **Proper installer and updates.** A setup wizard where you choose the install location and whether it's for you or for everyone; a clean uninstaller; automatic updates from GitHub Releases (optional).
 
