@@ -34,10 +34,7 @@
               <TextBlock Text="{Binding UserEmail}" />
             </StackPanel>
           </ToolTip.Tip>
-          <Border Width="38" Height="38" CornerRadius="19" Background="{DynamicResource AppPrimaryBrush}">
-            <TextBlock Text="{Binding UserInitial}" Foreground="{DynamicResource AppOnPrimaryBrush}" FontSize="16"
-                       FontWeight="Medium" HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Border>
+          <c:Avatar Width="38" Height="38" Initial="{Binding UserInitial}" />
         </Button>
       </StackPanel>
     </Grid>

@@ -15,6 +15,7 @@ public static class AppServices
     public static AccountService Account { get; private set; } = null!;
     public static SyncEngine Engine { get; private set; } = null!;
     public static UpdateService Updates { get; private set; } = null!;
+    public static ProfileService Profile { get; private set; } = null!;
 
     public static void Initialize()
     {
@@ -25,6 +26,16 @@ public static class AppServices
         Account.Restore();
         Engine = new SyncEngine(Settings, Database, Account, Activity);
         Updates = new UpdateService();
+        Profile = new ProfileService();
+        Account.SessionChanged += () =>
+        {
+            if (Account.IsSignedIn)
+                _ = Profile.RefreshAsync();
+            else
+                Profile.Clear();
+        };
+        if (Account.IsSignedIn)
+            _ = Profile.RefreshAsync();
     }
 
     public static async Task ShutdownAsync()

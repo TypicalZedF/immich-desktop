@@ -17,6 +17,8 @@
 
 - **Looks like Immich.** Official Immich logo, Google Sans, Immich's colors and layout (top bar, sidebar, storage meter and server status).
 - **Light, dark or follow Windows.** One click on the sun/moon in the top bar, or choose in Settings.
+- **Browse your library.** Your Immich timeline right in the app: grouped by month, thumbnails load as you scroll, full-size viewer with arrow keys (videos open in Immich).
+- **Your profile picture.** Shown from Immich, and you can change or remove it from Settings.
 - **Every way to sign in.** Email & password, **SSO / OAuth** (Authentik, Keycloak, Google, …) through your browser, or an API key.
 - **App lock.** Require **Windows Hello** (face, fingerprint, PIN) or an app password to open the window. Backup keeps running while it's locked; it re-locks when the window closes or after 5 minutes idle.
 - **Choose exactly what syncs.** Per folder: photos and/or videos, subfolders, skip patterns (`Screenshots`, `*.png`, `Trips/2019/**`), and an optional album.
@@ -28,6 +30,7 @@
 | | |
 |---|---|
 | <img src="docs/screenshots/02-sign-in-light.png" alt="Sign in" /> | <img src="docs/screenshots/03-folders-light.png" alt="Choose folders" /> |
+| <img src="docs/screenshots/15-photos-light.png" alt="Photos" /> | <img src="docs/screenshots/16-viewer-dark.png" alt="Viewer" /> |
 | <img src="docs/screenshots/20-folders-dark.png" alt="Folders (dark)" /> | <img src="docs/screenshots/51-locked-hello-dark.png" alt="App lock" /> |
 
 ## Install

@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using ImmichDesktop.App.Services;
 using ImmichDesktop.App.ViewModels;
 using ImmichDesktop.App.Views;
+using ImmichDesktop.Core.Api;
 using ImmichDesktop.Core.Settings;
 using ImmichDesktop.Core.Sync;
 using Material.Icons;
@@ -19,8 +20,11 @@ static class Screens
 
     public static void PrepareData()
     {
-        _root = Path.Combine(Path.GetTempPath(), "immich-desktop-screens", Guid.NewGuid().ToString("N"));
-        var data = Directory.CreateDirectory(Path.Combine(_root, "data")).FullName;
+        // Demo folders live at a neutral path (never the real user profile) so screenshots don't reveal names.
+        _root = OperatingSystem.IsWindows()
+            ? Path.Combine(Path.GetPathRoot(Environment.SystemDirectory)!, "ImmichDemo")
+            : Path.Combine(Path.GetTempPath(), "ImmichDemo");
+        var data = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "immich-desktop-screens", Guid.NewGuid().ToString("N"))).FullName;
         Environment.SetEnvironmentVariable("IMMICH_DESKTOP_DATA_DIR", data);
 
         var pictures = Directory.CreateDirectory(Path.Combine(_root, "Pictures")).FullName;
@@ -97,6 +101,12 @@ static class Screens
         AppServices.Initialize();
         Seed();
 
+        // Talk to a pretend server so the library, avatar and storage show real-looking content.
+        var demo = new DemoServer();
+        demo.Prepare();
+        AppServices.Account.UseClient(new ImmichClient(new Uri("https://photos.example.com/api/"), new AuthCredential(AuthKind.ApiKey, "demo"), demo));
+        Pump(TimeSpan.FromSeconds(1));
+
         foreach (var (variant, suffix) in new[] { (ThemeVariant.Light, "light"), (ThemeVariant.Dark, "dark") })
         {
             Application.Current!.RequestedThemeVariant = variant;
@@ -126,17 +136,23 @@ static class Screens
             // Main app
             main.ShowShell();
             var shell = (ShellViewModel)main.Content;
-            shell.HasStorage = true;
-            shell.StoragePercent = 38;
-            shell.StorageText = "682 GB of 1.8 TB used";
-            var overview = (OverviewViewModel)shell.NavItems[0].ViewModel;
+            Pump(TimeSpan.FromSeconds(1));
+            var overview = (OverviewViewModel)Page(shell, ShellPage.Overview);
             overview.Apply(Uploading);
             Shot(main, outDir, $"10-overview-uploading-{suffix}", height: 860);
             overview.Apply(Synced);
             Shot(main, outDir, $"11-overview-synced-{suffix}", height: 860);
 
+            shell.Navigate(ShellPage.Photos);
+            Shot(main, outDir, $"15-photos-{suffix}", height: 860, settle: TimeSpan.FromSeconds(3));
+            var photos = (PhotosViewModel)Page(shell, ShellPage.Photos);
+            var cell = photos.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).First(c => c.Asset is not null && c.Index == 4);
+            photos.OpenViewer(cell);
+            Shot(main, outDir, $"16-viewer-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            photos.Viewer?.CloseCommand.Execute(null);
+
             shell.Navigate(ShellPage.Folders);
-            ((FoldersViewModel)shell.NavItems[1].ViewModel).Folders[1].IsExpanded = true;
+            ((FoldersViewModel)Page(shell, ShellPage.Folders)).Folders[1].IsExpanded = true;
             Shot(main, outDir, $"20-folders-{suffix}", height: 900);
 
             shell.Navigate(ShellPage.Activity);
@@ -161,10 +177,25 @@ static class Screens
             Shot(main, outDir, $"41-dialog-{suffix}");
             main.Dispose();
         }
+        try { Directory.Delete(_root, recursive: true); } catch { /* best effort */ }
         Console.WriteLine($"Screenshots written to {Path.GetFullPath(outDir)}");
     }
 
-    static void Shot(MainWindowViewModel vm, string dir, string name, int width = 1060, int height = 720)
+    static ViewModelBase Page(ShellViewModel shell, ShellPage page) => shell.NavItems.First(n => n.Page == page).ViewModel;
+
+    /// <summary>Runs the UI loop for a while so async loads (thumbnails, avatar) can finish.</summary>
+    static void Pump(TimeSpan duration)
+    {
+        var end = DateTime.UtcNow + duration;
+        while (DateTime.UtcNow < end)
+        {
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Thread.Sleep(25);
+        }
+    }
+
+    static void Shot(MainWindowViewModel vm, string dir, string name, int width = 1060, int height = 720, TimeSpan? settle = null)
     {
         var window = new MainWindow { DataContext = vm, Width = width, Height = height };
         window.Show();
@@ -173,6 +204,8 @@ static class Screens
             Dispatcher.UIThread.RunJobs();
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         }
+        if (settle is { } wait)
+            Pump(wait);
         var frame = window.CaptureRenderedFrame();
         frame?.Save(Path.Combine(dir, name + ".png"));
         window.DataContext = null;

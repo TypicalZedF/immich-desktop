@@ -28,14 +28,23 @@
         <StackPanel Spacing="16">
           <TextBlock Classes="section" Text="ACCOUNT" />
           <Grid ColumnDefinitions="Auto,*,Auto">
-            <Border Width="48" Height="48" CornerRadius="24" Background="{DynamicResource AppPrimaryBrush}">
-              <TextBlock Text="{Binding UserInitial}" FontSize="20" FontWeight="Medium"
-                         Foreground="{DynamicResource AppOnPrimaryBrush}"
-                         HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Border>
-            <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="2">
+            <c:Avatar Width="64" Height="64" Initial="{Binding UserInitial}" />
+            <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center" Spacing="2">
               <TextBlock Classes="h3" Text="{Binding UserName}" />
               <TextBlock Classes="caption" Text="{Binding UserEmail}" />
+              <StackPanel Orientation="Horizontal" Spacing="4" Margin="-8,4,0,0">
+                <Button Classes="ghost" Padding="8,4" Command="{Binding ChangePhotoCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="CameraOutline" Width="16" Height="16" />
+                    <TextBlock Text="Change photo" FontSize="13" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="ghost" Padding="8,4" Command="{Binding RemovePhotoCommand}" IsVisible="{Binding HasPhoto}">
+                  <TextBlock Text="Remove" FontSize="13" />
+                </Button>
+              </StackPanel>
+              <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding PhotoError}" TextWrapping="Wrap"
+                         IsVisible="{Binding PhotoError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             </StackPanel>
             <Button Grid.Column="2" Classes="secondary" VerticalAlignment="Center" Command="{Binding SignOutCommand}">
               <StackPanel Orientation="Horizontal" Spacing="8">

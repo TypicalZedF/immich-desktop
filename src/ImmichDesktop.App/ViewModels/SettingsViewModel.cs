@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImmichDesktop.App.Services;
 using ImmichDesktop.Core;
+using ImmichDesktop.Core.Api;
 using ImmichDesktop.Core.Platform;
 using ImmichDesktop.Core.Settings;
 
@@ -42,6 +43,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
         ThemeService.Changed += OnThemeChanged;
         AppServices.Updates.Changed += OnUpdatesChanged;
+        AppServices.Profile.Changed += OnProfileChanged;
         _ = DetectHelloAsync();
     }
 
@@ -49,6 +51,47 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     {
         ThemeService.Changed -= OnThemeChanged;
         AppServices.Updates.Changed -= OnUpdatesChanged;
+        AppServices.Profile.Changed -= OnProfileChanged;
+    }
+
+    // ---- Profile picture (also changes it in Immich) ----
+
+    public bool HasPhoto => AppServices.Profile.Picture is not null;
+
+    [ObservableProperty]
+    public partial string? PhotoError { get; set; }
+
+    void OnProfileChanged() => OnPropertyChanged(nameof(HasPhoto));
+
+    [RelayCommand]
+    async Task ChangePhotoAsync()
+    {
+        PhotoError = null;
+        var path = await _shell.Main.PickImageAsync("Choose a profile picture");
+        if (path is null)
+            return;
+        try
+        {
+            await AppServices.Profile.SetPictureAsync(path);
+        }
+        catch (Exception ex)
+        {
+            PhotoError = $"Couldn't change your picture. {NetworkErrors.Describe(ex)}";
+        }
+    }
+
+    [RelayCommand]
+    async Task RemovePhotoAsync()
+    {
+        PhotoError = null;
+        try
+        {
+            await AppServices.Profile.RemovePictureAsync();
+        }
+        catch (Exception ex)
+        {
+            PhotoError = $"Couldn't remove your picture. {NetworkErrors.Describe(ex)}";
+        }
     }
 
     // ---- Account ----

@@ -12,6 +12,7 @@
     <DataTemplate DataType="vm:ShellViewModel"><views:ShellView /></DataTemplate>
     <DataTemplate DataType="vm:LockViewModel"><views:LockView /></DataTemplate>
     <DataTemplate DataType="vm:OverviewViewModel"><views:OverviewView /></DataTemplate>
+    <DataTemplate DataType="vm:PhotosViewModel"><views:PhotosView /></DataTemplate>
     <DataTemplate DataType="vm:FoldersViewModel"><views:FoldersView /></DataTemplate>
     <DataTemplate DataType="vm:ActivityViewModel"><views:ActivityView /></DataTemplate>
     <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>

@@ -18,7 +18,12 @@ public partial class LockView : UserControl
         if (vm.UsesPassword)
             this.FindControl<TextBox>("PasswordBox")?.Focus();
 
-        // Let the window finish appearing first so the Hello prompt opens on top of it.
-        DispatcherTimer.RunOnce(vm.OnShown, TimeSpan.FromMilliseconds(400));
+        // Only prompt if the window is actually in front of the user (e.g. just opened from the tray);
+        // otherwise the window's Activated event triggers it when they come back.
+        DispatcherTimer.RunOnce(() =>
+        {
+            if (TopLevel.GetTopLevel(this) is Window { IsActive: true })
+                vm.OnWindowActivated();
+        }, TimeSpan.FromMilliseconds(400));
     }
 }

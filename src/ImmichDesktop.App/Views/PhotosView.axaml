@@ -1,0 +1,169 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ImmichDesktop.App.ViewModels"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichDesktop.App.Views.PhotosView"
+             x:DataType="vm:PhotosViewModel">
+  <UserControl.Styles>
+    <!-- The grid is a plain virtualized list: no selection or hover chrome on rows -->
+    <Style Selector="ListBox.grid">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="ListBox.grid ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ListBox.grid ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.grid ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.grid ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.grid ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.tile">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="{DynamicResource AppNeutralSoftBrush}" />
+      <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+    <Style Selector="Button.tile:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppNeutralSoftBrush}" />
+      <Setter Property="Opacity" Value="0.85" />
+    </Style>
+    <Style Selector="Button.viewerNav">
+      <Setter Property="Width" Value="48" />
+      <Setter Property="Height" Value="48" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="#66000000" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.viewerNav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#99000000" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+  </UserControl.Styles>
+
+  <Panel>
+    <DockPanel>
+      <!-- Header -->
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="32,24,32,12">
+        <StackPanel Spacing="4">
+          <TextBlock Classes="h1" Text="Photos" />
+          <TextBlock Classes="secondary" Text="{Binding Summary}" />
+        </StackPanel>
+        <Button Grid.Column="1" Classes="ghost icon" VerticalAlignment="Center" Command="{Binding RefreshCommand}" ToolTip.Tip="Refresh">
+          <mi:MaterialIcon Kind="Refresh" Width="20" Height="20" />
+        </Button>
+      </Grid>
+
+      <Panel>
+        <!-- Grid -->
+        <ListBox Name="Grid" Classes="grid" ItemsSource="{Binding Rows}" Margin="32,0,20,0" Padding="0,0,12,24"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.DataTemplates>
+            <DataTemplate DataType="vm:MonthHeaderViewModel">
+              <StackPanel Orientation="Horizontal" Spacing="10" Margin="2,18,0,10">
+                <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="Medium" />
+                <TextBlock Classes="caption tertiary" Text="{Binding Count}" VerticalAlignment="Bottom" Margin="0,0,0,2" />
+              </StackPanel>
+            </DataTemplate>
+            <DataTemplate DataType="vm:AssetRowViewModel">
+              <ItemsControl ItemsSource="{Binding Cells}" Height="{Binding RowHeight}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:AssetCellViewModel">
+                    <Button Classes="tile" Width="{Binding TileSize}" Height="{Binding TileSize}" VerticalAlignment="Top"
+                            Command="{Binding OpenCommand}" IsVisible="{Binding !IsMissing}">
+                      <Panel>
+                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                        <!-- Video badge -->
+                        <Border IsVisible="{Binding IsVideo}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="6" Padding="6,2" CornerRadius="6" Background="#99000000">
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding DurationText}" Foreground="White" FontSize="11.5" FontWeight="Medium" />
+                            <mi:MaterialIcon Kind="PlayCircleOutline" Width="14" Height="14" Foreground="White" />
+                          </StackPanel>
+                        </Border>
+                        <mi:MaterialIcon IsVisible="{Binding IsFavorite}" Kind="Heart" Width="16" Height="16" Foreground="White"
+                                         HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6" />
+                      </Panel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </DataTemplate>
+          </ListBox.DataTemplates>
+        </ListBox>
+
+        <!-- States -->
+        <StackPanel Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsLoading}">
+          <mi:MaterialIcon Kind="Loading" Classes="spin" Width="28" Height="28" Foreground="{DynamicResource AppPrimaryBrush}" />
+          <TextBlock Classes="secondary" Text="Loading your library…" />
+        </StackPanel>
+        <Border Classes="card" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center"
+                IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <StackPanel Spacing="12">
+            <mi:MaterialIcon Kind="CloudOffOutline" Width="32" Height="32" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+            <TextBlock Text="{Binding Error}" TextWrapping="Wrap" TextAlignment="Center" />
+            <Button Classes="primary" HorizontalAlignment="Center" Content="Try again" Command="{Binding RefreshCommand}" />
+          </StackPanel>
+        </Border>
+        <StackPanel Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsEmpty}">
+          <mi:MaterialIcon Kind="ImageMultipleOutline" Width="40" Height="40" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+          <TextBlock Classes="secondary" Text="No photos yet. They'll appear here once they're backed up." />
+        </StackPanel>
+      </Panel>
+    </DockPanel>
+
+    <!-- Viewer -->
+    <Panel Name="ViewerLayer" IsVisible="{Binding Viewer, Converter={x:Static ObjectConverters.IsNotNull}}" Background="#F2000000" Focusable="True">
+      <Panel DataContext="{Binding Viewer}" x:DataType="vm:PhotoViewerViewModel">
+        <Image Source="{Binding Image}" Stretch="Uniform" Margin="72,64,72,24" />
+        <mi:MaterialIcon Kind="Loading" Classes="spin" Width="28" Height="28" Foreground="White" IsVisible="{Binding IsLoading}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+        <Border IsVisible="{Binding IsVideo}" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#88000000" CornerRadius="40" Padding="18">
+          <mi:MaterialIcon Kind="Play" Width="40" Height="40" Foreground="White" />
+        </Border>
+
+        <!-- Top bar -->
+        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Top" Margin="16,12">
+          <Button Classes="viewerNav" CornerRadius="24" Command="{Binding CloseCommand}" ToolTip.Tip="Close (Esc)">
+            <mi:MaterialIcon Kind="Close" Width="22" Height="22" />
+          </Button>
+          <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center">
+            <TextBlock Text="{Binding DateText}" Foreground="White" FontWeight="Medium" />
+            <TextBlock Text="{Binding Error}" Foreground="#FFB4B4" FontSize="12.5"
+                       IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          </StackPanel>
+          <Button Grid.Column="2" Classes="viewerNav" Width="NaN" Padding="16,0" CornerRadius="24" Command="{Binding OpenInImmichCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <mi:MaterialIcon Kind="OpenInNew" Width="18" Height="18" />
+              <TextBlock Text="{Binding IsVideo, Converter={x:Static vm:Converters.VideoOpenText}}" Foreground="White" />
+            </StackPanel>
+          </Button>
+        </Grid>
+
+        <Button Classes="viewerNav" CornerRadius="24" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,0"
+                Command="{Binding PreviousCommand}" ToolTip.Tip="Newer (←)">
+          <mi:MaterialIcon Kind="ChevronLeft" Width="28" Height="28" />
+        </Button>
+        <Button Classes="viewerNav" CornerRadius="24" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12,0"
+                Command="{Binding NextCommand}" ToolTip.Tip="Older (→)">
+          <mi:MaterialIcon Kind="ChevronRight" Width="28" Height="28" />
+        </Button>
+      </Panel>
+    </Panel>
+  </Panel>
+</UserControl>

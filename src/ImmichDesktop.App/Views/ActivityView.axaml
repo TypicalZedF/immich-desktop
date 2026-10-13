@@ -4,115 +4,136 @@
              xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="ImmichDesktop.App.Views.ActivityView"
              x:DataType="vm:ActivityViewModel">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="36,30,36,36" Spacing="18" MaxWidth="1000">
+  <UserControl.Styles>
+    <!-- Virtualized list without selection chrome: only visible rows are created. -->
+    <Style Selector="ListBox.log">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="ListBox.log ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ListBox.log ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.log ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppHoverBrush}" />
+    </Style>
+    <Style Selector="ListBox.log ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.log ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppHoverBrush}" />
+    </Style>
+  </UserControl.Styles>
 
-      <Grid ColumnDefinitions="*,Auto">
-        <StackPanel Spacing="4">
-          <TextBlock Classes="h1" Text="Activity" />
-          <TextBlock Classes="secondary" Text="What Immich Desktop has been up to." />
-        </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <Button Classes="ghost" Command="{Binding OpenLogsCommand}" ToolTip.Tip="Open the log folder (useful for bug reports)">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <mi:MaterialIcon Kind="FileDocumentOutline" />
-              <TextBlock Text="Logs" />
-            </StackPanel>
-          </Button>
-          <Button Classes="ghost" Command="{Binding ClearCommand}" ToolTip.Tip="Clear history">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <mi:MaterialIcon Kind="NotificationClearAll" />
-              <TextBlock Text="Clear" />
-            </StackPanel>
-          </Button>
-        </StackPanel>
-      </Grid>
-
-      <!-- Failed files -->
-      <Border Classes="card" IsVisible="{Binding HasFailures}" Padding="0">
-        <StackPanel>
-          <Grid ColumnDefinitions="Auto,*,Auto" Margin="22,18">
-            <Border Classes="iconChip tone warning">
-              <mi:MaterialIcon Kind="AlertCircleOutline" />
-            </Border>
-            <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="2">
-              <TextBlock Classes="h3" Text="{Binding FailuresTitle}" />
-              <TextBlock Classes="caption" Text="They're retried automatically, or you can retry them now." />
-            </StackPanel>
-            <Button Grid.Column="2" Classes="primary" Command="{Binding RetryFailedCommand}" VerticalAlignment="Center">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <mi:MaterialIcon Kind="Refresh" />
-                <TextBlock Text="Retry now" />
-              </StackPanel>
-            </Button>
-          </Grid>
-          <ItemsControl ItemsSource="{Binding Failures}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:FailedFileViewModel">
-                <Border BorderBrush="{DynamicResource AppDividerBrush}" BorderThickness="0,1,0,0" Padding="22,12">
-                  <Grid ColumnDefinitions="*,Auto">
-                    <StackPanel Spacing="2">
-                      <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Classes="caption" Text="{Binding Error}" TextWrapping="Wrap" />
-                      <TextBlock Classes="caption tertiary" Text="{Binding RetryText}" />
-                    </StackPanel>
-                    <Button Grid.Column="1" Classes="ghost icon" Command="{Binding RevealCommand}"
-                            ToolTip.Tip="Show in folder" VerticalAlignment="Center">
-                      <mi:MaterialIcon Kind="FolderSearchOutline" />
-                    </Button>
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </Border>
-
-      <!-- Filter -->
-      <Border Classes="segmented" HorizontalAlignment="Left">
-        <StackPanel Orientation="Horizontal">
-          <RadioButton Classes="segment" GroupName="filter" Content="All" IsChecked="{Binding ShowAll}" />
-          <RadioButton Classes="segment" GroupName="filter" Content="Uploads" IsChecked="{Binding ShowUploads}" />
-          <RadioButton Classes="segment" GroupName="filter" Content="Problems" IsChecked="{Binding ShowProblems}" />
-        </StackPanel>
-      </Border>
-
-      <!-- History -->
-      <Border Classes="card" Padding="0">
-        <Panel>
-          <StackPanel Spacing="10" Margin="40" HorizontalAlignment="Center" IsVisible="{Binding IsEmpty}">
-            <mi:MaterialIcon Kind="History" Width="36" Height="36" Foreground="{DynamicResource AppTextTertiaryBrush}" />
-            <TextBlock Classes="secondary" Text="Nothing here yet." HorizontalAlignment="Center" />
+  <DockPanel Margin="32,24,36,24">
+    <!-- Header -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+      <StackPanel Spacing="4">
+        <TextBlock Classes="h1" Text="Activity" />
+        <TextBlock Classes="secondary" Text="What Immich Desktop has been up to." />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <Button Classes="ghost" Command="{Binding OpenLogsCommand}" ToolTip.Tip="Open the log folder (useful for bug reports)">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <mi:MaterialIcon Kind="FileDocumentOutline" />
+            <TextBlock Text="Logs" />
           </StackPanel>
-          <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding !IsEmpty}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:ActivityItemViewModel">
-                <Border BorderBrush="{DynamicResource AppDividerBrush}" BorderThickness="0,0,0,1" Padding="20,12" Background="Transparent">
-                  <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-                    <Border Classes="tone" Width="34" Height="34" CornerRadius="11"
-                            Classes.busy="{Binding IsBusyTone}" Classes.warning="{Binding IsWarningTone}"
-                            Classes.error="{Binding IsErrorTone}" Classes.paused="{Binding IsPausedTone}">
-                      <mi:MaterialIcon Kind="{Binding Icon}" Width="18" Height="18" />
-                    </Border>
-                    <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="1">
-                      <TextBlock Text="{Binding Message}" FontWeight="Medium" TextWrapping="Wrap" />
-                      <TextBlock Classes="caption tertiary" Text="{Binding Detail}" TextTrimming="CharacterEllipsis"
-                                 IsVisible="{Binding HasDetail}" ToolTip.Tip="{Binding DetailTip}" />
-                    </StackPanel>
-                    <TextBlock Grid.Column="2" Classes="caption tertiary" Text="{Binding TimeText}"
-                               VerticalAlignment="Center" ToolTip.Tip="{Binding FullTime}" />
-                    <Button Grid.Column="3" Classes="ghost icon" Margin="6,0,0,0" Padding="6"
-                            Command="{Binding RevealCommand}" IsVisible="{Binding HasDetail}"
-                            ToolTip.Tip="Show in folder" VerticalAlignment="Center">
-                      <mi:MaterialIcon Kind="FolderSearchOutline" Width="16" Height="16" />
-                    </Button>
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </Panel>
-      </Border>
-    </StackPanel>
-  </ScrollViewer>
+        </Button>
+        <Button Classes="ghost" Command="{Binding ClearCommand}" ToolTip.Tip="Clear history">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <mi:MaterialIcon Kind="NotificationClearAll" />
+            <TextBlock Text="Clear" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- Failed files (compact, scrolls on its own) -->
+    <Border DockPanel.Dock="Top" Classes="card" Padding="0" Margin="0,0,0,16" IsVisible="{Binding HasFailures}">
+      <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="20,16">
+          <Border Classes="iconChip tone warning">
+            <mi:MaterialIcon Kind="AlertCircleOutline" />
+          </Border>
+          <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="2">
+            <TextBlock Classes="h3" Text="{Binding FailuresTitle}" />
+            <TextBlock Classes="caption" Text="They're retried automatically, or you can retry them now." />
+          </StackPanel>
+          <Button Grid.Column="2" Classes="primary" Command="{Binding RetryFailedCommand}" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <mi:MaterialIcon Kind="Refresh" />
+              <TextBlock Text="Retry now" />
+            </StackPanel>
+          </Button>
+        </Grid>
+        <ListBox Classes="log" ItemsSource="{Binding Failures}" MaxHeight="190">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:FailedFileViewModel">
+              <Border BorderBrush="{DynamicResource AppDividerBrush}" BorderThickness="0,1,0,0" Padding="20,10">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding FileName}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="caption" Text="{Binding Error}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Error}" />
+                  </StackPanel>
+                  <Button Grid.Column="1" Classes="ghost icon" Command="{Binding RevealCommand}" ToolTip.Tip="Show in folder" VerticalAlignment="Center">
+                    <mi:MaterialIcon Kind="FolderSearchOutline" />
+                  </Button>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <!-- Filter -->
+    <Border DockPanel.Dock="Top" Classes="segmented" HorizontalAlignment="Left" Margin="0,0,0,14">
+      <StackPanel Orientation="Horizontal">
+        <RadioButton Classes="segment" GroupName="filter" Content="All" IsChecked="{Binding ShowAll}" />
+        <RadioButton Classes="segment" GroupName="filter" Content="Uploads" IsChecked="{Binding ShowUploads}" />
+        <RadioButton Classes="segment" GroupName="filter" Content="Problems" IsChecked="{Binding ShowProblems}" />
+      </StackPanel>
+    </Border>
+
+    <!-- History: fills the rest of the page and virtualizes -->
+    <Border Classes="card" Padding="0">
+      <Panel>
+        <StackPanel Spacing="10" Margin="40" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsEmpty}">
+          <mi:MaterialIcon Kind="History" Width="36" Height="36" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+          <TextBlock Classes="secondary" Text="Nothing here yet." HorizontalAlignment="Center" />
+        </StackPanel>
+        <ListBox Classes="log" ItemsSource="{Binding Items}" IsVisible="{Binding !IsEmpty}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:ActivityItemViewModel">
+              <Border BorderBrush="{DynamicResource AppDividerBrush}" BorderThickness="0,0,0,1" Padding="18,10">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                  <Border Classes="tone" Width="32" Height="32" CornerRadius="10"
+                          Classes.busy="{Binding IsBusyTone}" Classes.warning="{Binding IsWarningTone}"
+                          Classes.error="{Binding IsErrorTone}" Classes.paused="{Binding IsPausedTone}">
+                    <mi:MaterialIcon Kind="{Binding Icon}" Width="17" Height="17" />
+                  </Border>
+                  <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="1">
+                    <TextBlock Text="{Binding Message}" FontWeight="Medium" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Message}" />
+                    <TextBlock Classes="caption tertiary" Text="{Binding Detail}" TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding HasDetail}" ToolTip.Tip="{Binding DetailTip}" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="2" Classes="caption tertiary" Text="{Binding TimeText}"
+                             VerticalAlignment="Center" ToolTip.Tip="{Binding FullTime}" />
+                  <Button Grid.Column="3" Classes="ghost icon" Margin="6,0,0,0" Padding="6"
+                          Command="{Binding RevealCommand}" IsVisible="{Binding HasDetail}"
+                          ToolTip.Tip="Show in folder" VerticalAlignment="Center">
+                    <mi:MaterialIcon Kind="FolderSearchOutline" Width="16" Height="16" />
+                  </Button>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Panel>
+    </Border>
+  </DockPanel>
 </UserControl>

@@ -29,6 +29,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Provided by the window: shows a native folder picker and returns the chosen path.</summary>
     public Func<string, Task<string?>>? PickFolder { get; set; }
 
+    /// <summary>Provided by the window: shows a native picker for an image file.</summary>
+    public Func<string, Task<string?>>? PickImage { get; set; }
+
+    public Task<string?> PickImageAsync(string title) => PickImage?.Invoke(title) ?? Task.FromResult<string?>(null);
+
     /// <summary>Provided by the window: its native handle (for the Windows Hello prompt).</summary>
     public Func<IntPtr>? GetWindowHandle { get; set; }
 

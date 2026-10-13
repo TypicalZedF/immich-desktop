@@ -20,7 +20,7 @@ public sealed partial class LockViewModel : ViewModelBase
     readonly Action _onUnlocked;
     readonly AppLockMode _mode;
     readonly string? _passwordHash;
-    bool _autoPrompted;
+    bool _promptedThisVisit;
 
     public LockViewModel(MainWindowViewModel main, Action onUnlocked)
     {
@@ -52,14 +52,23 @@ public sealed partial class LockViewModel : ViewModelBase
 
     bool CanAct() => !IsBusy;
 
-    /// <summary>Called by the view once it's on screen, so the Windows Hello prompt appears right away.</summary>
-    public void OnShown()
+    /// <summary>
+    /// Called when the window gains focus. Windows Hello is offered once per visit, so a window that
+    /// locked itself while you were away just shows the lock screen until you come back to it.
+    /// </summary>
+    public void OnWindowActivated()
     {
-        if (UsesHello && !_autoPrompted)
+        if (UsesHello && !_promptedThisVisit && !IsBusy)
         {
-            _autoPrompted = true;
+            _promptedThisVisit = true;
             UnlockWithHelloCommand.Execute(null);
         }
+    }
+
+    public void OnWindowDeactivated()
+    {
+        if (!IsBusy)
+            _promptedThisVisit = false;
     }
 
     [RelayCommand(CanExecute = nameof(CanAct))]

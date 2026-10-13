@@ -33,7 +33,13 @@ public partial class MainWindow : Window
         });
         _idleTimer.Start();
         Closed += (_, _) => _idleTimer.Stop();
+
+        // A locked window asks for Windows Hello only when you come back to it, never in the background.
+        Activated += (_, _) => (CurrentLock)?.OnWindowActivated();
+        Deactivated += (_, _) => (CurrentLock)?.OnWindowDeactivated();
     }
+
+    LockViewModel? CurrentLock => (DataContext as MainWindowViewModel)?.Content as LockViewModel;
 
     protected override void OnDataContextChanged(EventArgs e)
     {
@@ -41,6 +47,7 @@ public partial class MainWindow : Window
         if (DataContext is MainWindowViewModel vm)
         {
             vm.PickFolder = PickFolderAsync;
+            vm.PickImage = PickImageAsync;
             vm.GetWindowHandle = () => TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
         }
     }
@@ -53,6 +60,17 @@ public partial class MainWindow : Window
             e.Handled = true;
         }
         base.OnKeyDown(e);
+    }
+
+    async Task<string?> PickImageAsync(string title)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("Images") { Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.heic"] }],
+        });
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
 
     async Task<string?> PickFolderAsync(string title)

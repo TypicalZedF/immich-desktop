@@ -163,7 +163,46 @@ public sealed class ImmichClient : IDisposable
     public async Task<UserInfo> GetMeAsync(CancellationToken ct)
     {
         var me = await SendAsync<UserResponseDto>(HttpMethod.Get, "users/me", null, ct);
-        return new UserInfo(me.Id, me.Name, me.Email, me.QuotaSizeInBytes, me.QuotaUsageInBytes);
+        return new UserInfo(me.Id, me.Name, me.Email, me.QuotaSizeInBytes, me.QuotaUsageInBytes, me.ProfileImagePath, me.AvatarColor);
+    }
+
+    /// <summary>The user's profile picture, or null when none is set.</summary>
+    public async Task<byte[]?> GetProfileImageAsync(string userId, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(DefaultTimeout);
+        using var response = await _http.GetAsync($"users/{Uri.EscapeDataString(userId)}/profile-image", cts.Token);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+        await EnsureSuccessAsync(response, cts.Token);
+        return await response.Content.ReadAsByteArrayAsync(cts.Token);
+    }
+
+    /// <summary>Sets the profile picture (same as changing it in the Immich web app).</summary>
+    public async Task SetProfileImageAsync(string filePath, CancellationToken ct)
+    {
+        using var form = new MultipartFormDataContent();
+        var file = new StreamContent(File.OpenRead(filePath));
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(Path.GetExtension(filePath).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            ".heic" or ".heif" => "image/heic",
+            _ => "image/jpeg",
+        });
+        form.Add(file, "file", Path.GetFileName(filePath));
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromMinutes(2));
+        using var response = await _http.PostAsync("users/profile-image", form, cts.Token);
+        await EnsureSuccessAsync(response, cts.Token);
+    }
+
+    public async Task RemoveProfileImageAsync(CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(DefaultTimeout);
+        using var response = await _http.DeleteAsync("users/profile-image", cts.Token);
+        await EnsureSuccessAsync(response, cts.Token);
     }
 
     /// <summary>Storage shown in the sidebar, like the Immich web app: personal quota if set, else server disk.</summary>
@@ -237,6 +276,60 @@ public sealed class ImmichClient : IDisposable
             throw new TimeoutException("The upload timed out.");
         }
     }
+
+    // ---- Library (timeline) ----------------------------------------------------------------
+
+    /// <summary>The user's timeline, newest first, as buckets with counts (no assets yet).</summary>
+    internal Task<List<TimeBucketDto>> GetTimeBucketsRawAsync(CancellationToken ct) =>
+        SendAsync<List<TimeBucketDto>>(HttpMethod.Get, "timeline/buckets?visibility=timeline&order=desc", null, ct);
+
+    public async Task<List<TimeBucket>> GetTimeBucketsAsync(CancellationToken ct) =>
+        (await GetTimeBucketsRawAsync(ct)).Select(b => new TimeBucket(b.TimeBucket, b.Count)).ToList();
+
+    /// <summary>The assets in one bucket, newest first.</summary>
+    public async Task<List<TimelineAsset>> GetTimeBucketAsync(string bucket, CancellationToken ct)
+    {
+        var dto = await SendAsync<TimeBucketAssetsDto>(HttpMethod.Get,
+            $"timeline/bucket?visibility=timeline&order=desc&timeBucket={Uri.EscapeDataString(bucket)}", null, ct, TimeSpan.FromSeconds(60));
+        var assets = new List<TimelineAsset>(dto.Id.Count);
+        for (var i = 0; i < dto.Id.Count; i++)
+        {
+            assets.Add(new TimelineAsset(
+                dto.Id[i],
+                i < dto.IsImage.Count && dto.IsImage[i],
+                dto.IsFavorite is { } fav && i < fav.Count && fav[i],
+                dto.Ratio is { } ratio && i < ratio.Count && ratio[i] > 0 ? ratio[i] : 1,
+                dto.Duration is { } duration && i < duration.Count ? ParseDuration(duration[i]) : null,
+                dto.FileCreatedAt is { } created && i < created.Count ? created[i] : null));
+        }
+        return assets;
+    }
+
+    /// <summary>Thumbnail (~250px) or preview (~1440px) image bytes for an asset.</summary>
+    public async Task<byte[]> GetAssetImageAsync(string assetId, AssetImageSize size, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(60));
+        var sizeName = size == AssetImageSize.Preview ? "preview" : "thumbnail";
+        try
+        {
+            using var response = await _http.GetAsync($"assets/{Uri.EscapeDataString(assetId)}/thumbnail?size={sizeName}", HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            await EnsureSuccessAsync(response, cts.Token);
+            return await response.Content.ReadAsByteArrayAsync(cts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new TimeoutException("The server took too long to send the image.");
+        }
+    }
+
+    /// <summary>Durations are milliseconds on newer servers and "h:mm:ss.fff" strings on older ones.</summary>
+    static long? ParseDuration(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Number when value.TryGetInt64(out var ms) => ms,
+        JsonValueKind.String when TimeSpan.TryParse(value.GetString(), CultureInfo.InvariantCulture, out var span) => (long)span.TotalMilliseconds,
+        _ => null,
+    };
 
     // ---- Albums ------------------------------------------------------------------------------
 

@@ -13,6 +13,7 @@ namespace ImmichDesktop.App.ViewModels;
 public enum ShellPage
 {
     Overview,
+    Photos,
     Folders,
     Activity,
     Settings,
@@ -41,6 +42,7 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
         NavItems =
         [
             new NavItem(ShellPage.Overview, "Overview", MaterialIconKind.ViewDashboardOutline, MaterialIconKind.ViewDashboard, () => new OverviewViewModel(this)),
+            new NavItem(ShellPage.Photos, "Photos", MaterialIconKind.ImageMultipleOutline, MaterialIconKind.ImageMultiple, () => new PhotosViewModel(this)),
             new NavItem(ShellPage.Folders, "Folders", MaterialIconKind.FolderOutline, MaterialIconKind.Folder, () => new FoldersViewModel(this)),
             new NavItem(ShellPage.Activity, "Activity", MaterialIconKind.History, MaterialIconKind.History, () => new ActivityViewModel(this)),
             new NavItem(ShellPage.Settings, "Settings", MaterialIconKind.CogOutline, MaterialIconKind.Cog, () => new SettingsViewModel(this)),
