@@ -7,6 +7,7 @@
 #
 # Betas: every push to the `beta` branch publishes a pre-release named after the next version,
 # e.g. v1.2.1-beta.57 after v1.2.0. A tag with a suffix (v1.3.0-beta.1) is published as a beta too.
+# Only one beta is kept: publishing a beta removes older ones, and a stable release removes them all.
 #
 # Installed copies check for updates: the Stable channel sees only the latest stable release,
 # the Beta channel (Settings → Updates) also sees pre-releases.
@@ -93,3 +94,19 @@ jobs:
             --title "Immich Desktop $env:VERSION" `
             --notes $notes `
             --generate-notes @extra
+
+      - name: Keep only the newest beta
+        # A new beta replaces older betas; a stable release replaces every beta (it's newer than all of them).
+        # Beta-channel installs always look for the newest release, so nothing they need is removed.
+        if: env.SKIP != 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $current = "v$env:VERSION"
+          $betas = gh release list --limit 200 --json tagName,isPrerelease | ConvertFrom-Json |
+            Where-Object { $_.isPrerelease -and $_.tagName -ne $current }
+          foreach ($beta in $betas) {
+            Write-Host "Removing older beta $($beta.tagName)"
+            gh release delete $beta.tagName --cleanup-tag --yes
+          }
