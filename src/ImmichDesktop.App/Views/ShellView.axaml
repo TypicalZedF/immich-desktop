@@ -5,39 +5,77 @@
              xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="ImmichDesktop.App.Views.ShellView"
              x:DataType="vm:ShellViewModel">
-  <Grid ColumnDefinitions="252,*">
+  <!-- Layout follows the Immich web app: top navigation bar, left sidebar, content. -->
+  <Grid RowDefinitions="68,*" Background="{DynamicResource AppPageBrush}">
 
-    <!-- ===== Sidebar ===== -->
-    <Border Background="{DynamicResource AppSidebarBrush}">
-      <DockPanel Margin="16,22,16,16">
+    <!-- ===== Top bar ===== -->
+    <Grid ColumnDefinitions="256,*,Auto" Background="{DynamicResource AppPageBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="10" Margin="24,0,0,0" VerticalAlignment="Center">
+        <c:ImmichWordmark Height="34" />
+        <Border Classes="chip" Padding="8,2" Background="{DynamicResource AppPrimarySoftBrush}" VerticalAlignment="Center" Margin="0,4,0,0">
+          <TextBlock Text="DESKTOP" FontSize="10" FontWeight="Medium" LetterSpacing="1" Foreground="{DynamicResource AppPrimaryBrush}" />
+        </Border>
+      </StackPanel>
 
-        <!-- Brand -->
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="8,0,0,28">
-          <c:AppLogo Width="38" Height="38" />
-          <StackPanel VerticalAlignment="Center" Spacing="0">
-            <TextBlock Text="Immich" FontSize="18" FontWeight="Bold" LetterSpacing="-0.3" />
-            <TextBlock Classes="caption" Text="Desktop" Margin="0,-2,0,0" />
-          </StackPanel>
-        </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="0,0,20,0" VerticalAlignment="Center">
+        <Button Classes="ghost icon" Command="{Binding OpenWebCommand}" ToolTip.Tip="Open Immich in your browser">
+          <mi:MaterialIcon Kind="OpenInNew" Width="20" Height="20" />
+        </Button>
+        <Button Classes="ghost icon" Command="{Binding LockNowCommand}" IsVisible="{Binding IsLockEnabled}" ToolTip.Tip="Lock now">
+          <mi:MaterialIcon Kind="LockOutline" Width="20" Height="20" />
+        </Button>
+        <Button Classes="ghost icon" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{Binding ThemeTip}">
+          <mi:MaterialIcon Kind="{Binding ThemeIcon}" Width="20" Height="20" />
+        </Button>
+        <Button Classes="ghost" Padding="4" Margin="6,0,0,0" Command="{Binding OpenAccountCommand}">
+          <ToolTip.Tip>
+            <StackPanel>
+              <TextBlock Text="{Binding UserName}" FontWeight="Medium" />
+              <TextBlock Text="{Binding UserEmail}" />
+            </StackPanel>
+          </ToolTip.Tip>
+          <Border Width="38" Height="38" CornerRadius="19" Background="{DynamicResource AppPrimaryBrush}">
+            <TextBlock Text="{Binding UserInitial}" Foreground="{DynamicResource AppOnPrimaryBrush}" FontSize="16"
+                       FontWeight="Medium" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+        </Button>
+      </StackPanel>
+    </Grid>
 
-        <!-- Account card -->
-        <Border DockPanel.Dock="Bottom" Classes="card" Padding="12" CornerRadius="16" Margin="0,10,0,0">
-          <Grid ColumnDefinitions="Auto,*">
-            <Border Width="36" Height="36" CornerRadius="18" Background="{DynamicResource AppPrimaryBrush}">
-              <TextBlock Text="{Binding UserInitial}" Foreground="{DynamicResource AppOnPrimaryBrush}"
-                         FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Border>
-            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Spacing="1">
-              <TextBlock Text="{Binding UserName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-              <TextBlock Classes="caption" Text="{Binding ServerHost}" TextTrimming="CharacterEllipsis" />
+    <!-- ===== Sidebar + page ===== -->
+    <Grid Grid.Row="1" ColumnDefinitions="256,*">
+      <DockPanel Background="{DynamicResource AppSidebarBrush}" Margin="0,6,0,0">
+
+        <!-- Server status (Immich-style) -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="24,0,24,20" Spacing="4">
+          <Border Classes="divider" Margin="0,0,0,14" />
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <mi:MaterialIcon Kind="Server" Width="18" Height="18" Foreground="{DynamicResource AppTextSecondaryBrush}" />
+            <TextBlock Grid.Column="1" Classes="caption" Text="Server" Margin="10,0,0,0" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Ellipse Width="8" Height="8" Fill="{DynamicResource AppSuccessBrush}" IsVisible="{Binding IsServerOnline}" />
+              <Ellipse Width="8" Height="8" Fill="{DynamicResource AppDangerBrush}" IsVisible="{Binding !IsServerOnline}" />
+              <TextBlock Classes="caption" Text="{Binding ServerStatusText}" />
             </StackPanel>
           </Grid>
-        </Border>
+          <TextBlock Classes="caption tertiary" Margin="28,0,0,0" FontSize="11.5">
+            <Run Text="{Binding ServerHost}" /><Run Text="  " /><Run Text="{Binding ServerVersion}" />
+          </TextBlock>
+        </StackPanel>
 
-        <!-- Live status pill -->
-        <Border DockPanel.Dock="Bottom" CornerRadius="14" Padding="12,10" Background="{DynamicResource AppCardBrush}"
-                BorderBrush="{DynamicResource AppCardBorderBrush}" BorderThickness="1"
-                ToolTip.Tip="{Binding Status.Detail}">
+        <!-- Storage (Immich-style) -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="24,0,24,16" Spacing="8" IsVisible="{Binding HasStorage}">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <mi:MaterialIcon Kind="Cloud" Width="18" Height="18" Foreground="{DynamicResource AppTextSecondaryBrush}" />
+            <TextBlock Classes="caption" Text="Storage space" VerticalAlignment="Center" />
+          </StackPanel>
+          <ProgressBar Classes="thin" Value="{Binding StoragePercent}" Maximum="100" />
+          <TextBlock Classes="caption tertiary" FontSize="11.5" Text="{Binding StorageText}" />
+        </StackPanel>
+
+        <!-- Live backup status -->
+        <Border DockPanel.Dock="Bottom" Margin="16,0,16,18" CornerRadius="14" Padding="12,10"
+                Background="{DynamicResource AppCardBrush}" ToolTip.Tip="{Binding Status.Detail}">
           <Grid ColumnDefinitions="Auto,*">
             <Border Classes="tone" Width="30" Height="30" CornerRadius="15"
                     Classes.busy="{Binding Status.IsBusy}" Classes.paused="{Binding Status.IsPaused}"
@@ -53,23 +91,23 @@
         <ListBox Classes="nav" ItemsSource="{Binding NavItems}" SelectedItem="{Binding SelectedNav}">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:NavItem">
-              <StackPanel Orientation="Horizontal" Spacing="14">
-                <mi:MaterialIcon Kind="{Binding Icon}" Width="20" Height="20" />
-                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <StackPanel Orientation="Horizontal" Spacing="16">
+                <Panel Width="22" Height="22">
+                  <mi:MaterialIcon Classes="inactive" Kind="{Binding Icon}" Width="22" Height="22" />
+                  <mi:MaterialIcon Classes="active" Kind="{Binding ActiveIcon}" Width="22" Height="22" />
+                </Panel>
+                <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="Medium" VerticalAlignment="Center" />
               </StackPanel>
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
       </DockPanel>
-    </Border>
 
-    <!-- ===== Page ===== -->
-    <Border Grid.Column="1" Background="{DynamicResource AppPageBrush}">
-      <TransitioningContentControl Content="{Binding CurrentPage}">
+      <TransitioningContentControl Grid.Column="1" Content="{Binding CurrentPage}">
         <TransitioningContentControl.PageTransition>
           <CrossFade Duration="0:0:0.12" />
         </TransitioningContentControl.PageTransition>
       </TransitioningContentControl>
-    </Border>
+    </Grid>
   </Grid>
 </UserControl>

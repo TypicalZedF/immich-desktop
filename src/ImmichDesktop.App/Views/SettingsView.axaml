@@ -20,7 +20,7 @@
   </UserControl.Styles>
 
   <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="36,30,36,36" Spacing="18" MaxWidth="820" HorizontalAlignment="Stretch">
+    <StackPanel Margin="32,24,36,36" Spacing="18" MaxWidth="820" HorizontalAlignment="Stretch">
       <TextBlock Classes="h1" Text="Settings" />
 
       <!-- Account -->
@@ -29,7 +29,7 @@
           <TextBlock Classes="section" Text="ACCOUNT" />
           <Grid ColumnDefinitions="Auto,*,Auto">
             <Border Width="48" Height="48" CornerRadius="24" Background="{DynamicResource AppPrimaryBrush}">
-              <TextBlock Text="{Binding UserInitial}" FontSize="20" FontWeight="Bold"
+              <TextBlock Text="{Binding UserInitial}" FontSize="20" FontWeight="Medium"
                          Foreground="{DynamicResource AppOnPrimaryBrush}"
                          HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
@@ -65,10 +65,39 @@
         </StackPanel>
       </Border>
 
-      <!-- General -->
+      <!-- Appearance & general -->
       <Border Classes="card" Padding="22,16">
         <StackPanel>
           <TextBlock Classes="section" Text="GENERAL" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Theme" />
+              <TextBlock Classes="caption" Text="Light, dark, or follow your Windows setting." TextWrapping="Wrap" />
+            </StackPanel>
+            <Border Grid.Column="1" Classes="segmented" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton Classes="segment" GroupName="theme" IsChecked="{Binding ThemeSystem}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="ThemeLightDark" Width="16" Height="16" />
+                    <TextBlock Text="System" />
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Classes="segment" GroupName="theme" IsChecked="{Binding ThemeLight}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="WeatherSunny" Width="16" Height="16" />
+                    <TextBlock Text="Light" />
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Classes="segment" GroupName="theme" IsChecked="{Binding ThemeDark}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="WeatherNight" Width="16" Height="16" />
+                    <TextBlock Text="Dark" />
+                  </StackPanel>
+                </RadioButton>
+              </StackPanel>
+            </Border>
+          </Grid>
+          <Border Classes="divider" IsVisible="{Binding AutostartSupported}" />
           <Grid Classes="row" ColumnDefinitions="*,Auto" IsVisible="{Binding AutostartSupported}">
             <StackPanel>
               <TextBlock Classes="title" Text="Start automatically" />
@@ -76,13 +105,77 @@
             </StackPanel>
             <ToggleSwitch Grid.Column="1" IsChecked="{Binding LaunchAtStartup}" />
           </Grid>
-          <Border Classes="divider" IsVisible="{Binding AutostartSupported}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Security -->
+      <Border Classes="card" Padding="22,16">
+        <StackPanel>
+          <TextBlock Classes="section" Text="SECURITY" Margin="0,4,0,6" />
           <Grid Classes="row" ColumnDefinitions="*,Auto">
             <StackPanel>
-              <TextBlock Classes="title" Text="Appearance" />
-              <TextBlock Classes="caption" Text="Light, dark, or follow your system." />
+              <TextBlock Classes="title" Text="App lock" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="Require Windows Hello or a password to open this window. Backup keeps running while locked." />
             </StackPanel>
-            <ComboBox Grid.Column="1" ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}" VerticalAlignment="Center" />
+            <Border Grid.Column="1" Classes="segmented" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton Classes="segment" GroupName="lock" Content="Off" IsChecked="{Binding LockOff}" />
+                <RadioButton Classes="segment" GroupName="lock" IsChecked="{Binding LockHello}" IsEnabled="{Binding HelloAvailable}"
+                             ToolTip.Tip="Face, fingerprint or PIN">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="FaceRecognition" Width="16" Height="16" />
+                    <TextBlock Text="Windows Hello" />
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Classes="segment" GroupName="lock" IsChecked="{Binding LockPassword}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="FormTextboxPassword" Width="16" Height="16" />
+                    <TextBlock Text="Password" />
+                  </StackPanel>
+                </RadioButton>
+              </StackPanel>
+            </Border>
+          </Grid>
+
+          <!-- Set a password -->
+          <Border Classes="banner" Margin="0,4,0,10" Padding="18,16" IsVisible="{Binding IsSettingPassword}">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="h3" Text="Choose an app password" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="This only unlocks Immich Desktop on this PC. It's stored as a secure hash, never as plain text." />
+              <Grid ColumnDefinitions="*,12,*">
+                <TextBox Text="{Binding NewPassword}" PasswordChar="&#x2022;" Watermark="New password" />
+                <TextBox Grid.Column="2" Text="{Binding ConfirmPassword}" PasswordChar="&#x2022;" Watermark="Confirm password">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding SavePasswordCommand}" />
+                  </TextBox.KeyBindings>
+                </TextBox>
+              </Grid>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Classes="primary" Content="Turn on app lock" Command="{Binding SavePasswordCommand}" />
+                <Button Classes="ghost" Content="Cancel" Command="{Binding CancelPasswordCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Border Classes="banner error" Margin="0,4,0,10" IsVisible="{Binding LockError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding LockError}" TextWrapping="Wrap" />
+          </Border>
+
+          <Border Classes="divider" IsVisible="{Binding IsLockEnabled}" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto" IsVisible="{Binding IsLockEnabled}">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Lock now" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="The app also locks when you close the window and after 5 minutes without activity." />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="secondary" Command="{Binding LockNowCommand}" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="LockOutline" />
+                <TextBlock Text="Lock" />
+              </StackPanel>
+            </Button>
           </Grid>
         </StackPanel>
       </Border>
@@ -126,6 +219,47 @@
         </StackPanel>
       </Border>
 
+      <!-- Updates -->
+      <Border Classes="card" Padding="22,16" IsVisible="{Binding UpdatesEnabled}">
+        <StackPanel>
+          <TextBlock Classes="section" Text="UPDATES" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="Auto,*,Auto">
+            <c:ImmichLogo Width="40" Height="40" Margin="0,0,14,0" />
+            <StackPanel Grid.Column="1">
+              <TextBlock Classes="title" Text="{Binding Version}" />
+              <TextBlock Classes="caption" Text="{Binding UpdateStatus}" TextWrapping="Wrap" IsVisible="{Binding HasUpdateStatus}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Button Classes="secondary" Command="{Binding CheckForUpdatesCommand}" IsVisible="{Binding CanCheck}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="Refresh" Classes.spin="{Binding IsCheckingUpdates}" />
+                  <TextBlock Text="Check now" />
+                </StackPanel>
+              </Button>
+              <Button Classes="primary" Content="Restart to update" Command="{Binding InstallUpdateCommand}" IsVisible="{Binding UpdateReady}" />
+              <Button Classes="primary" Content="Download" Command="{Binding OpenReleasePageCommand}" IsVisible="{Binding UpdateAvailable}" />
+            </StackPanel>
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Check for updates automatically" />
+              <TextBlock Classes="caption" Text="Looks for new versions on GitHub every few hours." TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding CheckForUpdates}" />
+          </Grid>
+          <Border Classes="divider" IsVisible="{Binding CanSelfUpdate}" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto" IsVisible="{Binding CanSelfUpdate}">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Install updates automatically" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="Updates install quietly while the window is closed and nothing is uploading." />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoInstallUpdates}" IsEnabled="{Binding CheckForUpdates}" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
       <!-- Troubleshooting -->
       <Border Classes="card" Padding="22,16">
         <StackPanel>
@@ -152,30 +286,8 @@
         </StackPanel>
       </Border>
 
-      <!-- About -->
-      <Border Classes="card">
-        <Grid ColumnDefinitions="Auto,*,Auto">
-          <c:AppLogo Width="48" Height="48" />
-          <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="2">
-            <TextBlock Classes="h3" Text="Immich Desktop" />
-            <TextBlock Classes="caption" Text="{Binding Version}" />
-            <TextBlock Classes="caption" Text="{Binding UpdateStatus}"
-                       IsVisible="{Binding UpdateStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-          </StackPanel>
-          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding UpdatesSupported}">
-            <Button Classes="secondary" Command="{Binding CheckForUpdatesCommand}" IsVisible="{Binding !UpdateReady}">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <mi:MaterialIcon Kind="Refresh" Classes.spin="{Binding IsCheckingUpdates}" />
-                <TextBlock Text="Check for updates" />
-              </StackPanel>
-            </Button>
-            <Button Classes="primary" Content="Restart to update" Command="{Binding InstallUpdateCommand}" IsVisible="{Binding UpdateReady}" />
-          </StackPanel>
-        </Grid>
-      </Border>
-
       <TextBlock Classes="caption tertiary" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,4,0,0"
-                 Text="An unofficial desktop companion for Immich. Immich is a project by FUTO." />
+                 Text="An unofficial desktop companion for Immich. Immich and its logo belong to FUTO." />
     </StackPanel>
   </ScrollViewer>
 </UserControl>

@@ -7,6 +7,13 @@ public enum AppTheme
     Dark,
 }
 
+public enum AppLockMode
+{
+    Off,
+    WindowsHello,
+    Password,
+}
+
 /// <summary>A local folder that is backed up to Immich.</summary>
 public sealed class SyncFolder
 {
@@ -62,6 +69,15 @@ public sealed class AppSettings
     // App
     public bool LaunchAtStartup { get; set; } = true;
     public AppTheme Theme { get; set; } = AppTheme.System;
+    public bool CheckForUpdates { get; set; } = true;
+
+    // Security: ask for Windows Hello or a password before showing the window (backup keeps running).
+    public AppLockMode AppLock { get; set; } = AppLockMode.Off;
+
+    /// <summary>PBKDF2 hash of the app lock password (never the password itself).</summary>
+    public string? LockPasswordHash { get; set; }
+
+    public bool AutoInstallUpdates { get; set; } = true;
 
     public bool IsConfigured => !string.IsNullOrEmpty(ServerUrl) && !string.IsNullOrEmpty(UserId);
 }

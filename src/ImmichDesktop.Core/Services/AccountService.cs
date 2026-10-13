@@ -40,6 +40,15 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
         return await CompleteSignInAsync(server, new AuthCredential(AuthKind.AccessToken, token), ct);
     }
 
+    /// <summary>Completes an SSO sign-in once the browser has redirected back to the app.</summary>
+    public async Task<UserInfo> SignInWithOAuthAsync(ServerInfo server, OAuthSession session, string callbackUrl, CancellationToken ct)
+    {
+        string token;
+        using (var anonymous = new ImmichClient(server.ApiUrl, null))
+            token = await anonymous.FinishOAuthAsync(callbackUrl, session.State, session.CodeVerifier, ct);
+        return await CompleteSignInAsync(server, new AuthCredential(AuthKind.AccessToken, token), ct);
+    }
+
     public Task<UserInfo> SignInWithApiKeyAsync(ServerInfo server, string apiKey, CancellationToken ct) =>
         CompleteSignInAsync(server, new AuthCredential(AuthKind.ApiKey, apiKey.Trim()), ct);
 
@@ -112,6 +121,9 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
             s.UserId = null;
             s.UserName = null;
             s.UserEmail = null;
+            // The app lock belongs to the signed-in user; signing out is also the "forgot my password" path.
+            s.AppLock = AppLockMode.Off;
+            s.LockPasswordHash = null;
         });
         Log.Info("Signed out");
     }

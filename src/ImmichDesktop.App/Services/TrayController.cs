@@ -55,7 +55,7 @@ public sealed class TrayController : IDisposable
 
         var syncNow = Item("Sync now", () => AppServices.Engine.SyncNow());
         var settings = Item("Settings", () => _app.ShowMainWindow(ShellPage.Settings));
-        _updateItem = Item("Restart to update", () => AppServices.Updates.ApplyAndRestart(background: false));
+        _updateItem = Item("Restart to update", () => AppServices.Updates.InstallAndRestart());
         _updateSeparator = new NativeMenuItemSeparator();
         var quit = Item($"Quit {AppInfo.Name}", () => _app.Quit());
 
@@ -90,7 +90,7 @@ public sealed class TrayController : IDisposable
         });
 
         AppServices.Engine.StatusChanged += OnStatusChanged;
-        AppServices.Updates.UpdateReady += OnUpdateReady;
+        AppServices.Updates.Changed += OnUpdatesChanged;
         Update(AppServices.Engine.Status);
     }
 
@@ -120,11 +120,11 @@ public sealed class TrayController : IDisposable
 
     void OnStatusChanged(SyncStatus status) => Dispatcher.UIThread.Post(() => Update(status));
 
-    void OnUpdateReady() => Dispatcher.UIThread.Post(() =>
+    void OnUpdatesChanged() => Dispatcher.UIThread.Post(() =>
     {
-        if (_tray.Menu is { } menu && !menu.Items.Contains(_updateItem))
+        if (AppServices.Updates.State == UpdateState.Ready && _tray.Menu is { } menu && !menu.Items.Contains(_updateItem))
         {
-            _updateItem.Header = $"Restart to update to {AppServices.Updates.ReadyVersion}";
+            _updateItem.Header = $"Restart to update to {AppServices.Updates.Release?.Version.ToString(3)}";
             menu.Items.Insert(0, _updateItem);
             menu.Items.Insert(1, _updateSeparator);
         }
@@ -176,7 +176,7 @@ public sealed class TrayController : IDisposable
     {
         _animation.Stop();
         AppServices.Engine.StatusChanged -= OnStatusChanged;
-        AppServices.Updates.UpdateReady -= OnUpdateReady;
+        AppServices.Updates.Changed -= OnUpdatesChanged;
         _tray.IsVisible = false;
         _tray.Dispose();
     }

@@ -8,18 +8,10 @@
     <StackPanel Margin="36,30,36,36" Spacing="20" MaxWidth="1000">
 
       <!-- Header -->
-      <Grid ColumnDefinitions="*,Auto">
-        <StackPanel Spacing="4">
-          <TextBlock Classes="h1" Text="{Binding Greeting}" />
-          <TextBlock Classes="secondary" Text="Here's how your backup is doing." />
-        </StackPanel>
-        <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Center" Command="{Binding OpenWebCommand}">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <mi:MaterialIcon Kind="OpenInNew" />
-            <TextBlock Text="Open Immich" />
-          </StackPanel>
-        </Button>
-      </Grid>
+      <StackPanel Spacing="4">
+        <TextBlock Classes="h1" Text="{Binding Greeting}" />
+        <TextBlock Classes="secondary" Text="Here's how your backup is doing." />
+      </StackPanel>
 
       <!-- Update available -->
       <Border Classes="banner" IsVisible="{Binding UpdateAvailable}">

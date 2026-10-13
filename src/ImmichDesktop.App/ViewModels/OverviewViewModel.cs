@@ -27,8 +27,8 @@ public sealed partial class OverviewViewModel : ViewModelBase, IDisposable
 
         AppServices.Engine.StatusChanged += OnStatusChanged;
         AppServices.Settings.Changed += OnSettingsChanged;
-        AppServices.Updates.UpdateReady += OnUpdateReady;
-        UpdateAvailable = AppServices.Updates.ReadyVersion is not null;
+        AppServices.Updates.Changed += OnUpdatesChanged;
+        UpdateAvailable = AppServices.Updates.State == UpdateState.Ready;
 
         // Keeps "Checked 2 min ago" and the greeting fresh.
         _clock = new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, (_, _) => Apply(_status));
@@ -105,7 +105,7 @@ public sealed partial class OverviewViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial bool UpdateAvailable { get; set; }
 
-    public string UpdateText => $"Version {AppServices.Updates.ReadyVersion} is ready to install.";
+    public string UpdateText => AppServices.Updates.StatusText;
 
     /// <summary>Maps an engine snapshot onto the page. Public so the preview tool can feed sample data.</summary>
     public void Apply(SyncStatus s)
@@ -185,9 +185,9 @@ public sealed partial class OverviewViewModel : ViewModelBase, IDisposable
         RefreshFolders();
     });
 
-    void OnUpdateReady() => Dispatcher.UIThread.Post(() =>
+    void OnUpdatesChanged() => Dispatcher.UIThread.Post(() =>
     {
-        UpdateAvailable = true;
+        UpdateAvailable = AppServices.Updates.State == UpdateState.Ready;
         OnPropertyChanged(nameof(UpdateText));
     });
 
@@ -220,14 +220,14 @@ public sealed partial class OverviewViewModel : ViewModelBase, IDisposable
     void ManageFolders() => _shell.Navigate(ShellPage.Folders);
 
     [RelayCommand]
-    void InstallUpdate() => AppServices.Updates.ApplyAndRestart(background: false);
+    void InstallUpdate() => AppServices.Updates.InstallAndRestart();
 
     public void Dispose()
     {
         _clock.Stop();
         AppServices.Engine.StatusChanged -= OnStatusChanged;
         AppServices.Settings.Changed -= OnSettingsChanged;
-        AppServices.Updates.UpdateReady -= OnUpdateReady;
+        AppServices.Updates.Changed -= OnUpdatesChanged;
     }
 }
 

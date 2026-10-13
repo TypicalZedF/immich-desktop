@@ -21,7 +21,7 @@
 
           <!-- ===== Step 1: server ===== -->
           <StackPanel Spacing="20" IsVisible="{Binding IsServerStep}">
-            <c:AppLogo Width="72" Height="72" HorizontalAlignment="Center" />
+            <c:ImmichLogo Width="84" Height="84" HorizontalAlignment="Center" />
             <StackPanel Spacing="8">
               <TextBlock Classes="display" Text="Welcome to Immich Desktop" TextAlignment="Center" TextWrapping="Wrap" />
               <TextBlock Classes="secondary" TextAlignment="Center" TextWrapping="Wrap" LineHeight="21"
@@ -86,9 +86,10 @@
               </StackPanel>
             </Border>
 
+            <StackPanel Spacing="20" IsVisible="{Binding ShowSignInForm}">
             <Border Classes="segmented" HorizontalAlignment="Left">
               <StackPanel Orientation="Horizontal">
-                <RadioButton Classes="segment" GroupName="auth" Content="Email &amp; password" IsChecked="{Binding UsePassword}" />
+                <RadioButton Classes="segment" GroupName="auth" Content="Email &amp; password" IsChecked="{Binding UsePassword}" IsVisible="{Binding OffersPassword}" />
                 <RadioButton Classes="segment" GroupName="auth" Content="API key" IsChecked="{Binding UseApiKey}" />
               </StackPanel>
             </Border>
@@ -138,6 +139,37 @@
                 <TextBlock Text="Sign in" />
               </StackPanel>
             </Button>
+
+            <!-- SSO / OAuth (Authentik, Keycloak, Google, ...) -->
+            <StackPanel Spacing="16" IsVisible="{Binding OffersSso}">
+              <Grid ColumnDefinitions="*,Auto,*">
+                <Border Classes="divider" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Classes="caption tertiary" Text="or" Margin="12,0" />
+                <Border Grid.Column="2" Classes="divider" VerticalAlignment="Center" />
+              </Grid>
+              <Button Classes="secondary large" HorizontalAlignment="Stretch" Command="{Binding SignInWithSsoCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <mi:MaterialIcon Kind="ShieldAccountOutline" />
+                  <TextBlock Text="{Binding SsoButtonText}" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+            </StackPanel>
+
+            <!-- Waiting for the browser -->
+            <Border Classes="card" Padding="22" IsVisible="{Binding IsWaitingForBrowser}">
+              <StackPanel Spacing="12">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                  <mi:MaterialIcon Kind="Loading" Classes="spin" Width="22" Height="22" Foreground="{DynamicResource AppPrimaryBrush}" />
+                  <TextBlock Classes="h3" Text="Finish signing in in your browser" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Classes="caption" TextWrapping="Wrap" LineHeight="19"
+                           Text="We opened your sign-in page in your default browser. When you're done, your browser will ask to open Immich Desktop. Allow it and you'll be signed in here." />
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" LineHeight="19"
+                           Text="Seeing a redirect URI error? Ask your Immich admin to allow app.immich:///oauth-callback, the same one the mobile app uses." />
+                <Button Classes="secondary" HorizontalAlignment="Left" Content="Cancel" Command="{Binding CancelSsoCommand}" />
+              </StackPanel>
+            </Border>
           </StackPanel>
 
           <!-- ===== Step 3: folders ===== -->

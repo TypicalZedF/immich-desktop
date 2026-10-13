@@ -12,10 +12,12 @@ public static class AppInfo
     public const string Id = "ImmichDesktop";
 
     /// <summary>
-    /// GitHub repository that hosts releases, e.g. "https://github.com/you/immich-desktop".
-    /// Leave empty to disable the built-in updater.
+    /// GitHub repository ("owner/name") whose Releases provide updates. The releases must be publicly
+    /// readable for installed copies to see them. Leave empty to disable update checks.
     /// </summary>
-    public const string UpdateRepositoryUrl = "";
+    public const string UpdateRepository = "TypicalZedF/immich-desktop";
+
+    public static string ProjectUrl => $"https://github.com/{UpdateRepository}";
 
     public static string Version { get; } =
         typeof(AppInfo).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]

@@ -1,0 +1,69 @@
+# Every push / pull request: tests, a Linux build, and a Windows installer that is
+# actually installed and uninstalled to prove it works. The installer is attached to the run.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Test and build installer
+        shell: pwsh
+        run: ./build/publish.ps1 -Version "0.0.${{ github.run_number }}"
+
+      - name: Smoke test - silent install, launch, uninstall
+        shell: pwsh
+        run: |
+          $setup = "artifacts/installer/ImmichDesktop-Setup.exe"
+          Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CURRENTUSER", "/NORESTART" -Wait
+          $dir = "$env:LOCALAPPDATA\Programs\Immich Desktop"
+          if (-not (Test-Path "$dir\ImmichDesktop.exe")) { throw "App was not installed to $dir" }
+          if (-not (Test-Path "$dir\unins000.exe")) { throw "Uninstaller missing" }
+          Write-Host "Installed OK"
+
+          $env:IMMICH_DESKTOP_DATA_DIR = "$env:RUNNER_TEMP\immich-desktop-smoke"
+          $app = Start-Process "$dir\ImmichDesktop.exe" -ArgumentList "--background" -PassThru
+          Start-Sleep -Seconds 10
+          if ($app.HasExited) { throw "App exited during startup (code $($app.ExitCode))" }
+          Write-Host "App running OK"
+          Start-Process "$dir\ImmichDesktop.exe" -ArgumentList "--quit" -Wait
+          Start-Sleep -Seconds 3
+          if (-not $app.HasExited) { throw "App did not quit when asked" }
+          Write-Host "Quit OK"
+
+          Start-Process "$dir\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -Wait
+          Start-Sleep -Seconds 3
+          if (Test-Path "$dir\ImmichDesktop.exe") { throw "Uninstall left the app behind" }
+          Write-Host "Uninstalled OK"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: artifacts/installer/*
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build and test (Linux)
+        run: |
+          dotnet build ImmichDesktop.slnx -c Release
+          dotnet test tests/ImmichDesktop.Core.Tests -c Release --no-build

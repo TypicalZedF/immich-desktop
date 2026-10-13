@@ -4,22 +4,29 @@ using ImmichDesktop.Core;
 namespace ImmichDesktop.App.Services;
 
 /// <summary>
-/// Ensures one instance per user. A second launch (e.g. from the Start menu) signals the running
-/// instance over a named pipe so it can show its window, then exits.
+/// Ensures one instance per user. Other launches send the running instance a command over a named pipe:
+/// show the window, deliver an SSO callback link, or quit (used by the installer before updating/uninstalling).
 /// </summary>
 public sealed class SingleInstance : IDisposable
 {
+    public enum Command
+    {
+        Activate,
+        OpenLink,
+        Quit,
+    }
+
     static string Suffix => $"{AppInfo.Id}-{Environment.UserName}";
     static string MutexName => $@"Local\{Suffix}";
-    static string PipeName => $"{Suffix}-activate";
+    static string PipeName => $"{Suffix}-commands";
 
     readonly Mutex _mutex;
     readonly CancellationTokenSource _cts = new();
 
     SingleInstance(Mutex mutex) => _mutex = mutex;
 
-    /// <summary>Raised on a background thread when another launch asks us to show the window.</summary>
-    public event Action? ActivationRequested;
+    /// <summary>Raised on a background thread for each command received.</summary>
+    public event Action<Command, string?>? CommandReceived;
 
     public static SingleInstance? TryAcquire()
     {
@@ -31,16 +38,42 @@ public sealed class SingleInstance : IDisposable
         return null;
     }
 
-    public static void SignalExisting()
+    public static bool Send(Command command, string? argument = null)
     {
         try
         {
             using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out, PipeOptions.CurrentUserOnly);
-            client.Connect(2000); // connecting is the signal
+            client.Connect(3000);
+            using var writer = new StreamWriter(client) { AutoFlush = true };
+            writer.WriteLine(argument is null ? command.ToString() : $"{command} {argument}");
+            return true;
         }
         catch (Exception ex)
         {
-            Log.Warn("Could not signal the running instance", ex);
+            Log.Warn($"Could not send {command} to the running instance", ex);
+            return false;
+        }
+    }
+
+    /// <summary>Asks a running instance to quit and waits until it has exited.</summary>
+    public static void RequestQuit(TimeSpan timeout)
+    {
+        if (!Mutex.TryOpenExisting(MutexName, out var existing))
+            return; // not running
+        using (existing)
+        {
+            if (!Send(Command.Quit))
+                return;
+            try
+            {
+                // The running instance releases the mutex as it exits.
+                if (existing.WaitOne(timeout))
+                    existing.ReleaseMutex();
+            }
+            catch (AbandonedMutexException)
+            {
+                // It exited without releasing; that's fine.
+            }
         }
     }
 
@@ -56,16 +89,23 @@ public sealed class SingleInstance : IDisposable
                     await using var server = new NamedPipeServerStream(PipeName, PipeDirection.In, 1,
                         PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                     await server.WaitForConnectionAsync(ct);
-                    ActivationRequested?.Invoke();
+                    using var reader = new StreamReader(server);
+                    var line = await reader.ReadLineAsync(ct).AsTask().WaitAsync(TimeSpan.FromSeconds(5), ct);
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+
+                    var parts = line.Split(' ', 2);
+                    if (Enum.TryParse<Command>(parts[0], out var command))
+                        CommandReceived?.Invoke(command, parts.Length > 1 ? parts[1] : null);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
                     break;
                 }
                 catch (Exception ex)
                 {
-                    Log.Warn("Activation pipe error", ex);
-                    await Task.Delay(1000, ct).ConfigureAwait(false);
+                    Log.Warn("Command pipe error", ex);
+                    await Task.Delay(500, CancellationToken.None);
                 }
             }
         }, ct);

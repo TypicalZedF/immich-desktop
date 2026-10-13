@@ -126,12 +126,55 @@ public sealed class ImmichClient : IDisposable
         return response.AccessToken;
     }
 
+    public async Task<LoginOptions> GetLoginOptionsAsync(CancellationToken ct)
+    {
+        var features = await SendAsync<ServerFeaturesDto>(HttpMethod.Get, "server/features", null, ct);
+        string? buttonText = null;
+        try
+        {
+            buttonText = (await SendAsync<ServerConfigDto>(HttpMethod.Get, "server/config", null, ct)).OauthButtonText;
+        }
+        catch (ImmichApiException)
+        {
+            // Older servers; the default label is fine.
+        }
+        return new LoginOptions(features.PasswordLogin, features.Oauth, features.OauthAutoLaunch,
+            string.IsNullOrWhiteSpace(buttonText) ? "Sign in with SSO" : buttonText.Trim());
+    }
+
+    /// <summary>Starts an OAuth/SSO sign-in and returns the identity provider URL to open in the browser.</summary>
+    public async Task<string> StartOAuthAsync(string redirectUri, string codeChallenge, string state, CancellationToken ct)
+    {
+        var response = await SendAsync<OAuthAuthorizeResponseDto>(HttpMethod.Post, "oauth/authorize",
+            new OAuthAuthorizeRequestDto(redirectUri, codeChallenge, state), ct);
+        return response.Url;
+    }
+
+    /// <summary>Exchanges the browser callback for an access token.</summary>
+    public async Task<string> FinishOAuthAsync(string callbackUrl, string state, string codeVerifier, CancellationToken ct)
+    {
+        var response = await SendAsync<LoginResponseDto>(HttpMethod.Post, "oauth/callback",
+            new OAuthCallbackRequestDto(callbackUrl, state, codeVerifier), ct);
+        return response.AccessToken;
+    }
+
     public Task LogoutAsync(CancellationToken ct) => SendAsync(HttpMethod.Post, "auth/logout", null, ct);
 
     public async Task<UserInfo> GetMeAsync(CancellationToken ct)
     {
         var me = await SendAsync<UserResponseDto>(HttpMethod.Get, "users/me", null, ct);
-        return new UserInfo(me.Id, me.Name, me.Email);
+        return new UserInfo(me.Id, me.Name, me.Email, me.QuotaSizeInBytes, me.QuotaUsageInBytes);
+    }
+
+    /// <summary>Storage shown in the sidebar, like the Immich web app: personal quota if set, else server disk.</summary>
+    public async Task<StorageInfo> GetStorageAsync(CancellationToken ct)
+    {
+        var me = await GetMeAsync(ct);
+        if (me.QuotaSizeInBytes is > 0 && me.QuotaUsageInBytes is { } used)
+            return new StorageInfo(used, me.QuotaSizeInBytes.Value);
+
+        var disk = await SendAsync<ServerStorageDto>(HttpMethod.Get, "server/storage", null, ct);
+        return new StorageInfo(disk.DiskUseRaw, disk.DiskSizeRaw);
     }
 
     // ---- Server ------------------------------------------------------------------------------

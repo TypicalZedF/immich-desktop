@@ -109,8 +109,13 @@ static class Screens
 
             onboarding.ServerHost = "photos.example.com";
             onboarding.ServerVersion = "v3.3.0";
+            onboarding.OffersSso = true;
+            onboarding.SsoButtonText = "Sign in with Authentik";
             onboarding.Step = 1;
-            Shot(main, outDir, $"02-sign-in-{suffix}");
+            Shot(main, outDir, $"02-sign-in-{suffix}", height: 820);
+            onboarding.IsWaitingForBrowser = true;
+            Shot(main, outDir, $"02b-sso-waiting-{suffix}");
+            onboarding.IsWaitingForBrowser = false;
 
             onboarding.Step = 2;
             onboarding.FolderChoices.Add(new FolderChoiceViewModel(Path.Combine(_root, "Pictures"), MaterialIconKind.ImageMultipleOutline) { IsSelected = true, Detail = "2,814 photos and videos" });
@@ -121,6 +126,9 @@ static class Screens
             // Main app
             main.ShowShell();
             var shell = (ShellViewModel)main.Content;
+            shell.HasStorage = true;
+            shell.StoragePercent = 38;
+            shell.StorageText = "682 GB of 1.8 TB used";
             var overview = (OverviewViewModel)shell.NavItems[0].ViewModel;
             overview.Apply(Uploading);
             Shot(main, outDir, $"10-overview-uploading-{suffix}", height: 860);
@@ -136,6 +144,16 @@ static class Screens
 
             shell.Navigate(ShellPage.Settings);
             Shot(main, outDir, $"40-settings-{suffix}", height: 1200);
+
+            AppServices.Settings.Update(s => s.AppLock = AppLockMode.Password);
+            main.Lock();
+            Shot(main, outDir, $"50-locked-password-{suffix}");
+            AppServices.Settings.Update(s => s.AppLock = AppLockMode.WindowsHello);
+            main.ShowShell();
+            main.Lock();
+            Shot(main, outDir, $"51-locked-hello-{suffix}");
+            AppServices.Settings.Update(s => s.AppLock = AppLockMode.Off);
+            main.ShowShell(ShellPage.Settings);
 
             main.Dialog = new DialogViewModel("Stop backing up “Phone Camera”?",
                 "Photos and videos already uploaded stay in Immich. New files in this folder won't be backed up anymore.",

@@ -3,7 +3,7 @@ using Avalonia;
 using ImmichDesktop.App.Services;
 using ImmichDesktop.Core;
 using ImmichDesktop.Core.Platform;
-using Velopack;
+using ImmichDesktop.Core.Services;
 
 namespace ImmichDesktop.App;
 
@@ -12,23 +12,38 @@ internal static class Program
     /// <summary>Held for the lifetime of the process; null in design/preview tools.</summary>
     public static SingleInstance? Instance { get; private set; }
 
+    /// <summary>Set when Windows launched us to deliver an SSO callback link and no other copy was running.</summary>
+    public static string? StartupLink { get; private set; }
+
     [STAThread]
     public static int Main(string[] args)
     {
-        // Must run first: handles install/update/uninstall hooks and exits early when invoked by the installer.
-        var velopack = VelopackApp.Build();
-        if (OperatingSystem.IsWindows())
-            velopack.OnBeforeUninstallFastCallback(_ => UninstallCleanup.Run());
-        velopack.Run();
+        // Commands used by the installer/uninstaller.
+        if (args.Contains("--quit"))
+        {
+            SingleInstance.RequestQuit(TimeSpan.FromSeconds(15));
+            return 0;
+        }
+        if (args.Contains("--uninstall"))
+        {
+            SingleInstance.RequestQuit(TimeSpan.FromSeconds(15));
+            UninstallCleanup.Run();
+            return 0;
+        }
+
+        var link = args.FirstOrDefault(OAuthSession.IsCallback);
 
         Instance = SingleInstance.TryAcquire();
         if (Instance is null)
         {
-            // Already running: bring the existing window forward (unless this was the silent autostart launch).
-            if (!args.Contains(Autostart.BackgroundArgument))
-                SingleInstance.SignalExisting();
+            // Already running: hand over the SSO link, or bring the window forward (unless this is the silent autostart launch).
+            if (link is not null)
+                SingleInstance.Send(SingleInstance.Command.OpenLink, link);
+            else if (!args.Contains(Autostart.BackgroundArgument))
+                SingleInstance.Send(SingleInstance.Command.Activate);
             return 0;
         }
+        StartupLink = link;
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Error("Unhandled exception", e.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, e) =>
@@ -58,6 +73,5 @@ internal static class Program
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
             .UsePlatformDetect()
-            .WithInterFont()
             .LogToTrace();
 }

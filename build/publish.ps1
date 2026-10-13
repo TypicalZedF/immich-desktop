@@ -1,27 +1,35 @@
 <#
 .SYNOPSIS
-  Builds a release and packages the Windows installer (Setup.exe) with Velopack.
+  Builds a release and the Windows installer.
+
+.DESCRIPTION
+  Produces, in artifacts/installer:
+    ImmichDesktop-Setup.exe      setup wizard (choose install location, shortcuts, launch)
+    ImmichDesktop-Portable.zip   no-install version
+
+  Needs Inno Setup 6 for the installer: winget install JRSoftware.InnoSetup
 
 .EXAMPLE
-  ./build/publish.ps1 -Version 1.0.0
-  Output: artifacts/releases/win-x64/ImmichDesktop-win-Setup.exe (+ update packages for GitHub Releases)
+  ./build/publish.ps1 -Version 1.2.0
 #>
 param(
     [string]$Version = "1.0.0",
-    [ValidateSet("win-x64", "win-arm64")]
-    [string]$Runtime = "win-x64"
+    [ValidateSet("win-x64")]
+    [string]$Runtime = "win-x64",
+    [switch]$SkipTests
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 $project = Join-Path $root "src/ImmichDesktop.App/ImmichDesktop.App.csproj"
 $publishDir = Join-Path $root "artifacts/publish/$Runtime"
-$releaseDir = Join-Path $root "artifacts/releases/$Runtime"
-$vpkVersion = "1.2.161"   # keep in sync with the Velopack package in Directory.Packages.props
+$outputDir = Join-Path $root "artifacts/installer"
 
-Write-Host "==> Running tests" -ForegroundColor Cyan
-dotnet test (Join-Path $root "tests/ImmichDesktop.Core.Tests") -c Release --nologo
-if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
+if (-not $SkipTests) {
+    Write-Host "==> Running tests" -ForegroundColor Cyan
+    dotnet test (Join-Path $root "tests/ImmichDesktop.Core.Tests") -c Release --nologo
+    if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
+}
 
 Write-Host "==> Publishing $Runtime $Version" -ForegroundColor Cyan
 if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
@@ -30,24 +38,27 @@ dotnet publish $project -c Release -r $Runtime --self-contained true `
     -o $publishDir --nologo
 if ($LASTEXITCODE -ne 0) { throw "Publish failed" }
 
-Write-Host "==> Packaging installer" -ForegroundColor Cyan
-if (-not (Get-Command vpk -ErrorAction SilentlyContinue)) {
-    dotnet tool install -g vpk --version $vpkVersion
-    $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
-}
+New-Item -ItemType Directory -Force $outputDir | Out-Null
 
-vpk pack `
-    --packId ImmichDesktop `
-    --packVersion $Version `
-    --packDir $publishDir `
-    --mainExe ImmichDesktop.exe `
-    --packTitle "Immich Desktop" `
-    --packAuthors "Immich Desktop" `
-    --icon (Join-Path $root "src/ImmichDesktop.App/Assets/app.ico") `
-    --runtime $Runtime `
-    --outputDir $releaseDir
-if ($LASTEXITCODE -ne 0) { throw "Packaging failed" }
+Write-Host "==> Portable zip" -ForegroundColor Cyan
+$zip = Join-Path $outputDir "ImmichDesktop-Portable.zip"
+if (Test-Path $zip) { Remove-Item $zip -Force }
+Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $zip -CompressionLevel Optimal
+
+Write-Host "==> Installer" -ForegroundColor Cyan
+$iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+if (-not $iscc) {
+    $iscc = @(
+        "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+        "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+if (-not $iscc) { throw "Inno Setup 6 not found. Install it with: winget install JRSoftware.InnoSetup" }
+
+& $iscc /Qp "/DAppVersion=$Version" "/DSourceDir=$publishDir" "/DOutputDir=$outputDir" (Join-Path $PSScriptRoot "installer.iss")
+if ($LASTEXITCODE -ne 0) { throw "Installer build failed" }
 
 Write-Host ""
-Write-Host "Installer ready:" -ForegroundColor Green
-Get-ChildItem $releaseDir -Filter "*Setup.exe" | ForEach-Object { Write-Host "  $($_.FullName)  ($([math]::Round($_.Length / 1MB, 1)) MB)" }
+Write-Host "Ready:" -ForegroundColor Green
+Get-ChildItem $outputDir | ForEach-Object { Write-Host ("  {0}  ({1:N1} MB)" -f $_.FullName, ($_.Length / 1MB)) }

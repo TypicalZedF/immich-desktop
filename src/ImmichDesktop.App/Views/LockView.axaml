@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ImmichDesktop.App.ViewModels"
+             xmlns:c="using:ImmichDesktop.App.Controls"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichDesktop.App.Views.LockView"
+             x:DataType="vm:LockViewModel">
+  <Grid>
+    <StackPanel Width="380" Spacing="22" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Panel HorizontalAlignment="Center">
+        <c:ImmichLogo Width="76" Height="76" />
+        <Border Width="30" Height="30" CornerRadius="15" Background="{DynamicResource AppPrimaryBrush}"
+                BorderBrush="{DynamicResource AppPageBrush}" BorderThickness="3"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-8,-6">
+          <mi:MaterialIcon Kind="Lock" Width="14" Height="14" Foreground="{DynamicResource AppOnPrimaryBrush}" />
+        </Border>
+      </Panel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Classes="h1" Text="Immich Desktop is locked" HorizontalAlignment="Center" />
+        <TextBlock Classes="secondary" Text="{Binding Subtitle}" TextAlignment="Center" TextWrapping="Wrap" />
+      </StackPanel>
+
+      <!-- Windows Hello -->
+      <Button Classes="primary large" HorizontalAlignment="Stretch" IsVisible="{Binding UsesHello}"
+              Command="{Binding UnlockWithHelloCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <mi:MaterialIcon Kind="Loading" Classes="spin" IsVisible="{Binding IsBusy}" />
+          <mi:MaterialIcon Kind="FaceRecognition" IsVisible="{Binding !IsBusy}" />
+          <TextBlock Text="Unlock with Windows Hello" />
+        </StackPanel>
+      </Button>
+
+      <!-- Password -->
+      <StackPanel Spacing="12" IsVisible="{Binding UsesPassword}">
+        <TextBox Name="PasswordBox" Text="{Binding Password}" PasswordChar="&#x2022;" Watermark="App password">
+          <TextBox.InnerLeftContent>
+            <mi:MaterialIcon Kind="LockOutline" Width="18" Height="18" Margin="14,0,0,0"
+                             Foreground="{DynamicResource AppTextTertiaryBrush}" />
+          </TextBox.InnerLeftContent>
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding UnlockWithPasswordCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button Classes="primary large" HorizontalAlignment="Stretch" Command="{Binding UnlockWithPasswordCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <mi:MaterialIcon Kind="Loading" Classes="spin" IsVisible="{Binding IsBusy}" />
+            <TextBlock Text="Unlock" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+
+      <Border Classes="banner error" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <TextBlock Text="{Binding Error}" TextWrapping="Wrap" />
+      </Border>
+
+      <Button Classes="link" HorizontalAlignment="Center" Content="Forgot how to unlock?" Command="{Binding ForgotCommand}" />
+    </StackPanel>
+  </Grid>
+</UserControl>

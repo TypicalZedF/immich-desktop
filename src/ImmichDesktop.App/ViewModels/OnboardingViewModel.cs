@@ -5,6 +5,7 @@ using ImmichDesktop.App.Services;
 using ImmichDesktop.Core;
 using ImmichDesktop.Core.Api;
 using ImmichDesktop.Core.Platform;
+using ImmichDesktop.Core.Services;
 using ImmichDesktop.Core.Settings;
 using ImmichDesktop.Core.Sync;
 using Material.Icons;
@@ -18,6 +19,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
     readonly bool _resumeSignIn;
     readonly CancellationTokenSource _lifetime = new();
     ServerInfo? _server;
+    OAuthSession? _oauth;
 
     public OnboardingViewModel(MainWindowViewModel main, bool resumeSignIn)
     {
@@ -28,6 +30,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
         Email = settings.UserEmail ?? "";
         LaunchAtStartup = settings.LaunchAtStartup;
 
+        OAuthCallbacks.Received += OnOAuthCallback;
         if (resumeSignIn && ServerUrl.Length > 0)
             _ = ConnectAsync();
     }
@@ -76,6 +79,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
             IsInsecure = _server.WebUrl.Scheme == Uri.UriSchemeHttp;
             ServerUrl = _server.WebUrl.ToString().TrimEnd('/');
             SignInError = null;
+            await LoadLoginOptionsAsync(_server);
             Step = 1;
         }
         catch (OperationCanceledException)
@@ -94,6 +98,130 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
     bool CanAct() => !IsBusy;
 
     // ---- Step 2: sign in ----
+
+    [ObservableProperty]
+    public partial bool OffersSso { get; set; }
+
+    [ObservableProperty]
+    public partial bool OffersPassword { get; set; } = true;
+
+    [ObservableProperty]
+    public partial string SsoButtonText { get; set; } = "Sign in with SSO";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowSignInForm))]
+    public partial bool IsWaitingForBrowser { get; set; }
+
+    public bool ShowSignInForm => !IsWaitingForBrowser;
+
+    async Task LoadLoginOptionsAsync(ServerInfo server)
+    {
+        try
+        {
+            using var anonymous = new ImmichClient(server.ApiUrl, null);
+            var options = await anonymous.GetLoginOptionsAsync(_lifetime.Token);
+            OffersSso = options.OAuth;
+            OffersPassword = options.PasswordLogin;
+            SsoButtonText = options.OAuthButtonText;
+            if (!options.PasswordLogin)
+                UseApiKey = true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Older servers may not expose these; fall back to password + API key.
+            OffersSso = false;
+            OffersPassword = true;
+        }
+    }
+
+    /// <summary>Opens the identity provider in the default browser; it hands the sign-in back via app.immich://.</summary>
+    [RelayCommand(CanExecute = nameof(CanAct))]
+    async Task SignInWithSsoAsync()
+    {
+        if (_server is null)
+            return;
+        SignInError = null;
+        IsBusy = true;
+        try
+        {
+            UrlProtocol.Register();
+            _oauth = OAuthSession.Create();
+            using var anonymous = new ImmichClient(_server.ApiUrl, null);
+            var url = await anonymous.StartOAuthAsync(OAuthSession.RedirectUri, _oauth.CodeChallenge, _oauth.State, _lifetime.Token);
+            ShellLauncher.Open(url);
+            IsWaitingForBrowser = true;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _oauth = null;
+            SignInError = $"Couldn't start SSO sign-in: {NetworkErrors.Describe(ex)}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    void CancelSso()
+    {
+        _oauth = null;
+        IsWaitingForBrowser = false;
+    }
+
+    async void OnOAuthCallback(string url)
+    {
+        var session = _oauth;
+        if (session is null || _server is null)
+            return;
+        if (!session.Matches(url))
+        {
+            Log.Warn("Ignored an SSO callback that doesn't match the current sign-in");
+            return;
+        }
+
+        _oauth = null;
+        IsBusy = true;
+        SignInError = null;
+        try
+        {
+            await AppServices.Account.SignInWithOAuthAsync(_server, session, url, _lifetime.Token);
+            IsWaitingForBrowser = false;
+            AfterSignIn();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            IsWaitingForBrowser = false;
+            SignInError = $"SSO sign-in didn't complete: {NetworkErrors.Describe(ex)}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    void AfterSignIn()
+    {
+        Password = "";
+        ApiKey = "";
+
+        var settings = AppServices.Settings.Current;
+        if (_resumeSignIn && settings.Folders.Count > 0)
+        {
+            AppServices.Engine.SyncNow();
+            _main.ShowShell();
+            return;
+        }
+
+        LoadFolderChoices(settings);
+        Step = 2;
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UsePassword))]
@@ -138,19 +266,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
             else
                 await AppServices.Account.SignInWithPasswordAsync(_server, Email, Password, _lifetime.Token);
 
-            Password = "";
-            ApiKey = "";
-
-            var settings = AppServices.Settings.Current;
-            if (_resumeSignIn && settings.Folders.Count > 0)
-            {
-                AppServices.Engine.SyncNow();
-                _main.ShowShell();
-                return;
-            }
-
-            LoadFolderChoices(settings);
-            Step = 2;
+            AfterSignIn();
         }
         catch (OperationCanceledException)
         {
@@ -172,6 +288,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     void Back()
     {
+        CancelSso();
         if (Step > 0)
             Step--;
     }
@@ -283,6 +400,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        OAuthCallbacks.Received -= OnOAuthCallback;
         _lifetime.Cancel();
         _lifetime.Dispose();
     }

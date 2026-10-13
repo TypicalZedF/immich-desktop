@@ -1,6 +1,9 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using ImmichDesktop.App.Services;
+using ImmichDesktop.Core;
+using ImmichDesktop.Core.Platform;
 using ImmichDesktop.Core.Settings;
 using ImmichDesktop.Core.Sync;
 using Material.Icons;
@@ -15,36 +18,45 @@ public enum ShellPage
     Settings,
 }
 
-public sealed class NavItem(ShellPage page, string title, MaterialIconKind icon, Func<ViewModelBase> create)
+public sealed class NavItem(ShellPage page, string title, MaterialIconKind icon, MaterialIconKind activeIcon, Func<ViewModelBase> create)
 {
     readonly Lazy<ViewModelBase> _viewModel = new(create);
 
     public ShellPage Page { get; } = page;
     public string Title { get; } = title;
     public MaterialIconKind Icon { get; } = icon;
+    public MaterialIconKind ActiveIcon { get; } = activeIcon;
     public ViewModelBase ViewModel => _viewModel.Value;
     public bool IsCreated => _viewModel.IsValueCreated;
 }
 
-/// <summary>Signed-in layout: sidebar navigation, account card and live status pill.</summary>
+/// <summary>Signed-in layout, modeled on the Immich web app: top bar, sidebar, storage and server status.</summary>
 public sealed partial class ShellViewModel : ViewModelBase, IDisposable
 {
+    readonly CancellationTokenSource _lifetime = new();
+
     public ShellViewModel(MainWindowViewModel main)
     {
         Main = main;
         NavItems =
         [
-            new NavItem(ShellPage.Overview, "Overview", MaterialIconKind.ViewDashboardOutline, () => new OverviewViewModel(this)),
-            new NavItem(ShellPage.Folders, "Folders", MaterialIconKind.FolderOutline, () => new FoldersViewModel(this)),
-            new NavItem(ShellPage.Activity, "Activity", MaterialIconKind.History, () => new ActivityViewModel(this)),
-            new NavItem(ShellPage.Settings, "Settings", MaterialIconKind.CogOutline, () => new SettingsViewModel(this)),
+            new NavItem(ShellPage.Overview, "Overview", MaterialIconKind.ViewDashboardOutline, MaterialIconKind.ViewDashboard, () => new OverviewViewModel(this)),
+            new NavItem(ShellPage.Folders, "Folders", MaterialIconKind.FolderOutline, MaterialIconKind.Folder, () => new FoldersViewModel(this)),
+            new NavItem(ShellPage.Activity, "Activity", MaterialIconKind.History, MaterialIconKind.History, () => new ActivityViewModel(this)),
+            new NavItem(ShellPage.Settings, "Settings", MaterialIconKind.CogOutline, MaterialIconKind.Cog, () => new SettingsViewModel(this)),
         ];
         SelectedNav = NavItems[0];
 
-        LoadAccount(AppServices.Settings.Current);
+        var settings = AppServices.Settings.Current;
+        LoadAccount(settings);
+        IsLockEnabled = settings.AppLock != AppLockMode.Off;
+        UpdateThemeIcon();
         ApplyStatus(AppServices.Engine.Status);
+
         AppServices.Engine.StatusChanged += OnStatusChanged;
         AppServices.Settings.Changed += OnSettingsChanged;
+        ThemeService.Changed += OnThemeChanged;
+        _ = LoadStorageAsync();
     }
 
     public MainWindowViewModel Main { get; }
@@ -61,10 +73,13 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
 
     public void Navigate(ShellPage page) => SelectedNav = NavItems.First(n => n.Page == page);
 
-    // ---- Account card ----
+    // ---- Top bar ----
 
     [ObservableProperty]
     public partial string UserName { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string UserEmail { get; set; } = "";
 
     [ObservableProperty]
     public partial string UserInitial { get; set; } = "";
@@ -72,14 +87,105 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial string ServerHost { get; set; } = "";
 
+    [ObservableProperty]
+    public partial string ServerVersion { get; set; } = "";
+
+    [ObservableProperty]
+    public partial MaterialIconKind ThemeIcon { get; set; }
+
+    [ObservableProperty]
+    public partial string ThemeTip { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool IsLockEnabled { get; set; }
+
     void LoadAccount(AppSettings settings)
     {
         UserName = string.IsNullOrWhiteSpace(settings.UserName) ? settings.UserEmail ?? "" : settings.UserName;
+        UserEmail = settings.UserEmail ?? "";
         UserInitial = UserName.Length > 0 ? char.ToUpperInvariant(UserName[0]).ToString() : "?";
         ServerHost = Uri.TryCreate(settings.WebUrl, UriKind.Absolute, out var web) ? web.Host : "";
+        ServerVersion = settings.ServerVersion ?? "";
     }
 
-    // ---- Status pill ----
+    void UpdateThemeIcon()
+    {
+        var dark = ThemeService.IsDark;
+        ThemeIcon = dark ? MaterialIconKind.WeatherSunny : MaterialIconKind.WeatherNight;
+        ThemeTip = dark ? "Switch to light theme" : "Switch to dark theme";
+    }
+
+    [RelayCommand]
+    void ToggleTheme() => ThemeService.Toggle();
+
+    [RelayCommand]
+    void LockNow() => Main.Lock();
+
+    [RelayCommand]
+    void OpenWeb()
+    {
+        if (AppServices.Settings.Current.WebUrl is { } url)
+            ShellLauncher.Open(url);
+    }
+
+    [RelayCommand]
+    void OpenAccount() => Navigate(ShellPage.Settings);
+
+    void OnThemeChanged(AppTheme _) => UpdateThemeIcon();
+
+    // ---- Sidebar footer: storage + server status (as in Immich) ----
+
+    [ObservableProperty]
+    public partial bool HasStorage { get; set; }
+
+    [ObservableProperty]
+    public partial double StoragePercent { get; set; }
+
+    [ObservableProperty]
+    public partial string StorageText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool IsServerOnline { get; set; } = true;
+
+    [ObservableProperty]
+    public partial string ServerStatusText { get; set; } = "Online";
+
+    async Task LoadStorageAsync()
+    {
+        while (!_lifetime.IsCancellationRequested)
+        {
+            if (AppServices.Account.Client is { } client)
+            {
+                try
+                {
+                    var storage = await client.GetStorageAsync(_lifetime.Token);
+                    StoragePercent = storage.Fraction * 100;
+                    StorageText = $"{Format.Bytes(storage.Used)} of {Format.Bytes(storage.Total)} used";
+                    HasStorage = storage.Total > 0;
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    // e.g. an API key without the server.storage permission: just hide the meter.
+                    Log.Info($"Storage info unavailable: {ex.Message}");
+                    HasStorage = false;
+                }
+            }
+            try
+            {
+                await Task.Delay(TimeSpan.FromMinutes(10), _lifetime.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+    }
+
+    // ---- Status ----
 
     [ObservableProperty]
     public partial StatusView Status { get; set; } = null!;
@@ -89,6 +195,7 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     void OnSettingsChanged(AppSettings settings) => Dispatcher.UIThread.Post(() =>
     {
         LoadAccount(settings);
+        IsLockEnabled = settings.AppLock != AppLockMode.Off;
         ApplyStatus(AppServices.Engine.Status);
     });
 
@@ -97,12 +204,22 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
         var view = StatusPresenter.Describe(status, AppServices.Settings.Current);
         if (view != Status)
             Status = view;
+
+        IsServerOnline = status.State is not (SyncState.Offline or SyncState.AuthError);
+        ServerStatusText = status.State switch
+        {
+            SyncState.Offline => "Offline",
+            SyncState.AuthError => "Signed out",
+            _ => "Online",
+        };
     }
 
     public void Dispose()
     {
+        _lifetime.Cancel();
         AppServices.Engine.StatusChanged -= OnStatusChanged;
         AppServices.Settings.Changed -= OnSettingsChanged;
+        ThemeService.Changed -= OnThemeChanged;
         foreach (var item in NavItems.Where(n => n.IsCreated))
             (item.ViewModel as IDisposable)?.Dispose();
     }
