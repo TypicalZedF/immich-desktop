@@ -125,6 +125,48 @@ public class SyncEngineTests
     }
 
     [Fact]
+    public async Task Excluding_files_drops_them_from_the_queue_without_a_full_rescan()
+    {
+        await using var h = new Harness();
+        h.Temp.File("Photos/keep.jpg", modifiedUtc: DateTime.UtcNow);
+        h.Temp.File("Photos/Screenshots/Screenshot_1.png", modifiedUtc: DateTime.UtcNow);
+        h.Temp.File("Photos/Screenshot 2026-10-12.png", modifiedUtc: DateTime.UtcNow);
+
+        // First pass queues everything (files are "still being written", so nothing uploads yet).
+        h.Engine.FileSettleTime = TimeSpan.FromMinutes(1);
+        await h.RunAsync();
+        Assert.Equal(3, h.Engine.Status.Counts.Pending);
+
+        // The user ticks "Skip screenshots" while files are queued.
+        h.Settings.Update(s => s.Folders[0].ExcludePatterns = ["Screenshot*"]);
+        h.Engine.OnSettingsChanged(h.Settings.Current);
+
+        h.Engine.FileSettleTime = TimeSpan.Zero;
+        h.Db.RetryFailed(); // clear the "still being written" deferral
+        await h.RunAsync();
+
+        Assert.Equal(["keep.jpg"], h.Server.UploadedFileNames);
+        Assert.Equal(new StatusCounts(0, 1, 0, 0, 0), h.Engine.Status.Counts);
+    }
+
+    [Fact]
+    public async Task Turning_a_folder_off_stops_its_queued_uploads()
+    {
+        await using var h = new Harness();
+        h.Temp.File("Photos/a.jpg", modifiedUtc: DateTime.UtcNow);
+        h.Engine.FileSettleTime = TimeSpan.FromMinutes(1);
+        await h.RunAsync();
+
+        h.Settings.Update(s => s.Folders[0].Enabled = false);
+        h.Engine.OnSettingsChanged(h.Settings.Current);
+        h.Engine.FileSettleTime = TimeSpan.Zero;
+        h.Db.RetryFailed();
+        await h.RunAsync();
+
+        Assert.Empty(h.Server.UploadedFileNames);
+    }
+
+    [Fact]
     public async Task Rejected_credentials_put_the_engine_in_auth_error()
     {
         await using var h = new Harness();

@@ -87,6 +87,7 @@
                       <CheckBox IsChecked="{Binding IncludePhotos}" Content="Photos" />
                       <CheckBox IsChecked="{Binding IncludeVideos}" Content="Videos" />
                       <CheckBox IsChecked="{Binding IncludeSubfolders}" Content="Include subfolders" />
+                      <CheckBox IsChecked="{Binding SkipScreenshots}" Content="Skip screenshots" ToolTip.Tip="Skips the Screenshots folder and files named Screenshot…" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Spacing="8">
@@ -117,6 +118,11 @@
                           <TextBlock Text="Remove folder" />
                         </StackPanel>
                       </Button>
+                      <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="6,0,0,0"
+                                  IsVisible="{Binding SaveHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <mi:MaterialIcon Kind="CheckCircleOutline" Width="16" Height="16" Foreground="{DynamicResource AppSuccessBrush}" />
+                        <TextBlock Classes="caption" Text="{Binding SaveHint}" />
+                      </StackPanel>
                     </StackPanel>
                   </Grid>
                 </Border>
@@ -127,7 +133,7 @@
       </ItemsControl>
 
       <TextBlock Classes="caption tertiary" TextWrapping="Wrap" Margin="4,4,0,0"
-                 Text="Backup only adds to Immich. Deleting a file on this computer never deletes it from your server." />
+                 Text="Changes apply right away: files you exclude stop uploading immediately. Backup only adds to Immich: excluding or deleting files here never removes anything already on your server." />
     </StackPanel>
   </ScrollViewer>
 </UserControl>

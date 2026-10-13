@@ -139,13 +139,48 @@ public sealed partial class FolderItemViewModel : ViewModelBase
         IsMissing = !Directory.Exists(folder.Path);
         _loading = false;
 
+        _hintTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _hintTimer.Tick += (_, _) =>
+        {
+            _hintTimer.Stop();
+            SaveHint = null;
+        };
         _saveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
         _saveTimer.Tick += (_, _) =>
         {
             _saveTimer.Stop();
             FoldersViewModel.Save(this);
+            SaveHint = "Saved \u00B7 applied to backup";
+            _hintTimer.Stop();
+            _hintTimer.Start();
         };
     }
+
+    readonly DispatcherTimer _hintTimer;
+
+    /// <summary>Little "Saving / Saved" note so edits feel acknowledged.</summary>
+    [ObservableProperty]
+    public partial string? SaveHint { get; set; }
+
+    const string ScreenshotPattern = "Screenshot*";
+
+    /// <summary>One-click exclusion for screenshots (Windows "Screenshots" folder and Screenshot_*.png style files).</summary>
+    public bool SkipScreenshots
+    {
+        get => PatternLines().Any(p => string.Equals(p, ScreenshotPattern, StringComparison.OrdinalIgnoreCase));
+        set
+        {
+            if (value == SkipScreenshots)
+                return;
+            var lines = PatternLines().Where(p => !string.Equals(p, ScreenshotPattern, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (value)
+                lines.Insert(0, ScreenshotPattern);
+            ExcludePatterns = string.Join(Environment.NewLine, lines);
+        }
+    }
+
+    List<string> PatternLines() =>
+        ExcludePatterns.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
     public string Id { get; }
     public string Path { get; }
@@ -193,8 +228,11 @@ public sealed partial class FolderItemViewModel : ViewModelBase
         base.OnPropertyChanged(e);
         if (_loading || _saveTimer is null)
             return;
+        if (e.PropertyName == nameof(ExcludePatterns))
+            base.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs(nameof(SkipScreenshots)));
         if (e.PropertyName is nameof(Enabled) or nameof(IncludeSubfolders) or nameof(IncludePhotos) or nameof(IncludeVideos) or nameof(AlbumName) or nameof(ExcludePatterns))
         {
+            SaveHint = "Saving\u2026";
             _saveTimer.Stop();
             _saveTimer.Start();
         }

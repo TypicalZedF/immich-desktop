@@ -56,7 +56,11 @@ public sealed class SyncEngine : IAsyncDisposable
     ImmichClient? _preparedClient;
     int _offlineFailures;
     string _foldersKey = "";
-    List<SyncFolder> _folderSnapshot = [];
+    volatile List<SyncFolder> _folderSnapshot = [];
+    volatile IReadOnlyDictionary<string, (SyncFolder Folder, FileFilter Filter)> _rules =
+        new Dictionary<string, (SyncFolder, FileFilter)>();
+    readonly ConcurrentDictionary<string, byte> _foldersToRescan = new();
+    volatile bool _pruneFolders;
 
     // Status
     SyncState _state = SyncState.Idle;
@@ -99,6 +103,7 @@ public sealed class SyncEngine : IAsyncDisposable
         var settings = _settings.Current;
         _foldersKey = FoldersKey(settings);
         _folderSnapshot = settings.Folders;
+        RebuildRules();
         ApplyRuntimeSettings(settings);
         ConfigureWatchers(settings);
 
@@ -171,33 +176,92 @@ public sealed class SyncEngine : IAsyncDisposable
         _shutdown.Dispose();
     }
 
-    void OnSettingsChanged(AppSettings settings)
+    internal void OnSettingsChanged(AppSettings settings)
     {
         ApplyRuntimeSettings(settings);
 
+        var foldersChanged = false;
         var key = FoldersKey(settings);
         if (key != _foldersKey)
         {
-            // Album name changed -> re-add that folder's assets to the new album.
+            foldersChanged = true;
             var previous = _folderSnapshot.ToDictionary(f => f.Id);
             foreach (var folder in settings.Folders)
             {
-                if (previous.TryGetValue(folder.Id, out var old) && old.AlbumName != folder.AlbumName)
+                if (!previous.TryGetValue(folder.Id, out var old))
+                {
+                    if (folder.Enabled)
+                        _foldersToRescan[folder.Id] = 0; // newly added
+                    continue;
+                }
+                // Album name changed -> re-add that folder's assets to the new album.
+                if (old.AlbumName != folder.AlbumName)
                     _db.ResetAlbumFlags(folder.Id);
+                // Only folders whose file rules changed need rescanning.
+                if (folder.Enabled && AffectsWhichFiles(old, folder))
+                    _foldersToRescan[folder.Id] = 0;
             }
+            if (previous.Keys.Any(id => settings.Folders.All(f => f.Id != id)))
+                _pruneFolders = true;
 
-            // Don't interrupt uploads in flight (e.g. while someone types an album name);
-            // the new configuration takes effect on the next pass, which starts right after this one.
             _foldersKey = key;
             _folderSnapshot = settings.Folders;
+            RebuildRules();
             ConfigureWatchers(settings);
-            _fullScanRequested = true;
+
+            // Changes take effect right away: anything queued or uploading that no longer matches is dropped.
+            // Uploads that still match carry on undisturbed.
+            CancelUnwantedUploads();
         }
 
         if (settings.Paused)
             _runCts?.Cancel();
 
-        Wake();
+        // Folder edits often come in bursts (typing a pattern, ticking boxes): wait for a quiet moment.
+        if (foldersChanged)
+            ScheduleWake();
+        else
+            Wake();
+    }
+
+    static bool AffectsWhichFiles(SyncFolder a, SyncFolder b) =>
+        a.Enabled != b.Enabled ||
+        a.IncludeSubfolders != b.IncludeSubfolders ||
+        a.IncludePhotos != b.IncludePhotos ||
+        a.IncludeVideos != b.IncludeVideos ||
+        !string.Equals(a.Path, b.Path, StringComparison.Ordinal) ||
+        !a.ExcludePatterns.SequenceEqual(b.ExcludePatterns);
+
+    void RebuildRules() =>
+        _rules = _folderSnapshot.Where(f => f.Enabled).ToDictionary(f => f.Id, f => (f, new FileFilter(f, _media)));
+
+    enum Wanted
+    {
+        Yes,
+        Excluded,   // no longer matches its folder's rules: forget it
+        FolderOff,  // folder turned off or removed: leave it for later
+    }
+
+    /// <summary>Checks a queued file against the folder rules as they are right now.</summary>
+    Wanted IsWanted(string path, string folderId)
+    {
+        if (!_rules.TryGetValue(folderId, out var rule))
+            return Wanted.FolderOff;
+        if (!rule.Filter.IsMatch(path))
+            return Wanted.Excluded;
+        if (!rule.Folder.IncludeSubfolders &&
+            !string.Equals(FolderRules.Normalize(Path.GetDirectoryName(path) ?? ""), FolderRules.Normalize(rule.Folder.Path), FolderRules.PathComparison))
+            return Wanted.Excluded;
+        return Wanted.Yes;
+    }
+
+    void CancelUnwantedUploads()
+    {
+        foreach (var tracker in _active.Values)
+        {
+            if (IsWanted(tracker.Path, tracker.FolderId) != Wanted.Yes)
+                tracker.Cancel();
+        }
     }
 
     void OnSessionChanged()
@@ -264,6 +328,15 @@ public sealed class SyncEngine : IAsyncDisposable
     {
         var settings = _settings.Current;
         var client = _account.Client;
+
+        // Always work from the current folder rules, even if a change notification was missed.
+        var key = FoldersKey(settings);
+        if (key != _foldersKey)
+        {
+            _foldersKey = key;
+            _folderSnapshot = settings.Folders;
+            RebuildRules();
+        }
 
         if (client is null || !settings.IsConfigured)
         {
@@ -359,6 +432,7 @@ public sealed class SyncEngine : IAsyncDisposable
         _albumIds.Clear();
         _albumWarnings.Clear();
         _preparedClient = client;
+        RebuildRules();
     }
 
     TimeSpan? NextRetryDelay(AppSettings settings)
@@ -382,6 +456,8 @@ public sealed class SyncEngine : IAsyncDisposable
         {
             _fullScanRequested = false;
             _dirtyPaths.Clear();
+            _foldersToRescan.Clear();
+            _pruneFolders = false;
             SetState(SyncState.Scanning, "Looking for new photos and videos…");
             try
             {
@@ -399,7 +475,12 @@ public sealed class SyncEngine : IAsyncDisposable
             }
             _lastFullScanUtc = DateTime.UtcNow;
         }
-        else if (!_dirtyPaths.IsEmpty)
+        else
+        {
+            await RescanChangedFoldersAsync(settings, ct);
+        }
+
+        if (!full && !_dirtyPaths.IsEmpty)
         {
             var dirty = new Dictionary<string, string>();
             foreach (var path in _dirtyPaths.Keys.ToList())
@@ -411,6 +492,40 @@ public sealed class SyncEngine : IAsyncDisposable
         }
 
         RefreshCounts(settings);
+    }
+
+    /// <summary>Rescans only folders whose settings changed (and forgets removed ones).</summary>
+    async Task RescanChangedFoldersAsync(AppSettings settings, CancellationToken ct)
+    {
+        var ids = _foldersToRescan.Keys.ToList();
+        foreach (var id in ids)
+            _foldersToRescan.TryRemove(id, out _);
+        var prune = _pruneFolders;
+        _pruneFolders = false;
+
+        var targets = settings.Folders.Where(f => f.Enabled && ids.Contains(f.Id)).ToList();
+        if (targets.Count == 0 && !prune)
+            return;
+
+        if (targets.Count > 0)
+            SetState(SyncState.Scanning, targets.Count == 1 ? $"Applying your changes to \u201C{targets[0].DisplayName}\u201D\u2026" : "Applying your folder changes\u2026");
+        try
+        {
+            await Task.Run(() =>
+            {
+                if (prune)
+                    _db.DeleteFoldersExcept(settings.Folders.Select(f => f.Id).ToList());
+                foreach (var folder in targets)
+                    ScanTree(folder, folder.Path, ct);
+            }, ct);
+        }
+        catch
+        {
+            foreach (var id in ids)
+                _foldersToRescan[id] = 0;
+            _pruneFolders |= prune;
+            throw;
+        }
     }
 
     /// <summary>Indexes everything under <paramref name="root"/> (the folder itself or one of its subdirectories).</summary>
@@ -550,6 +665,7 @@ public sealed class SyncEngine : IAsyncDisposable
                 if (settings.PauseOnBattery && PowerStatus.IsOnBattery())
                     throw new WaitForPowerException();
 
+                folderIds = _rules.Keys.ToList(); // folders turned off mid-run stop after this batch
                 var batch = _db.GetCandidates(folderIds, BatchSize);
                 if (batch.Count == 0)
                     break;
@@ -622,6 +738,9 @@ public sealed class SyncEngine : IAsyncDisposable
         foreach (var record in batch)
         {
             ct.ThrowIfCancellationRequested();
+            if (Skip(record))
+                continue;
+
             var file = new FileInfo(record.Path);
             if (!file.Exists)
             {
@@ -664,10 +783,26 @@ public sealed class SyncEngine : IAsyncDisposable
         return ready;
     }
 
+    /// <summary>Drops a queued file that the current folder rules no longer want.</summary>
+    bool Skip(FileRecord record)
+    {
+        var wanted = IsWanted(record.Path, record.FolderId);
+        if (wanted == Wanted.Yes)
+            return false;
+        if (wanted == Wanted.Excluded)
+            _db.DeletePaths([record.Path]);
+        Interlocked.Increment(ref _runDone);
+        return true;
+    }
+
     async Task<bool> UploadOneAsync(ImmichClient client, FileRecord record, CancellationToken ct)
     {
-        var tracker = new UploadTracker(record.Path, record.Size);
+        if (Skip(record))
+            return false;
+
+        using var tracker = new UploadTracker(record.Path, record.FolderId, record.Size, ct);
         _active[record.Path] = tracker;
+        ct = tracker.Token;
         try
         {
             var file = new FileInfo(record.Path);
@@ -698,6 +833,13 @@ public sealed class SyncEngine : IAsyncDisposable
             if (!result.IsDuplicate)
                 _activity.Add(ActivityKind.Uploaded, file.Name, record.Path);
             return !result.IsDuplicate;
+        }
+        catch (OperationCanceledException) when (tracker.WasCancelledIndividually)
+        {
+            // Excluded or its folder turned off while uploading: stop just this file.
+            Log.Info($"Stopped uploading {record.Path}: no longer included");
+            Skip(record);
+            return false;
         }
         catch (ImmichApiException ex) when (!ex.IsUnauthorized && !ex.IsTransient)
         {
@@ -955,11 +1097,24 @@ public sealed class SyncEngine : IAsyncDisposable
         }
     }
 
-    sealed class UploadTracker(string path, long size)
+    sealed class UploadTracker(string path, string folderId, long size, CancellationToken runToken) : IDisposable
     {
+        readonly CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(runToken);
+        volatile bool _cancelled;
         long _sent;
         public string Path { get; } = path;
+        public string FolderId { get; } = folderId;
         public long Size { get; } = size;
+        public CancellationToken Token => _cts.Token;
+        public bool WasCancelledIndividually => _cancelled && !runToken.IsCancellationRequested;
+
+        public void Cancel()
+        {
+            _cancelled = true;
+            try { _cts.Cancel(); } catch (ObjectDisposedException) { /* already finished */ }
+        }
+
+        public void Dispose() => _cts.Dispose();
 
         public long Sent
         {
