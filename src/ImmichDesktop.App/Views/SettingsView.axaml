@@ -118,6 +118,90 @@
         </StackPanel>
       </Border>
 
+      <!-- Network -->
+      <Border Classes="card" Padding="22,16">
+        <StackPanel>
+          <TextBlock Classes="section" Text="NETWORK" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Data saving" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="On metered connections (phone hotspots, capped plans). Photos also skip full-resolution downloads there." />
+            </StackPanel>
+            <ComboBox Grid.Column="1" Width="190" VerticalAlignment="Center" ItemsSource="{Binding MeteredOptions}" SelectedItem="{Binding SelectedMetered}" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Automatic server switching" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="Use a local address on your home network and external addresses everywhere else, like the Immich mobile app." />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoSwitchServer}" />
+          </Grid>
+          <StackPanel IsVisible="{Binding AutoSwitchServer}" Spacing="10" Margin="0,4,0,10">
+            <TextBlock Classes="section" Text="LOCAL NETWORK" Margin="0,8,0,0" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox Text="{Binding LocalNetworkName}" Watermark="Network name (your Wi-Fi name)" />
+              <Button Grid.Column="1" Classes="secondary" Margin="8,0,0,0" Command="{Binding UseCurrentNetworkCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="Wifi" />
+                  <TextBlock Text="Use current connection" />
+                </StackPanel>
+              </Button>
+            </Grid>
+            <TextBox Text="{Binding LocalServerUrl}" Watermark="Local server address, e.g. http://192.168.1.10:2283" />
+
+            <TextBlock Classes="section" Text="EXTERNAL ADDRESSES" Margin="0,10,0,0" />
+            <TextBlock Classes="caption" TextWrapping="Wrap"
+                       Text="Tried in order when you're away from home. The address you signed in with is always tried last." />
+            <ItemsControl ItemsSource="{Binding ExternalServerUrls}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Border Background="{DynamicResource AppInputBrush}" CornerRadius="10" Padding="12,4,4,4" Margin="0,0,0,6">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                      <mi:MaterialIcon Kind="Earth" Width="16" Height="16" Margin="0,0,10,0" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                      <TextBlock Grid.Column="1" Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <Button Grid.Column="2" Classes="ghost icon" ToolTip.Tip="Try this one earlier"
+                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveExternalUrlUpCommand}" CommandParameter="{Binding}">
+                        <mi:MaterialIcon Kind="ArrowUp" Width="16" Height="16" />
+                      </Button>
+                      <Button Grid.Column="3" Classes="ghost icon" ToolTip.Tip="Remove"
+                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).RemoveExternalUrlCommand}" CommandParameter="{Binding}">
+                        <mi:MaterialIcon Kind="Close" Width="16" Height="16" />
+                      </Button>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox Text="{Binding NewExternalUrl}" Watermark="Add an address, e.g. https://photos.example.com">
+                <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding AddExternalUrlCommand}" /></TextBox.KeyBindings>
+              </TextBox>
+              <Button Grid.Column="1" Classes="secondary" Margin="8,0,0,0" Content="Add" Command="{Binding AddExternalUrlCommand}" />
+            </Grid>
+            <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding NetworkError}" TextWrapping="Wrap"
+                       IsVisible="{Binding NetworkError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <mi:MaterialIcon Kind="LanConnect" Width="16" Height="16" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                <TextBlock Classes="caption" Text="{Binding NetworkStatus}" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button Classes="ghost" Content="Check now" Command="{Binding CheckNetworkCommand}" />
+                <Button Classes="primary" Command="{Binding SaveNetworkCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <mi:MaterialIcon Kind="Check" IsVisible="{Binding NetworkSaved}" />
+                    <TextBlock Text="Save" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
       <!-- Desktop background -->
       <Border Classes="card" Padding="22,16" IsVisible="{Binding WallpaperSupported}">
         <StackPanel>

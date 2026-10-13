@@ -88,6 +88,12 @@ public sealed class SyncEngine : IAsyncDisposable
     /// <summary>Files modified more recently than this are assumed to still be copying and are retried later.</summary>
     public TimeSpan FileSettleTime { get; set; } = TimeSpan.FromSeconds(10);
 
+    /// <summary>Whether the current connection is metered (for data saving). Set by the app.</summary>
+    public Func<bool> IsMetered { get; set; } = () => false;
+
+    bool PausedForData(AppSettings settings) => settings.MeteredBackup == MeteredBackup.Pause && IsMetered();
+    bool PhotosOnlyForData(AppSettings settings) => settings.MeteredBackup == MeteredBackup.PhotosOnly && IsMetered();
+
     /// <summary>Latest snapshot. Raised on a background thread; marshal to the UI thread before touching controls.</summary>
     public event Action<SyncStatus>? StatusChanged;
 
@@ -361,6 +367,12 @@ public sealed class SyncEngine : IAsyncDisposable
             SetState(SyncState.WaitingForPower);
             return TimeSpan.FromMinutes(1);
         }
+        if (PausedForData(settings))
+        {
+            RefreshCounts(settings);
+            SetState(SyncState.WaitingForNetwork);
+            return TimeSpan.FromMinutes(1);
+        }
 
         using var run = CancellationTokenSource.CreateLinkedTokenSource(shutdown);
         _runCts = run;
@@ -388,6 +400,12 @@ public sealed class SyncEngine : IAsyncDisposable
         {
             RefreshCounts(settings);
             SetState(SyncState.WaitingForPower);
+            return TimeSpan.FromMinutes(1);
+        }
+        catch (WaitForNetworkException)
+        {
+            RefreshCounts(settings);
+            SetState(SyncState.WaitingForNetwork);
             return TimeSpan.FromMinutes(1);
         }
         catch (ImmichApiException ex) when (ex.IsUnauthorized)
@@ -664,11 +682,36 @@ public sealed class SyncEngine : IAsyncDisposable
                 ct.ThrowIfCancellationRequested();
                 if (settings.PauseOnBattery && PowerStatus.IsOnBattery())
                     throw new WaitForPowerException();
+                if (PausedForData(settings))
+                    throw new WaitForNetworkException();
 
                 folderIds = _rules.Keys.ToList(); // folders turned off mid-run stop after this batch
                 var batch = _db.GetCandidates(folderIds, BatchSize);
                 if (batch.Count == 0)
                     break;
+
+                // Data saving: on a metered connection videos wait for a better one.
+                if (PhotosOnlyForData(settings))
+                {
+                    var videos = batch.Where(r => _media.Classify(r.Path) == MediaKind.Video).ToList();
+                    if (videos.Count > 0)
+                    {
+                        foreach (var video in videos)
+                            _db.Defer(video.Path, DateTime.UtcNow.AddMinutes(15));
+                        if (!_deferredVideosNoted)
+                        {
+                            _deferredVideosNoted = true;
+                            _activity.Add(ActivityKind.Info, "On a metered connection: videos will upload when you're on an unmetered one");
+                        }
+                        batch = batch.Except(videos).ToList();
+                        if (batch.Count == 0)
+                            continue;
+                    }
+                }
+                else
+                {
+                    _deferredVideosNoted = false;
+                }
 
                 var ready = await PrepareBatchAsync(batch, ct);
                 if (ready.Count == 0)
@@ -1143,4 +1186,8 @@ public sealed class SyncEngine : IAsyncDisposable
     }
 
     sealed class WaitForPowerException : Exception;
+
+    sealed class WaitForNetworkException : Exception;
+
+    bool _deferredVideosNoted;
 }

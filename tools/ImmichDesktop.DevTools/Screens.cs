@@ -7,6 +7,7 @@ using ImmichDesktop.App.Services;
 using ImmichDesktop.App.ViewModels;
 using ImmichDesktop.App.Views;
 using ImmichDesktop.Core.Api;
+using ImmichDesktop.Core.Platform;
 using ImmichDesktop.Core.Settings;
 using ImmichDesktop.Core.Sync;
 using Material.Icons;
@@ -184,10 +185,18 @@ static class Screens
             shell.Navigate(ShellPage.Activity);
             Shot(main, outDir, $"30-activity-{suffix}", height: 860);
 
-            AppServices.Settings.Update(s => s.WallpaperEnabled = true);
+            AppServices.Settings.Update(s =>
+            {
+                s.WallpaperEnabled = true;
+                s.AutoSwitchServer = true;
+                s.LocalNetworkName = "Morgan Home";
+                s.LocalServerUrl = "http://192.168.1.20:2283";
+                s.ExternalServerUrls = ["https://photos.example.com", "https://immich.tail1234.ts.net"];
+            });
+            NetworkStatus.Override = new NetworkSnapshot("Morgan Home", false);
             shell.Navigate(ShellPage.Settings);
-            Shot(main, outDir, $"40-settings-{suffix}", height: 1700, settle: TimeSpan.FromSeconds(1));
-            AppServices.Settings.Update(s => s.WallpaperEnabled = false);
+            Shot(main, outDir, $"40-settings-{suffix}", height: 2300, settle: TimeSpan.FromSeconds(1));
+            AppServices.Settings.Update(s => { s.WallpaperEnabled = false; s.AutoSwitchServer = false; });
 
             // Profile picture: choose from the library, then crop.
             var photo = new ProfilePhotoViewModel(main);

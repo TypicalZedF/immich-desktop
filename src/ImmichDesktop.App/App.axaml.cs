@@ -50,6 +50,7 @@ public partial class App : Application
                 Autostart.SetEnabled(true);
             UrlProtocol.Register();
 
+            AppServices.Network.Start();
             AppServices.Engine.Start();
             AppServices.Engine.StatusChanged += OnEngineStatus;
             AppServices.Settings.Changed += OnSettingsChanged;

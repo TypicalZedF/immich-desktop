@@ -16,6 +16,14 @@ public enum UpdateChannel
     Beta,
 }
 
+/// <summary>What backup does on a metered connection (e.g. a phone hotspot or a capped plan).</summary>
+public enum MeteredBackup
+{
+    Normal,
+    PhotosOnly,
+    Pause,
+}
+
 /// <summary>Where desktop backgrounds come from.</summary>
 public enum WallpaperSource
 {
@@ -81,6 +89,17 @@ public sealed class AppSettings
     public int UploadLimitKBps { get; set; }
 
     public bool PauseOnBattery { get; set; }
+
+    /// <summary>Data saving: what to do on metered connections.</summary>
+    public MeteredBackup MeteredBackup { get; set; } = MeteredBackup.PhotosOnly;
+
+    // Server addresses, like the mobile app's automatic URL switching: a local address used on your
+    // home network and external addresses (tried in order) everywhere else. ServerUrl stays the
+    // address you signed in with, the last resort.
+    public bool AutoSwitchServer { get; set; }
+    public string? LocalNetworkName { get; set; }
+    public string? LocalServerUrl { get; set; }
+    public List<string> ExternalServerUrls { get; set; } = [];
     public int RescanIntervalMinutes { get; set; } = 60;
 
     // App

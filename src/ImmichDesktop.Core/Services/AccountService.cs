@@ -141,6 +141,23 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
         Log.Info("Signed out");
     }
 
+    /// <summary>Raised when the server address in use changes (e.g. moving between home and away).</summary>
+    public event Action? EndpointChanged;
+
+    /// <summary>
+    /// Talks to the same server and account through another address. The old client keeps working
+    /// for a while for anything still using it.
+    /// </summary>
+    public void SwitchEndpoint(Uri apiUrl)
+    {
+        if (Client is not { } current || current.ApiUrl == apiUrl)
+            return;
+        Client = new ImmichClient(apiUrl, current.Credential) { ServerVersion = current.ServerVersion, DeviceId = current.DeviceId };
+        Log.Info($"Now connecting through {apiUrl.Host}");
+        EndpointChanged?.Invoke();
+        _ = Task.Delay(TimeSpan.FromMinutes(10)).ContinueWith(_ => current.Dispose(), TaskScheduler.Default);
+    }
+
     /// <summary>For tests: use a pre-built client without touching disk.</summary>
     internal void UseClient(ImmichClient client)
     {

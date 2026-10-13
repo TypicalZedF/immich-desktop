@@ -80,7 +80,9 @@ public sealed class WallpaperService : IDisposable
             byte[] data;
             try
             {
-                data = await client.GetAssetImageAsync(asset.Id, AssetImageSize.Fullsize, CancellationToken.None);
+                // Data saving: the smaller preview on a metered connection.
+                var size = AppServices.Network.IsMetered ? AssetImageSize.Preview : AssetImageSize.Fullsize;
+                data = await client.GetAssetImageAsync(asset.Id, size, CancellationToken.None);
             }
             catch (ImmichApiException)
             {

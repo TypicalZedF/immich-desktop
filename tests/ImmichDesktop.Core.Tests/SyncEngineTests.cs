@@ -239,4 +239,32 @@ public class SyncEngineTests
         Assert.Equal(SyncState.Paused, h.Engine.Status.State);
         Assert.Empty(h.Server.UploadedFileNames);
     }
+
+    [Fact]
+    public async Task Data_saving_holds_videos_or_everything_on_a_metered_connection()
+    {
+        await using var h = new Harness();
+        h.Temp.File("Photos/a.jpg");
+        h.Temp.File("Photos/b.mp4", bytes: 200_000);
+        var metered = true;
+        h.Engine.IsMetered = () => metered;
+
+        // Photos only (the default): the video waits.
+        await h.RunAsync();
+        Assert.Equal(["a.jpg"], h.Server.UploadedFileNames);
+
+        // Pause: nothing is uploaded at all.
+        h.Settings.Update(s => s.MeteredBackup = MeteredBackup.Pause);
+        h.Temp.File("Photos/c.jpg");
+        h.Engine.SyncNow();
+        await h.RunAsync();
+        Assert.Equal(SyncState.WaitingForNetwork, h.Engine.Status.State);
+        Assert.Single(h.Server.UploadedFileNames);
+
+        // Back on an unmetered connection everything catches up, the held video included.
+        metered = false;
+        h.Engine.SyncNow();
+        await h.RunAsync();
+        Assert.Equal(["a.jpg", "b.mp4", "c.jpg"], h.Server.UploadedFileNames.Order());
+    }
 }

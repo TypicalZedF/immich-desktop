@@ -57,6 +57,10 @@ public static class StatusPresenter
             case SyncState.WaitingForPower:
                 return new("Waiting for power", "Backup continues when your PC is plugged in.", "Waiting for the charger", MaterialIconKind.PowerPlugOutline, StatusTone.Paused);
 
+            case SyncState.WaitingForNetwork:
+                return new("Saving data", "Backup is paused on this metered connection. Change this in Settings → Network.",
+                    "Paused on a metered connection", MaterialIconKind.WifiStrengthAlertOutline, StatusTone.Paused);
+
             case SyncState.Offline:
                 return new("Can't reach your server", s.Detail ?? "Retrying shortly.", "Offline — will retry", MaterialIconKind.CloudOffOutline, StatusTone.Warning);
 

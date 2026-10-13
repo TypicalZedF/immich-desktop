@@ -17,6 +17,7 @@ public static class AppServices
     public static UpdateService Updates { get; private set; } = null!;
     public static ProfileService Profile { get; private set; } = null!;
     public static WallpaperService Wallpaper { get; private set; } = null!;
+    public static NetworkMonitor Network { get; private set; } = null!;
 
     public static void Initialize()
     {
@@ -25,7 +26,9 @@ public static class AppServices
         Activity = new ActivityLog(Database);
         Account = new AccountService(Settings, Database);
         Account.Restore();
-        Engine = new SyncEngine(Settings, Database, Account, Activity);
+        WindowsNetwork.Register();
+        Network = new NetworkMonitor(Settings, Account);
+        Engine = new SyncEngine(Settings, Database, Account, Activity) { IsMetered = () => Network.IsMetered };
         Updates = new UpdateService();
         Profile = new ProfileService();
         Wallpaper = new WallpaperService();
@@ -43,6 +46,7 @@ public static class AppServices
     public static async Task ShutdownAsync()
     {
         Updates?.Dispose();
+        Network?.Dispose();
         Wallpaper?.Dispose();
         if (Engine is not null)
             await Engine.DisposeAsync();

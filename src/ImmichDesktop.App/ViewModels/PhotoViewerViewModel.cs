@@ -119,7 +119,8 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
             await SwapInAsync(asset, () => loader.LoadForViewerAsync(asset.Id, AssetImageSize.Preview, needed, ct), ct);
 
             // The preview is ~1440px; on a big or high-DPI screen fetch the full image for a crisp picture.
-            if (asset.IsImage && _loadedSize < needed * 0.9 && _owner.FullsizeSupported)
+            // Data saving: not on a metered connection (zooming in still fetches it).
+            if (asset.IsImage && _loadedSize < needed * 0.9 && _owner.FullsizeSupported && !AppServices.Network.IsMetered)
                 await LoadFullAsync(asset, needed, ct);
         }
         catch (OperationCanceledException)

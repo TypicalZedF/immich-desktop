@@ -17,6 +17,9 @@ public enum SyncState
     Uploading,
     Paused,
     WaitingForPower,
+
+    /// <summary>Data saving: paused on a metered connection.</summary>
+    WaitingForNetwork,
     Offline,
     AuthError,
     Error,

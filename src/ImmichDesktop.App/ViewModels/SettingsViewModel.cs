@@ -39,6 +39,12 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         CheckForUpdates = s.CheckForUpdates;
         AutoInstallUpdates = s.AutoInstallUpdates;
         _channel = s.UpdateChannel;
+        SelectedMetered = MeteredOptions.FirstOrDefault(o => o.Value == s.MeteredBackup) ?? MeteredOptions[1];
+        AutoSwitchServer = s.AutoSwitchServer;
+        LocalNetworkName = s.LocalNetworkName ?? "";
+        LocalServerUrl = s.LocalServerUrl ?? "";
+        foreach (var url in s.ExternalServerUrls)
+            ExternalServerUrls.Add(url);
         WallpaperEnabled = s.WallpaperEnabled;
         SelectedWallpaperSource = WallpaperSources.FirstOrDefault(o => o.Value == s.WallpaperSource) ?? WallpaperSources[0];
         SelectedWallpaperInterval = WallpaperIntervals.FirstOrDefault(o => o.Value == s.WallpaperIntervalMinutes) ?? WallpaperIntervals[2];
@@ -49,6 +55,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         AppServices.Updates.Changed += OnUpdatesChanged;
         AppServices.Profile.Changed += OnProfileChanged;
         AppServices.Wallpaper.Changed += OnWallpaperChanged;
+        AppServices.Network.Changed += OnNetworkChanged;
         _ = DetectHelloAsync();
         if (WallpaperSupported)
             _ = LoadWallpaperAlbumsAsync();
@@ -60,7 +67,145 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         AppServices.Updates.Changed -= OnUpdatesChanged;
         AppServices.Profile.Changed -= OnProfileChanged;
         AppServices.Wallpaper.Changed -= OnWallpaperChanged;
+        AppServices.Network.Changed -= OnNetworkChanged;
     }
+
+    // ---- Network: data saving and server addresses ----
+
+    public IReadOnlyList<Option<MeteredBackup>> MeteredOptions { get; } =
+    [
+        new("Back up everything", MeteredBackup.Normal),
+        new("Photos only", MeteredBackup.PhotosOnly),
+        new("Pause backup", MeteredBackup.Pause),
+    ];
+
+    [ObservableProperty]
+    public partial Option<MeteredBackup> SelectedMetered { get; set; }
+
+    partial void OnSelectedMeteredChanged(Option<MeteredBackup> value)
+    {
+        if (_loading || value is null) return;
+        AppServices.Settings.Update(s => s.MeteredBackup = value.Value);
+        AppServices.Engine.Wake();
+    }
+
+    [ObservableProperty]
+    public partial bool AutoSwitchServer { get; set; }
+
+    partial void OnAutoSwitchServerChanged(bool value)
+    {
+        if (_loading) return;
+        AppServices.Settings.Update(s => s.AutoSwitchServer = value);
+        _ = AppServices.Network.CheckAsync();
+    }
+
+    [ObservableProperty]
+    public partial string LocalNetworkName { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string LocalServerUrl { get; set; } = "";
+
+    partial void OnLocalNetworkNameChanged(string value) => NetworkSaved = false;
+    partial void OnLocalServerUrlChanged(string value) => NetworkSaved = false;
+
+    public System.Collections.ObjectModel.ObservableCollection<string> ExternalServerUrls { get; } = [];
+
+    [ObservableProperty]
+    public partial string NewExternalUrl { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string? NetworkError { get; set; }
+
+    [ObservableProperty]
+    public partial bool NetworkSaved { get; set; }
+
+    public string NetworkStatus
+    {
+        get
+        {
+            var network = AppServices.Network.Network;
+            var where = network.Name is { } name ? $"On “{name}”" : "Network unknown";
+            if (network.IsMetered)
+                where += " (metered)";
+            var host = AppServices.Account.Client?.ApiUrl is { } api ? (api.IsDefaultPort ? api.Host : $"{api.Host}:{api.Port}") : null;
+            var through = host is null ? "" : AppServices.Network.IsUsingLocal ? $" · using the local address {host}" : $" · using {host}";
+            return where + through;
+        }
+    }
+
+    void OnNetworkChanged() => Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(NetworkStatus)));
+
+    [RelayCommand]
+    async Task UseCurrentNetworkAsync()
+    {
+        var current = await Task.Run(Core.Platform.NetworkStatus.Current);
+        if (current.Name is { } name)
+        {
+            LocalNetworkName = name;
+            NetworkError = null;
+        }
+        else
+        {
+            NetworkError = "Couldn't tell which network you're on. Type its name (your Wi-Fi name) instead.";
+        }
+    }
+
+    [RelayCommand]
+    void AddExternalUrl()
+    {
+        var text = NewExternalUrl.Trim();
+        if (text.Length == 0)
+            return;
+        if (Core.Services.ServerEndpoints.ToApiUrl(text) is null)
+        {
+            NetworkError = $"“{text}” isn't a server address. Use something like https://photos.example.com.";
+            return;
+        }
+        if (!ExternalServerUrls.Contains(text, StringComparer.OrdinalIgnoreCase))
+            ExternalServerUrls.Add(text);
+        NewExternalUrl = "";
+        NetworkError = null;
+        SaveNetwork();
+    }
+
+    [RelayCommand]
+    void RemoveExternalUrl(string url)
+    {
+        ExternalServerUrls.Remove(url);
+        SaveNetwork();
+    }
+
+    [RelayCommand]
+    void MoveExternalUrlUp(string url)
+    {
+        var index = ExternalServerUrls.IndexOf(url);
+        if (index > 0)
+            ExternalServerUrls.Move(index, index - 1);
+        SaveNetwork();
+    }
+
+    [RelayCommand]
+    void SaveNetwork()
+    {
+        NetworkSaved = false;
+        if (LocalServerUrl.Trim().Length > 0 && Core.Services.ServerEndpoints.ToApiUrl(LocalServerUrl) is null)
+        {
+            NetworkError = $"“{LocalServerUrl.Trim()}” isn't a server address. Use something like http://192.168.1.10:2283.";
+            return;
+        }
+        NetworkError = null;
+        AppServices.Settings.Update(s =>
+        {
+            s.LocalNetworkName = string.IsNullOrWhiteSpace(LocalNetworkName) ? null : LocalNetworkName.Trim();
+            s.LocalServerUrl = string.IsNullOrWhiteSpace(LocalServerUrl) ? null : LocalServerUrl.Trim();
+            s.ExternalServerUrls = ExternalServerUrls.ToList();
+        });
+        NetworkSaved = true;
+        _ = AppServices.Network.CheckAsync();
+    }
+
+    [RelayCommand]
+    static Task CheckNetworkAsync() => AppServices.Network.CheckAsync();
 
     // ---- Desktop background ----
 
