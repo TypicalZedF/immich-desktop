@@ -767,6 +767,12 @@
                         <CheckBox IsChecked="{Binding ShowPictures}" l:Tr.Content="Show pictures" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <Button Classes="ghost" l:Tr.Content="Select all" Command="{Binding SelectAllCommand}" />
                         <Button Classes="secondary" l:Tr.Content="Not sensitive" Command="{Binding NotSensitiveCommand}" />
+                        <Button Classes="secondary danger" Command="{Binding DeleteCommand}" l:Tr.Tip="Move to the trash in Immich">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <mi:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" />
+                            <TextBlock l:Tr.Text="Delete" />
+                          </StackPanel>
+                        </Button>
                         <Button Classes="primary" Command="{Binding MoveToLockedCommand}">
                           <StackPanel Orientation="Horizontal" Spacing="8">
                             <mi:MaterialIcon Kind="LockOutline" Width="16" Height="16" />

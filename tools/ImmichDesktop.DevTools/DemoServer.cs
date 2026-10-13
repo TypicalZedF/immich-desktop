@@ -219,6 +219,7 @@ sealed class DemoServer : HttpMessageHandler
         {
             _ when path.StartsWith("/api/albums/", StringComparison.Ordinal) && request.Method == HttpMethod.Delete => DeleteAlbum(path),
             "/api/assets" when request.Method == HttpMethod.Put => UpdateAssets(request),
+            "/api/assets" when request.Method == HttpMethod.Delete => TrashAssets(),
             // Like Immich v3: no ownerId, the owner is the first member, and "shared" also counts link-only albums.
             "/api/albums" => Json(Albums.Where(a => !DeletedAlbums.Contains(a.Id)).Select((a, i) => new
             {
@@ -318,6 +319,15 @@ sealed class DemoServer : HttpMessageHandler
     {
         if (request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() is { } body && body.Contains("\"locked\"", StringComparison.Ordinal))
             Interlocked.Increment(ref LockedRequests);
+        return new HttpResponseMessage(HttpStatusCode.NoContent);
+    }
+
+    /// <summary>Requests that moved photos to the trash.</summary>
+    public int TrashRequests;
+
+    HttpResponseMessage TrashAssets()
+    {
+        Interlocked.Increment(ref TrashRequests);
         return new HttpResponseMessage(HttpStatusCode.NoContent);
     }
 

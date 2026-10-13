@@ -12,7 +12,7 @@ namespace ImmichDesktop.App.ViewModels;
 
 /// <summary>
 /// Utilities → Suggest for the locked folder: the on-device privacy check's settings, progress, and
-/// the pictures it flagged, to move to the locked folder or mark as fine. Pictures are blurred until
+/// the pictures it flagged, to move to the locked folder, delete, or mark as fine. Pictures are blurred until
 /// you choose to see them.
 /// </summary>
 public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
@@ -128,7 +128,24 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
 
     public string MinConfidenceText => MinConfidence <= 0 ? Tr.T("Any") : Tr.T("{0}% or more", ((int)MinConfidence).ToString(System.Globalization.CultureInfo.CurrentCulture));
 
-    partial void OnMinConfidenceChanged(double value) => ApplyFilter();
+    // Dragging the slider changes the value many times a second; the tiles follow at most every
+    // 80 ms (always ending on the final value) instead of on every step.
+    DispatcherTimer? _filterTimer;
+
+    partial void OnMinConfidenceChanged(double value)
+    {
+        if (_filterTimer is null)
+        {
+            _filterTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
+            _filterTimer.Tick += (_, _) =>
+            {
+                _filterTimer.Stop();
+                ApplyFilter();
+            };
+        }
+        if (!_filterTimer.IsEnabled)
+            _filterTimer.Start();
+    }
 
     [ObservableProperty]
     public partial string FilterSummary { get; set; } = "";
@@ -137,14 +154,34 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
     {
         var kinds = KindFilters.Where(f => f.IsOn).Aggregate(SensitiveKind.None, (all, f) => all | f.Kind);
         var shown = _all.Where(i => (kinds == SensitiveKind.None || (i.Kinds & kinds) != 0) && i.Score * 100 >= MinConfidence - 0.001).ToList();
-        foreach (var hidden in Items.Except(shown).Where(i => i.IsSelected))
+        var visible = shown.ToHashSet();
+        foreach (var hidden in Items.Where(i => i.IsSelected && !visible.Contains(i)))
             hidden.IsSelected = false; // actions only ever apply to what you can see
-        Items.Clear();
-        foreach (var item in shown)
-            Items.Add(item);
+        Sync(shown, visible);
         Count = Items.Count;
         FilterSummary = Items.Count == _all.Count ? "" : Tr.T("{0} of {1} shown", Items.Count.ToString("N0"), _all.Count.ToString("N0"));
         UpdateSelection();
+    }
+
+    /// <summary>
+    /// Makes <see cref="Items"/> match <paramref name="shown"/> (which keeps the order of <c>_all</c>) by
+    /// removing and inserting only what changed, so tiles that stay aren't rebuilt.
+    /// </summary>
+    void Sync(List<PrivacySuggestionViewModel> shown, HashSet<PrivacySuggestionViewModel> visible)
+    {
+        for (var i = Items.Count - 1; i >= 0; i--)
+            if (!visible.Contains(Items[i]))
+                Items.RemoveAt(i);
+        for (var i = 0; i < shown.Count; i++)
+        {
+            if (i < Items.Count && ReferenceEquals(Items[i], shown[i]))
+                continue;
+            var at = Items.IndexOf(shown[i]);
+            if (at < 0)
+                Items.Insert(i, shown[i]);
+            else
+                Items.Move(at, i);
+        }
     }
 
     /// <summary>One chip per kind that's actually among the suggestions, with how many.</summary>
@@ -378,6 +415,32 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
         _owner.ShowNotice(Tr.T("Won't suggest {0} again", Format.Plural(chosen.Count, "photo")));
     }
 
+    /// <summary>Moves the selected pictures (or all of them) to the trash in Immich.</summary>
+    [RelayCommand]
+    async Task DeleteAsync()
+    {
+        if (_owner.Client is not { } client || Items.Count == 0)
+            return;
+        var chosen = Chosen;
+        var what = Format.Plural(chosen.Count, "photo");
+        if (!await _owner.ConfirmAsync(Tr.T("Move {0} to the trash?", what),
+                Tr.T("They're removed from your library on every device. You can restore them from the trash in Immich for a while."),
+                Tr.T("Move to trash"), danger: true))
+            return;
+        try
+        {
+            var ids = chosen.Select(i => i.Id).ToList();
+            await client.TrashAssetsAsync(ids, CancellationToken.None);
+            AppServices.Database.SetPrivacyDecision(ids, 3);
+            Remove(chosen);
+            _owner.ShowNotice(Tr.T("Moved {0} to the trash", what));
+        }
+        catch (Exception ex)
+        {
+            _owner.ShowNotice(Tr.T("Couldn't move to the trash. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
+
     void Remove(IReadOnlyList<PrivacySuggestionViewModel> items)
     {
         foreach (var item in items)
@@ -398,6 +461,7 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _lifetime.Cancel();
+        _filterTimer?.Stop();
         AppServices.PrivacyScan.StatusChanged -= OnStatus;
         foreach (var item in _all)
             item.Dispose();

@@ -128,7 +128,7 @@ public sealed class StateDatabase
         return Convert.ToInt32(Scalar(db, "SELECT COUNT(*) FROM privacy_scan WHERE decision = 0 AND kinds <> 0"));
     }
 
-    /// <summary>Records a choice: 1 moved to the locked folder, 2 not sensitive (don't suggest again).</summary>
+    /// <summary>Records a choice: 1 moved to the locked folder, 2 not sensitive (don't suggest again), 3 moved to the trash.</summary>
     public void SetPrivacyDecision(IReadOnlyCollection<string> assetIds, int decision)
     {
         using var db = Open();

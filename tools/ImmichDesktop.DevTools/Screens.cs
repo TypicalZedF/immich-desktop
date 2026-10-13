@@ -301,16 +301,32 @@ static class Screens
                 review.ShowDetails = false;
                 review.ShowPictures = true;
                 Shot(main, outDir, "19p2-privacy-shown", height: 860, settle: TimeSpan.FromSeconds(0.5));
-                // Move the card to the locked folder, mark the prescription as fine.
+                // The "How sure" slider: at 90% only the card (95%) stays; the prescription (80%) comes back at 0.
+                foreach (var step in new[] { 30.0, 55, 75, 90 })
+                {
+                    review.MinConfidence = step;
+                    Pump(TimeSpan.FromMilliseconds(20));
+                }
+                Pump(TimeSpan.FromMilliseconds(300));
+                var atNinety = review.Items.Count;
+                var cardTile = review.Items.FirstOrDefault();
+                review.MinConfidence = 0;
+                Pump(TimeSpan.FromMilliseconds(300));
+                Console.WriteLine($"Privacy filter: {atNinety} at 90%, {review.Items.Count} at any; card tile kept: {ReferenceEquals(cardTile, review.Items.FirstOrDefault())}");
+                if (atNinety != 1 || review.Items.Count != 2 || !ReferenceEquals(cardTile, review.Items[0]))
+                    throw new InvalidOperationException("The confidence filter didn't work");
+                // Move the card to the locked folder, delete the prescription.
                 review.Items.First(i => i.Kinds.HasFlag(ImmichDesktop.Core.Privacy.SensitiveKind.PaymentCard)).IsSelected = true;
                 review.MoveToLockedCommand.Execute(null);
                 Pump(TimeSpan.FromMilliseconds(500));
                 main.Dialog?.ConfirmCommand.Execute(null);
                 Pump(TimeSpan.FromSeconds(1));
-                review.NotSensitiveCommand.Execute(null);
-                Pump(TimeSpan.FromMilliseconds(300));
-                Console.WriteLine($"Privacy review: {review.Count} left; locked requests: {demo.LockedRequests}; suggestions in database: {AppServices.Database.CountPrivacySuggestions()}");
-                if (review.Count != 0 || demo.LockedRequests != 1)
+                review.DeleteCommand.Execute(null);
+                Pump(TimeSpan.FromMilliseconds(500));
+                main.Dialog?.ConfirmCommand.Execute(null);
+                Pump(TimeSpan.FromSeconds(1));
+                Console.WriteLine($"Privacy review: {review.Count} left; locked requests: {demo.LockedRequests}; trash requests: {demo.TrashRequests}; suggestions in database: {AppServices.Database.CountPrivacySuggestions()}");
+                if (review.Count != 0 || demo.LockedRequests != 1 || demo.TrashRequests != 1)
                     throw new InvalidOperationException("Moving suggestions to the locked folder didn't work");
             }
             privacyPage.BackCommand.Execute(null);
