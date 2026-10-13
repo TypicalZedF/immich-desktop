@@ -3,6 +3,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using Avalonia.Styling;
 using ImmichDesktop.App.Services;
 using ImmichDesktop.Core.Api;
@@ -33,6 +35,8 @@ public sealed class MapView : Control
     static readonly IBrush WaterDark = new SolidColorBrush(Color.Parse("#141A22"));
     static readonly IBrush LandBrush = new SolidColorBrush(Color.Parse("#F5F5F2"));
     static readonly IBrush LandDark = new SolidColorBrush(Color.Parse("#262A30"));
+    static readonly IBrush AttributionLight = new SolidColorBrush(Color.Parse("#B3FFFFFF"));
+    static readonly IBrush AttributionDark = new SolidColorBrush(Color.Parse("#99000000"));
     static readonly Color Coast = Color.Parse("#B8C4D0");
     static readonly Color CoastDark = Color.Parse("#3A4250");
     static readonly Color Border = Color.Parse("#B9BEC7");
@@ -94,6 +98,9 @@ public sealed class MapView : Control
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
+        _rebuildTimer?.Stop();
+        _base?.Dispose();
+        _base = null;
         _tiles?.Dispose();
         _tiles = null;
     }
@@ -212,12 +219,28 @@ public sealed class MapView : Control
         return new Point(dx * WorldSize + Bounds.Width / 2, (_points[i].Y - _centerY) * WorldSize + Bounds.Height / 2);
     }
 
+    // ---- The built-in map, cached ----
+    // Drawing ~120k points of coastline, borders and rivers every frame made dragging laggy. Instead
+    // the map is drawn once into an image a bit larger than the screen; panning just slides it, and
+    // zooming scales it until the pointer stops, then it's redrawn sharp.
+
+    /// <summary>Extra room drawn around the screen, so short drags need no redraw.</summary>
+    const double CacheMargin = 0.35;
+
+    RenderTargetBitmap? _base;
+    double _baseZoom, _baseCx, _baseCy, _baseScaling;
+    Size _baseSize;
+    bool _baseDark;
+    DispatcherTimer? _rebuildTimer;
+
     public override void Render(DrawingContext context)
     {
         var bounds = new Rect(Bounds.Size);
+        if (bounds.Width < 1 || bounds.Height < 1)
+            return;
         var dark = IsDark;
         context.FillRectangle(dark ? WaterDark : Water, bounds);
-        DrawWorld(context, dark);
+        DrawBaseMap(context, dark);
         var street = ShowStreetDetail && _tiles is { AllFailed: false };
         if (street)
             DrawTiles(context, dark);
@@ -228,22 +251,95 @@ public sealed class MapView : Control
         var text = new FormattedText(credit, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, 10.5,
             dark ? Brushes.White : Brushes.Black);
         var box = new Rect(Bounds.Width - text.Width - 12, Bounds.Height - text.Height - 6, text.Width + 12, text.Height + 6);
-        context.FillRectangle(new SolidColorBrush(dark ? Color.Parse("#99000000") : Color.Parse("#B3FFFFFF")), box);
+        context.FillRectangle(dark ? AttributionDark : AttributionLight, box);
         context.DrawText(text, new Point(box.X + 6, box.Y + 3));
     }
 
+    void DrawBaseMap(DrawingContext context, bool dark)
+    {
+        var scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
+        var valid = _base is not null && _baseDark == dark && _baseSize == Bounds.Size && _baseScaling == scaling;
+        if (valid)
+        {
+            // Where the cached image's middle is now, and how much it's been scaled since.
+            var scale = Math.Pow(2, _zoom - _baseZoom);
+            var dx = _baseCx - _centerX;
+            dx -= Math.Round(dx);
+            var middle = new Point(Bounds.Width / 2 + dx * WorldSize, Bounds.Height / 2 + (_baseCy - _centerY) * WorldSize);
+            var w = Bounds.Width * (1 + 2 * CacheMargin) * scale;
+            var h = Bounds.Height * (1 + 2 * CacheMargin) * scale;
+            var dest = new Rect(middle.X - w / 2, middle.Y - h / 2, w, h);
+            var covers = dest.Contains(new Rect(Bounds.Size));
+            if (covers && Math.Abs(scale - 1) < 0.001)
+            {
+                context.DrawImage(_base!, new Rect(_base!.Size), dest);
+                return;
+            }
+            if (covers || Math.Abs(scale - 1) >= 0.001)
+            {
+                // Zooming (or about to run off the edge): show the scaled image now, redraw sharp shortly.
+                context.DrawImage(_base!, new Rect(_base!.Size), dest);
+                ScheduleRebuild();
+                if (covers)
+                    return;
+            }
+        }
+        RebuildBase(dark, scaling);
+        context.DrawImage(_base!, new Rect(_base!.Size),
+            new Rect(-Bounds.Width * CacheMargin, -Bounds.Height * CacheMargin,
+                Bounds.Width * (1 + 2 * CacheMargin), Bounds.Height * (1 + 2 * CacheMargin)));
+    }
+
+    void ScheduleRebuild()
+    {
+        _rebuildTimer ??= new DispatcherTimer(TimeSpan.FromMilliseconds(140), DispatcherPriority.Background, (_, _) =>
+        {
+            _rebuildTimer!.Stop();
+            _base?.Dispose();
+            _base = null;
+            InvalidateVisual();
+        });
+        _rebuildTimer.Stop();
+        _rebuildTimer.Start();
+    }
+
+    void RebuildBase(bool dark, double scaling)
+    {
+        _rebuildTimer?.Stop();
+        var width = Bounds.Width * (1 + 2 * CacheMargin);
+        var height = Bounds.Height * (1 + 2 * CacheMargin);
+        var pixels = new PixelSize(Math.Max(1, (int)Math.Ceiling(width * scaling)), Math.Max(1, (int)Math.Ceiling(height * scaling)));
+        if (_base is null || _base.PixelSize != pixels)
+        {
+            _base?.Dispose();
+            _base = new RenderTargetBitmap(pixels, new Vector(96 * scaling, 96 * scaling));
+        }
+        using (var ctx = _base.CreateDrawingContext())
+        {
+            ctx.FillRectangle(dark ? WaterDark : Water, new Rect(0, 0, width, height));
+            DrawWorld(ctx, dark, width, height);
+        }
+        _baseZoom = _zoom;
+        _baseCx = _centerX;
+        _baseCy = _centerY;
+        _baseDark = dark;
+        _baseSize = Bounds.Size;
+        _baseScaling = scaling;
+    }
+
     /// <summary>
-    /// The built-in map, for every copy of the world on screen: land and coastlines, lakes, major
-    /// rivers, state lines (once zoomed in a little) and country borders.
+    /// The built-in map for an area of <paramref name="width"/> × <paramref name="height"/> around the
+    /// current center, every copy of the world in it: land and coastlines, lakes, major rivers, state
+    /// lines (once zoomed in a little) and country borders.
     /// </summary>
-    void DrawWorld(DrawingContext context, bool dark)
+    void DrawWorld(DrawingContext context, bool dark, double width, double height)
     {
         if (WorldMap.Land is not { } land)
             return;
         var size = WorldSize;
-        var origin = ToScreen(0, 0);
+        var origin = new Point((0 - _centerX) * size + width / 2, (0 - _centerY) * size + height / 2);
         // Lines stay the same width on screen whatever the zoom.
-        Pen Line(Color color, double width) => new(new SolidColorBrush(color), width / size);
+        Pen Line(Color color, double w) => new(new SolidColorBrush(color), w / size);
         var coast = Line(dark ? CoastDark : Coast, 1.2);
         var border = Line(dark ? BorderDark : Border, 1.0);
         var state = new Pen(new SolidColorBrush(dark ? StateDark : State), 0.9 / size, new DashStyle([3, 2], 0));
@@ -251,8 +347,9 @@ public sealed class MapView : Control
         var water = dark ? WaterDark : Water;
         var showStates = _zoom >= 2.5;
         var showRivers = _zoom >= 3.5;
-        var first = (int)Math.Floor(-origin.X / size) - 1; // shapes may reach past 180°
-        var last = (int)Math.Floor((Bounds.Width - origin.X) / size);
+        // Shapes may reach a little past ±180°, so include a copy either side.
+        var first = (int)Math.Floor(-origin.X / size) - 1;
+        var last = (int)Math.Floor((width - origin.X) / size) + 1;
         for (var copy = first; copy <= last; copy++)
         {
             using (context.PushTransform(Matrix.CreateScale(size, size) * Matrix.CreateTranslation(origin.X + copy * size, origin.Y)))

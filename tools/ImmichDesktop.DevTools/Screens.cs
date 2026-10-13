@@ -189,6 +189,8 @@ static class Screens
             Shot(main, outDir, $"19d-map-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
             Shot(main, outDir, $"19d2-map-usa-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1), interact: w =>
                 Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(w).OfType<ImmichDesktop.App.Controls.MapView>().First().CenterOn(39, -96, 4.2));
+            Shot(main, outDir, $"19d3-map-world-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1), interact: w =>
+                Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(w).OfType<ImmichDesktop.App.Controls.MapView>().First().CenterOn(18, 40, 2.4));
             shell.Navigate(ShellPage.Trash);
             Shot(main, outDir, $"19f-trash-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
             shell.Navigate(ShellPage.Locked);
