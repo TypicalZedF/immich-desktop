@@ -188,6 +188,7 @@ sealed class DemoServer : HttpMessageHandler
                 country = c.Country,
             }))),
             "/api/search/smart" or "/api/search/metadata" => Search(17),
+            _ when path.StartsWith("/api/shared-links/", StringComparison.Ordinal) && request.Method == HttpMethod.Delete => DeleteLink(path),
             "/api/shared-links" when request.Method == HttpMethod.Post => Json(new { id = "l1", key = "Xq7cT2pLm9vR4sWz" }),
             "/api/shared-links" => Json(new object[]
             {
@@ -234,6 +235,15 @@ sealed class DemoServer : HttpMessageHandler
             _ => new HttpResponseMessage(HttpStatusCode.NotFound),
         };
         return Task.FromResult(response);
+    }
+
+    /// <summary>Shared links deleted through the app (for checking the delete flow).</summary>
+    public List<string> Deleted { get; } = [];
+
+    HttpResponseMessage DeleteLink(string path)
+    {
+        Deleted.Add(path.Split('/')[3]);
+        return new HttpResponseMessage(HttpStatusCode.NoContent);
     }
 
     static HttpResponseMessage BucketResponse(string bucket)

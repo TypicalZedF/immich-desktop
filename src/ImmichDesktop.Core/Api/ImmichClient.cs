@@ -356,6 +356,7 @@ public sealed class ImmichClient : IDisposable
     static long? ParseDuration(JsonElement value) => value.ValueKind switch
     {
         JsonValueKind.Number when value.TryGetInt64(out var ms) => ms,
+        JsonValueKind.Number => (long)value.GetDouble(),
         JsonValueKind.String when TimeSpan.TryParse(value.GetString(), CultureInfo.InvariantCulture, out var span) => (long)span.TotalMilliseconds,
         _ => null,
     };
@@ -488,7 +489,7 @@ public sealed class ImmichClient : IDisposable
     static TimelineAsset ToTimelineAsset(AssetDto a)
     {
         var ratio = a.ExifInfo is { ExifImageWidth: > 0, ExifImageHeight: > 0 } e ? e.ExifImageWidth!.Value / (double)e.ExifImageHeight!.Value : 1;
-        long? duration = TimeSpan.TryParse(a.Duration, CultureInfo.InvariantCulture, out var span) && span > TimeSpan.Zero ? (long)span.TotalMilliseconds : null;
+        long? duration = ParseDuration(a.Duration) is > 0 and var ms ? ms : null;
         return new TimelineAsset(a.Id, !string.Equals(a.Type, "VIDEO", StringComparison.OrdinalIgnoreCase), a.IsFavorite, ratio, duration, a.FileCreatedAt,
             FileSize: a.ExifInfo?.FileSizeInByte);
     }

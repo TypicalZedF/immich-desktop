@@ -149,7 +149,7 @@ public class LibraryApiTests
         var handler = new Recorder((_, _) => new object[]
         {
             new { id = "small", type = "IMAGE", isFavorite = false, exifInfo = new { fileSizeInByte = 20_000_000L } },
-            new { id = "big", type = "VIDEO", isFavorite = false, exifInfo = new { fileSizeInByte = 900_000_000L } },
+            new { id = "big", type = "VIDEO", isFavorite = false, duration = 72_000, exifInfo = new { fileSizeInByte = 900_000_000L } }, // newer servers: milliseconds as a number
         });
         using var client = Client(handler);
 
@@ -157,6 +157,7 @@ public class LibraryApiTests
 
         Assert.Equal(["big", "small"], files.Select(f => f.Id));
         Assert.Equal(900_000_000L, files[0].FileSize);
+        Assert.Equal(72_000, files[0].DurationMs);
         Assert.Equal(("POST", "/api/search/large-assets?minFileSize=10000000&size=250"), (handler.Requests[0].Method, handler.Requests[0].PathAndQuery));
     }
 }
@@ -170,11 +171,16 @@ public class SharedAlbumTests
         [
           {"id":"a1","albumName":"Just mine, has a public link","shared":true,"ownerId":"me","albumUsers":[]},
           {"id":"a2","albumName":"Family","shared":true,"ownerId":"me","albumUsers":[{"role":"editor","user":{"id":"sam"}}]},
-          {"id":"a3","albumName":"Sam's trip","shared":true,"ownerId":"sam","albumUsers":[]}
+          {"id":"a3","albumName":"Sam's trip","shared":true,"ownerId":"sam","albumUsers":[]},
+          {"id":"a4","albumName":"Mine, owner listed as a member","shared":true,"ownerId":"me","albumUsers":[{"role":"owner","user":{"id":"me"}}]},
+          {"id":"a5","albumName":"Mine, owner only as an object","shared":true,"owner":{"id":"me"},"albumUsers":[{"role":"editor","user":{"id":"me"}}]},
+          {"id":"a6","albumName":"Immich v3: owner first, no ownerId, link only","shared":true,"hasSharedLink":true,"albumUsers":[{"role":"editor","user":{"id":"me"}}]},
+          {"id":"a7","albumName":"Immich v3: shared with Sam","shared":true,"albumUsers":[{"role":"editor","user":{"id":"me"}},{"role":"viewer","user":{"id":"sam"}}]},
+          {"id":"a8","albumName":"Immich v3: Sam's album","shared":true,"albumUsers":[{"role":"editor","user":{"id":"sam"}},{"role":"viewer","user":{"id":"me"}}]}
         ]
         """;
         var albums = System.Text.Json.JsonSerializer.Deserialize<List<ImmichDesktop.Core.Api.AlbumInfo>>(json,
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
-        Assert.Equal(["a2", "a3"], albums.Where(a => a.IsSharedWithPeople("me")).Select(a => a.Id));
+        Assert.Equal(["a2", "a3", "a7", "a8"], albums.Where(a => a.IsSharedWithPeople("me")).Select(a => a.Id));
     }
 }

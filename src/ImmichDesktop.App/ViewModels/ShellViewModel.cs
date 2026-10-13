@@ -112,6 +112,9 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
         // Leaving the locked folder locks it again, like the Immich apps.
         if (oldValue is { IsCreated: true, ViewModel: PhotosViewModel { IsLockedFolder: true } locked })
             _ = locked.LockAsync();
+        // Coming back to a page: show what changed meanwhile (e.g. a link shared from Photos).
+        if (newValue is { IsCreated: true, ViewModel: PhotosViewModel shown })
+            shown.OnShownAgain();
         CurrentPage = newValue?.ViewModel;
     }
 

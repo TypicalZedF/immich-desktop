@@ -142,6 +142,20 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         _ => Tr.T("Photos"),
     };
 
+    /// <summary>Back on this page after visiting others: refresh lists that other pages can change.</summary>
+    internal void OnShownAgain()
+    {
+        if (Drill is not null || Duplicates is not null)
+            return;
+        _ = Page switch
+        {
+            LibraryPage.Sharing => LoadSharingAsync(),
+            LibraryPage.Albums => LoadAlbumsAsync(),
+            LibraryPage.Utilities => LoadUtilitiesAsync(),
+            _ => Task.CompletedTask,
+        };
+    }
+
     [RelayCommand]
     void Back()
     {

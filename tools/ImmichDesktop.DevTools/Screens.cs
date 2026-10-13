@@ -239,6 +239,19 @@ static class Screens
             Shot(main, outDir, $"19b-explore-{suffix}", height: 860, settle: TimeSpan.FromSeconds(2));
             shell.Navigate(ShellPage.Sharing);
             Shot(main, outDir, $"19c-sharing-{suffix}", height: 860, settle: TimeSpan.FromSeconds(2));
+            if (suffix == "light")
+            {
+                // Deleting a shared link: confirm, then it's gone from the list (checked, not just pictured).
+                var sharing = (PhotosViewModel)Page(shell, ShellPage.Sharing);
+                var before = sharing.SharedLinks.Count;
+                sharing.SharedLinks[0].DeleteCommand.Execute(null);
+                Pump(TimeSpan.FromMilliseconds(300));
+                (main.Dialog as DialogViewModel)?.ConfirmCommand.Execute(null);
+                Pump(TimeSpan.FromSeconds(1));
+                Console.WriteLine($"Shared link delete: {before} -> {sharing.SharedLinks.Count} links; server saw {demo.Deleted.Count} delete(s): {string.Join(", ", demo.Deleted)}");
+                if (sharing.SharedLinks.Count != before - 1 || demo.Deleted.Count != 1)
+                    throw new InvalidOperationException("Deleting a shared link didn't work");
+            }
             shell.Navigate(ShellPage.Map);
             Shot(main, outDir, $"19d-map-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
             Shot(main, outDir, $"19d2-map-usa-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1), interact: w =>

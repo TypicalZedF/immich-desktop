@@ -45,14 +45,33 @@ public sealed record UploadResult(string Id, string Status)
 }
 
 public sealed record AlbumInfo(string Id, string AlbumName, string? AlbumThumbnailAssetId = null, int AssetCount = 0, bool Shared = false,
-    string? OwnerId = null, List<System.Text.Json.JsonElement>? AlbumUsers = null)
+    string? OwnerId = null, List<System.Text.Json.JsonElement>? AlbumUsers = null, System.Text.Json.JsonElement? Owner = null)
 {
     /// <summary>
-    /// Shared with other people: someone else is in it, or it's someone else's album. (The server's own
-    /// "shared" also counts albums that only have a public link.)
+    /// Shared with other people: anyone besides you is in it (or it's someone else's album). The
+    /// server's own "shared" also counts albums that only have a public link.
     /// </summary>
-    public bool IsSharedWithPeople(string? myUserId) =>
-        AlbumUsers is { Count: > 0 } || (OwnerId is not null && myUserId is not null && OwnerId != myUserId);
+    public bool IsSharedWithPeople(string? myUserId)
+    {
+        // Everyone in the album: the owner and its members (newer servers list the owner first among
+        // the members and no longer send ownerId).
+        var people = new HashSet<string>(StringComparer.Ordinal);
+        if (OwnerId is not null)
+            people.Add(OwnerId);
+        if (Owner is { ValueKind: System.Text.Json.JsonValueKind.Object } owner && owner.TryGetProperty("id", out var ownerId) && ownerId.GetString() is { } o)
+            people.Add(o);
+        foreach (var member in AlbumUsers ?? [])
+        {
+            if (member.ValueKind != System.Text.Json.JsonValueKind.Object)
+                continue;
+            var id = member.TryGetProperty("user", out var user) && user.ValueKind == System.Text.Json.JsonValueKind.Object && user.TryGetProperty("id", out var uid)
+                ? uid.GetString()
+                : member.TryGetProperty("userId", out var direct) ? direct.GetString() : null;
+            if (id is not null)
+                people.Add(id);
+        }
+        return myUserId is null ? people.Count > 1 : people.Any(p => p != myUserId);
+    }
 }
 
 /// <summary>
@@ -183,7 +202,7 @@ internal sealed record ExifDto(
     string? City, string? State, string? Country, int? ExifImageWidth, int? ExifImageHeight, long? FileSizeInByte, string? Description);
 internal sealed record AssetPersonDto(string? Name);
 internal sealed record AssetDto(
-    string Id, string? Type, string? OriginalFileName, string? FileCreatedAt, bool IsFavorite, string? Duration,
+    string Id, string? Type, string? OriginalFileName, string? FileCreatedAt, bool IsFavorite, System.Text.Json.JsonElement Duration,
     ExifDto? ExifInfo, List<AssetPersonDto>? People);
 internal sealed record SearchAssetsDto(List<AssetDto> Items, string? NextPage);
 internal sealed record SearchResponseDto(SearchAssetsDto Assets);
