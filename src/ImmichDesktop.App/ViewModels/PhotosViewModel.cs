@@ -162,6 +162,15 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         };
     }
 
+    /// <summary>Out of whatever is open (search results, an album, a review…) to the page itself.</summary>
+    internal void ReturnToStart()
+    {
+        if (Viewer is not null)
+            return; // the photo viewer covers the page; it has its own close
+        for (var i = 0; i < 4 && (Drill is not null || Duplicates is not null || Privacy is not null); i++)
+            Back();
+    }
+
     [RelayCommand]
     void Back()
     {

@@ -255,6 +255,17 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial bool IsWorking { get; set; }
 
+    /// <summary>A one-time check is under way (starting, checking or paused).</summary>
+    [ObservableProperty]
+    public partial bool IsOneTimeRunning { get; set; }
+
+    /// <summary>Check the library just this once, with the setting off.</summary>
+    [RelayCommand]
+    void ScanOnce() => AppServices.PrivacyScan.ScanOnce();
+
+    [RelayCommand]
+    void StopOnce() => AppServices.PrivacyScan.StopOnce();
+
     void OnStatus(PrivacyScanStatus status) => Dispatcher.UIThread.Post(() =>
     {
         Apply(status);
@@ -273,6 +284,7 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
         ShowProgress = status.State is PrivacyScanState.Scanning or PrivacyScanState.Paused && status.Total > 0;
         Progress = status.Total > 0 ? status.Checked / (double)status.Total : 0;
         IsWorking = status.State is PrivacyScanState.Starting or PrivacyScanState.Scanning;
+        IsOneTimeRunning = status.OneTime && status.State is PrivacyScanState.Starting or PrivacyScanState.Scanning or PrivacyScanState.Paused or PrivacyScanState.Error;
     }
 
     internal static string Describe(PrivacyScanStatus status)
@@ -280,12 +292,13 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
         var where = status.OnGpu ? Tr.T("on the graphics card") : Tr.T("on the processor");
         return status.State switch
         {
-            PrivacyScanState.Off => Tr.T("Off. Turn it on to check your library on this PC."),
+            PrivacyScanState.Off => Tr.T("Off. Turn it on to keep your library checked, or check it once."),
             PrivacyScanState.Unavailable => status.Detail ?? Tr.T("Not available on this PC."),
             PrivacyScanState.Starting => Tr.T("Starting…"),
             PrivacyScanState.Scanning => Tr.T("Checking {0} of {1} ({2})", status.Checked.ToString("N0"), status.Total.ToString("N0"), where)
                 + (status.Remaining is { } left ? " · " + Format.TimeLeft(left) : ""),
             PrivacyScanState.Paused => Tr.T("{0} · {1} of {2} checked", status.Detail ?? Tr.T("Paused"), status.Checked.ToString("N0"), status.Total.ToString("N0")),
+            PrivacyScanState.Done when status.OneTime => Tr.T("All {0} photos and videos checked, once. New ones aren't checked until you check again.", status.Total.ToString("N0")),
             PrivacyScanState.Done => Tr.T("All {0} photos and videos checked. New ones are checked as they arrive.", status.Total.ToString("N0")),
             PrivacyScanState.Error => Tr.T("Stopped: {0} Trying again soon.", status.Detail ?? ""),
             _ => "",

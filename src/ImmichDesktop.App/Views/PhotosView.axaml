@@ -723,6 +723,22 @@
                             </StackPanel>
                             <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="1" IsVisible="{Binding ShowProgress}" Height="4" />
                           </StackPanel>
+                          <!-- With the setting off: check the library just this once -->
+                          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEnabled}">
+                            <Button Classes="secondary" Command="{Binding ScanOnceCommand}" IsVisible="{Binding !IsOneTimeRunning}"
+                                    l:Tr.Tip="Checks your library now and stops when it's done. New photos aren't checked until you do it again.">
+                              <StackPanel Orientation="Horizontal" Spacing="8">
+                                <mi:MaterialIcon Kind="ShieldSearch" Width="16" Height="16" />
+                                <TextBlock l:Tr.Text="Check once now" />
+                              </StackPanel>
+                            </Button>
+                            <Button Classes="secondary" Command="{Binding StopOnceCommand}" IsVisible="{Binding IsOneTimeRunning}">
+                              <StackPanel Orientation="Horizontal" Spacing="8">
+                                <mi:MaterialIcon Kind="Stop" Width="16" Height="16" />
+                                <TextBlock l:Tr.Text="Stop checking" />
+                              </StackPanel>
+                            </Button>
+                          </StackPanel>
                           <Button Classes="ghost" Command="{Binding ToggleDetailsCommand}" Padding="8,4" Margin="-8,0,0,0" HorizontalAlignment="Left">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                               <mi:MaterialIcon Kind="InformationOutline" Width="16" Height="16" />

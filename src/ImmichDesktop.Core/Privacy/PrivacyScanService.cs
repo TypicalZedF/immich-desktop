@@ -10,8 +10,9 @@ public enum PrivacyScanState { Off, Unavailable, Starting, Scanning, Paused, Don
 
 /// <summary>Where the privacy check is, for the Utilities page.</summary>
 /// <param name="Remaining">Estimated time to finish, from the recent pace (null until there's enough to go on).</param>
+/// <param name="OneTime">A one-time check (the setting is off): it stops once the library is done.</param>
 public sealed record PrivacyScanStatus(PrivacyScanState State, int Checked, int Total, int Suggestions, bool OnGpu, string? Detail = null,
-    TimeSpan? Remaining = null)
+    TimeSpan? Remaining = null, bool OneTime = false)
 {
     public static PrivacyScanStatus Off { get; } = new(PrivacyScanState.Off, 0, 0, 0, false);
 }
@@ -44,6 +45,8 @@ public sealed class PrivacyScanService : IDisposable
     CancellationTokenSource? _run;
     Task? _task;
     bool? _runningWithGpu;
+    bool _once;        // a one-time check was asked for
+    bool _wasEnabled;  // the setting, last time it was applied
 
     /// <param name="isPrivateNetwork">
     /// True on a home (private) network. The check only runs then: never on public Wi-Fi, even
@@ -75,16 +78,22 @@ public sealed class PrivacyScanService : IDisposable
     void Apply()
     {
         var s = _settings.Current;
-        var wanted = s.PrivacyScanEnabled && _account.IsSignedIn;
         lock (_gate)
         {
+            // Turning the setting off also stops a one-time check that was running alongside it.
+            if (_wasEnabled && !s.PrivacyScanEnabled)
+                _once = false;
+            _wasEnabled = s.PrivacyScanEnabled;
+            var wanted = (s.PrivacyScanEnabled || _once) && _account.IsSignedIn;
             if (wanted && _task is { IsCompleted: false } && _runningWithGpu == s.PrivacyScanUseGpu)
                 return;
             _run?.Cancel();
             _run = null;
             if (!wanted)
             {
-                Report(PrivacyScanStatus.Off with { Suggestions = Suggestions });
+                // A finished one-time check keeps saying so (until it's started again or turned on).
+                if (Status is not { State: PrivacyScanState.Done, OneTime: true })
+                    Report(PrivacyScanStatus.Off with { Suggestions = Suggestions });
                 return;
             }
             if (!OnDeviceModels.Available)
@@ -161,6 +170,14 @@ public sealed class PrivacyScanService : IDisposable
                     }
                 }
                 ReportRun(new PrivacyScanStatus(PrivacyScanState.Done, library.Count, library.Count, Suggestions, onGpu), ct);
+                lock (_gate)
+                {
+                    if (!_settings.Current.PrivacyScanEnabled)
+                    {
+                        _once = false; // a one-time check: done, so stop (new photos wait for the next one)
+                        return;
+                    }
+                }
                 await Task.Delay(RecheckLibraryEvery, ct); // then look for new photos
             }
         }
@@ -278,6 +295,25 @@ public sealed class PrivacyScanService : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// Checks the library once, with the setting off: it stops when it's done instead of watching
+    /// for new photos. The same rules apply (home network only, pauses on battery and so on).
+    /// </summary>
+    public void ScanOnce()
+    {
+        lock (_gate)
+            _once = true;
+        Apply();
+    }
+
+    /// <summary>Stops a one-time check.</summary>
+    public void StopOnce()
+    {
+        lock (_gate)
+            _once = false;
+        Apply();
+    }
+
     /// <summary>Starts over (e.g. after its results were forgotten).</summary>
     public void Restart()
     {
@@ -286,6 +322,8 @@ public sealed class PrivacyScanService : IDisposable
             _run?.Cancel();
             _run = null;
             _runningWithGpu = null;
+            if (Status.OneTime)
+                Report(PrivacyScanStatus.Off with { Suggestions = Suggestions }); // its results are gone
         }
         Apply();
     }
@@ -302,7 +340,7 @@ public sealed class PrivacyScanService : IDisposable
         lock (_gate)
         {
             if (!ct.IsCancellationRequested)
-                Report(status);
+                Report(status with { OneTime = _once && !_settings.Current.PrivacyScanEnabled });
         }
     }
 

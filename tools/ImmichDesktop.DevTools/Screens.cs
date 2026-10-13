@@ -281,12 +281,18 @@ static class Screens
                 Console.WriteLine($"Privacy check turned off mid-scan: {AppServices.PrivacyScan.Status.State} after {AppServices.PrivacyScan.Status.Checked} checked");
                 if (AppServices.PrivacyScan.Status.State != ImmichDesktop.Core.Privacy.PrivacyScanState.Off)
                     throw new InvalidOperationException("Turning the privacy check off didn't show it as off");
-                AppServices.Settings.Update(s => s.PrivacyScanEnabled = true);
+                // The full check runs as a one-time check: it stops when done and says so.
+                AppServices.PrivacyScan.ScanOnce();
                 var started = DateTime.UtcNow;
                 while (AppServices.PrivacyScan.Status.State is not (ImmichDesktop.Core.Privacy.PrivacyScanState.Done or ImmichDesktop.Core.Privacy.PrivacyScanState.Error)
                        && DateTime.UtcNow - started < TimeSpan.FromMinutes(6))
                     Pump(TimeSpan.FromSeconds(1));
                 var scan = AppServices.PrivacyScan.Status;
+                AppServices.Settings.Update(s => s.ThumbnailSize = s.ThumbnailSize); // any settings change must leave a finished one-time check alone
+                Pump(TimeSpan.FromMilliseconds(300));
+                Console.WriteLine($"One-time check: {scan.State}, one-time {scan.OneTime}; after a settings change: {AppServices.PrivacyScan.Status.State}");
+                if (!scan.OneTime || AppServices.PrivacyScan.Status is not { State: ImmichDesktop.Core.Privacy.PrivacyScanState.Done, OneTime: true })
+                    throw new InvalidOperationException("The one-time check didn't finish as one");
                 var flagged = AppServices.Database.GetPrivacySuggestions();
                 Console.WriteLine($"Privacy check: {scan.State} {scan.Checked}/{scan.Total} in {(DateTime.UtcNow - started).TotalSeconds:0}s; flagged: {string.Join(", ", flagged.Select(f => $"{f.AssetId}={(ImmichDesktop.Core.Privacy.SensitiveKind)f.Kinds}"))} {scan.Detail}");
             }
@@ -424,6 +430,31 @@ static class Screens
             shell.SearchText = "beach";
             shell.SearchCommand.Execute(null);
             Shot(main, outDir, $"19e-search-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            {
+                // Backing out of a search: the × closes the results; another page clears the box;
+                // clicking the current page in the sidebar again goes back to its start.
+                var searched = (PhotosViewModel)Page(shell, ShellPage.Photos);
+                var opened = searched.Drill is not null && shell.HasSearchText && !shell.IsSuggestionsOpen;
+                shell.ClearSearchCommand.Execute(null);
+                Pump(TimeSpan.FromMilliseconds(300));
+                var cleared = searched.Drill is null && shell.SearchText == "";
+                shell.SearchText = "beach";
+                shell.SearchCommand.Execute(null);
+                Pump(TimeSpan.FromMilliseconds(300));
+                searched.BackCommand.Execute(null);
+                var backClears = shell.SearchText == "";
+                shell.SearchText = "beach";
+                shell.SearchCommand.Execute(null);
+                Pump(TimeSpan.FromMilliseconds(300));
+                shell.Navigate(ShellPage.Map);
+                var leaveClears = shell.SearchText == "" && !shell.IsSuggestionsOpen;
+                shell.Navigate(ShellPage.Photos);
+                shell.ReturnToStart();
+                var reclick = searched.Drill is null;
+                Console.WriteLine($"Search back-out: opened {opened}, × {cleared}, Back clears box {backClears}, leaving clears box {leaveClears}, sidebar re-click {reclick}");
+                if (!(opened && cleared && backClears && leaveClears && reclick))
+                    throw new InvalidOperationException("Backing out of a search didn't work");
+            }
             shell.Navigate(ShellPage.Photos);
 
             shell.Navigate(ShellPage.Folders);

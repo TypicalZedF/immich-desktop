@@ -25,13 +25,20 @@
           <TextBox.InnerLeftContent>
             <mi:MaterialIcon Kind="Magnify" Width="20" Height="20" Margin="14,0,0,0" Foreground="{DynamicResource AppTextTertiaryBrush}" />
           </TextBox.InnerLeftContent>
+          <TextBox.InnerRightContent>
+            <Button Classes="ghost icon" Padding="6" Margin="0,0,6,0" Command="{Binding ClearSearchCommand}" IsVisible="{Binding HasSearchText}"
+                    l:Tr.Tip="Clear search" Focusable="False">
+              <mi:MaterialIcon Kind="Close" Width="18" Height="18" />
+            </Button>
+          </TextBox.InnerRightContent>
           <TextBox.KeyBindings>
             <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
           </TextBox.KeyBindings>
         </TextBox>
         <!-- Suggestions: people, places, albums, file names, and recent searches -->
         <Popup Name="SearchPopup" IsOpen="{Binding IsSuggestionsOpen}" PlacementTarget="{Binding #SearchBox}" Placement="BottomEdgeAlignedLeft"
-               VerticalOffset="6" IsLightDismissEnabled="True" Width="{Binding #SearchBox.Bounds.Width}">
+               VerticalOffset="6" IsLightDismissEnabled="True" OverlayDismissEventPassThrough="True" ShouldUseOverlayLayer="True"
+               Width="{Binding #SearchBox.Bounds.Width}">
           <Border Classes="card" Padding="6" CornerRadius="16" Background="{DynamicResource AppPageBrush}" BoxShadow="0 10 30 0 #33000000">
             <StackPanel>
               <Grid ColumnDefinitions="*,Auto" Margin="10,4,4,4" IsVisible="{Binding ShowClearHistory}">

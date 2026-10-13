@@ -134,6 +134,13 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
         // Coming back to a page: show what changed meanwhile (e.g. a link shared from Photos).
         if (newValue is { IsCreated: true, ViewModel: PhotosViewModel shown })
             shown.OnShownAgain();
+        // The search box describes the results on screen; on another page it's just stale text.
+        CloseSuggestions();
+        if (_searchPage is not null && !ReferenceEquals(newValue.ViewModel, _searchPage))
+        {
+            StopWatchingResults();
+            SetSearchTextQuietly("");
+        }
         CurrentPage = newValue?.ViewModel;
     }
 
@@ -160,6 +167,14 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     void ShowBackup() => Navigate(ShellPage.Overview);
 
     public void Navigate(ShellPage page) => SelectedNav = NavItems.First(n => n.Page == page);
+
+    /// <summary>The current page's sidebar entry was clicked again: back to the page's start.</summary>
+    public void ReturnToStart()
+    {
+        CloseSuggestions();
+        if (SelectedNav is { IsCreated: true, ViewModel: PhotosViewModel photos })
+            photos.ReturnToStart();
+    }
 
     // ---- Top bar ----
 

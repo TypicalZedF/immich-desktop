@@ -15,7 +15,20 @@ public partial class ShellView : UserControl
         // Search suggestions: open on focus, arrow keys move through them, Esc closes, click picks.
         var search = this.FindControl<TextBox>("SearchBox")!;
         var suggestions = this.FindControl<ListBox>("SuggestionList")!;
-        search.GotFocus += (_, _) => (DataContext as ShellViewModel)?.OnSearchFocused();
+        var popup = this.FindControl<Avalonia.Controls.Primitives.Popup>("SearchPopup")!;
+        // Only when you click or tab into the box: focus coming back on its own (the window being
+        // reactivated, a popup closing) mustn't pop the suggestions open again.
+        search.GotFocus += (_, e) =>
+        {
+            if (e.NavigationMethod != NavigationMethod.Unspecified || search.IsPointerOver)
+                (DataContext as ShellViewModel)?.OnSearchFocused();
+        };
+        search.LostFocus += (_, _) =>
+        {
+            // Clicking a suggestion moves focus into the list; anywhere else closes them.
+            if (DataContext is ShellViewModel vm && popup.Child is { IsKeyboardFocusWithin: false, IsPointerOver: false })
+                vm.CloseSuggestions();
+        };
         search.AddHandler(KeyDownEvent, (_, e) =>
         {
             if (DataContext is not ShellViewModel vm)
@@ -24,7 +37,13 @@ public partial class ShellView : UserControl
             {
                 case Key.Down: vm.MoveSelection(+1); e.Handled = true; break;
                 case Key.Up: vm.MoveSelection(-1); e.Handled = true; break;
-                case Key.Escape: vm.CloseSuggestions(); e.Handled = true; break;
+                case Key.Escape:
+                    if (vm.IsSuggestionsOpen)
+                        vm.CloseSuggestions();
+                    else
+                        vm.ClearSearchCommand.Execute(null);
+                    e.Handled = true;
+                    break;
             }
         }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         suggestions.Tapped += (_, e) =>
@@ -35,8 +54,26 @@ public partial class ShellView : UserControl
                 vm.ChooseCommand.Execute(chosen);
         };
 
+        DataContextChanged += (_, _) =>
+        {
+            if (_shell is not null)
+                _shell.SearchStarted -= OnSearchStarted;
+            _shell = DataContext as ShellViewModel;
+            if (_shell is not null)
+                _shell.SearchStarted += OnSearchStarted;
+        };
+
         // Group headings in the sidebar are labels, not pages: they can't be selected.
         var nav = this.FindControl<ListBox>("Nav")!;
+        // Clicking the page you're already on takes it back to its start (out of search results,
+        // an album, a person…), like the web app.
+        nav.AddHandler(PointerReleasedEvent, (_, e) =>
+        {
+            if (e.InitialPressMouseButton == MouseButton.Left && e.Source is Visual source
+                && source.FindAncestorOfType<ListBoxItem>(includeSelf: true)?.DataContext is NavItem item
+                && DataContext is ShellViewModel vm && ReferenceEquals(item, vm.SelectedNav))
+                vm.ReturnToStart();
+        }, Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
         nav.ContainerPrepared += (_, e) =>
         {
             if (e.Container is not ListBoxItem item)
@@ -58,4 +95,9 @@ public partial class ShellView : UserControl
             }
         };
     }
+
+    ShellViewModel? _shell;
+
+    /// <summary>A search opened: take focus off the box so the results get the keyboard.</summary>
+    void OnSearchStarted() => TopLevel.GetTopLevel(this)?.FocusManager?.ClearFocus();
 }

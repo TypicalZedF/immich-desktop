@@ -612,8 +612,6 @@ public sealed class MapView : Control
                 // One photo: its thumbnail, like the web app (a dot until it has loaded).
                 var id = markers[c.Members[0]].Id;
                 _visible.Add((c, at, ThumbRadius));
-                if (HeatMap)
-                    continue;
                 if (Thumbnail(id, ref wanted) is { } thumb)
                 {
                     var rect = new Rect(at.X - ThumbRadius, at.Y - ThumbRadius, ThumbRadius * 2, ThumbRadius * 2);
@@ -634,10 +632,12 @@ public sealed class MapView : Control
             var label = Label(c.Members.Length, dark);
             var radius = Math.Max(14 + 2.5 * Math.Log10(c.Members.Length), label.Width / 2 + 8);
             _visible.Add((c, at, radius));
-            if (HeatMap)
-                continue;
-            context.DrawEllipse(accent, ring, at, radius, radius);
-            context.DrawText(label, new Point(at.X - label.Width / 2, at.Y - label.Height / 2));
+            // Over the heat map the bubbles are see-through, so the colours under them still show.
+            using (HeatMap ? context.PushOpacity(0.72) : default(DrawingContext.PushedState?))
+            {
+                context.DrawEllipse(accent, ring, at, radius, radius);
+                context.DrawText(label, new Point(at.X - label.Width / 2, at.Y - label.Height / 2));
+            }
         }
     }
 

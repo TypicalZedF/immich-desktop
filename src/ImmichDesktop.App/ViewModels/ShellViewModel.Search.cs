@@ -46,8 +46,18 @@ public sealed partial class ShellViewModel
     bool _namesLoading;
     bool _choosing;
 
+    public bool HasSearchText => SearchText.Length > 0;
+
+    /// <summary>Raised when a search opens, so the view can take focus off the box.</summary>
+    public event Action? SearchStarted;
+
+    /// <summary>The results a search opened in Photos (to close them when the search is cleared).</summary>
+    PhotosViewModel? _searchPage;
+    object? _searchResults;
+
     partial void OnSearchTextChanged(string value)
     {
+        OnPropertyChanged(nameof(HasSearchText));
         if (_choosing)
             return;
         UpdateSuggestions();
@@ -165,9 +175,8 @@ public sealed partial class ShellViewModel
     {
         CloseSuggestions();
         Remember(entry);
-        _choosing = true;
-        SearchText = entry.Text;
-        _choosing = false;
+        StopWatchingResults();
+        SetSearchTextQuietly(entry.Text);
         Navigate(ShellPage.Photos);
         if (SelectedNav.ViewModel is not PhotosViewModel photos)
             return;
@@ -189,6 +198,55 @@ public sealed partial class ShellViewModel
                 photos.SearchFor(entry.Text);
                 break;
         }
+        WatchResults(photos);
+        SearchStarted?.Invoke();
+    }
+
+    /// <summary>Clears the box when you leave the results (Back, or another page in the sidebar).</summary>
+    void WatchResults(PhotosViewModel photos)
+    {
+        if (_searchPage is { } old)
+            old.PropertyChanged -= OnResultsPageChanged;
+        _searchPage = photos;
+        _searchResults = photos.Drill;
+        photos.PropertyChanged += OnResultsPageChanged;
+    }
+
+    void OnResultsPageChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(PhotosViewModel.Drill) || sender is not PhotosViewModel photos || ReferenceEquals(photos.Drill, _searchResults))
+            return;
+        StopWatchingResults();
+        if (!IsSuggestionsOpen)
+            SetSearchTextQuietly("");
+    }
+
+    void StopWatchingResults()
+    {
+        if (_searchPage is { } page)
+            page.PropertyChanged -= OnResultsPageChanged;
+        _searchPage = null;
+        _searchResults = null;
+    }
+
+    void SetSearchTextQuietly(string text)
+    {
+        _choosing = true;
+        SearchText = text;
+        _choosing = false;
+    }
+
+    /// <summary>The × in the search box: empties it and closes the results it opened.</summary>
+    [RelayCommand]
+    void ClearSearch()
+    {
+        CloseSuggestions();
+        var page = _searchPage;
+        var results = _searchResults;
+        StopWatchingResults();
+        SetSearchTextQuietly("");
+        if (page is not null && results is not null && ReferenceEquals(page.Drill, results))
+            page.BackCommand.Execute(null);
     }
 
     static void Remember(SearchHistoryEntry entry) => AppServices.Settings.Update(s =>
