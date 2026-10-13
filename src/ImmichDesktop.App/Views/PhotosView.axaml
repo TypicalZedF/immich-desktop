@@ -311,8 +311,8 @@
               </DataTemplate>
             </ListBox.DataTemplates>
           </ListBox>
-          <c:TimelineScrubber Grid.Column="1" Name="Scrubber" Width="76" Sections="{Binding Sections}"
-                              IsVisible="{Binding HasSections}" Margin="0,0,8,8" />
+          <c:TimelineScrubber Grid.Column="1" Name="Scrubber" Width="68" Sections="{Binding Sections}"
+                              IsVisible="{Binding HasSections}" Margin="2,0,6,10" />
 
           <!-- States -->
           <StackPanel Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsLoading}">

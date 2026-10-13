@@ -42,11 +42,14 @@ public partial class PhotosView : UserControl
         _grid.SizeChanged += (_, e) => UpdateLayout(e.NewSize.Width);
         _grid.TemplateApplied += (_, _) => HookScroll();
 
-        // The date rail scrolls the grid.
-        _scrubber.SeekRequested += offset =>
+        // The date rail scrolls the grid (and the wheel over it scrolls the photos, as you'd expect).
+        _scrubber.SeekRequested += SeekTo;
+        _scrubber.PointerWheelChanged += (_, e) =>
         {
-            if (_scroll is not null)
-                _scroll.Offset = new Vector(_scroll.Offset.X, offset);
+            if (_scroll is null)
+                return;
+            _scroll.Offset = new Vector(_scroll.Offset.X, Math.Clamp(_scroll.Offset.Y - e.Delta.Y * 120, 0, Math.Max(0, _scroll.Extent.Height - _scroll.Viewport.Height)));
+            e.Handled = true;
         };
 
         // Map: zoom buttons, "show photos in this area", clicking a bubble.
@@ -76,17 +79,63 @@ public partial class PhotosView : UserControl
         _scroll.SizeChanged += (_, _) => UpdateScrubber();
     }
 
+    /// <summary>With the date rail showing, the grid's own scrollbar would just crowd it.</summary>
+    void UpdateScrollBar()
+    {
+        var rail = _vm?.HasSections == true;
+        ScrollViewer.SetVerticalScrollBarVisibility(_grid, rail ? Avalonia.Controls.Primitives.ScrollBarVisibility.Hidden : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto);
+        _grid.Padding = new Thickness(0, 0, rail ? 2 : 12, 24);
+        if (_grid.Bounds.Width > 0)
+            UpdateLayout(_grid.Bounds.Width);
+    }
+
     void UpdateScrubber()
     {
-        if (_scroll is not null)
-            _scrubber.SetScroll(_scroll.Offset.Y, _scroll.Extent.Height, _scroll.Viewport.Height);
+        if (_scroll is not null && _vm is not null && CurrentOffset() is { } offset)
+            _scrubber.SetScroll(offset, _vm.ContentHeight, _scroll.Viewport.Height);
+    }
+
+    /// <summary>
+    /// The exact position in the grid, from the row actually at the top of the screen. (The scrollbar's
+    /// numbers are estimates for rows that haven't been drawn yet, so they drift on long timelines.)
+    /// </summary>
+    double? CurrentOffset()
+    {
+        if (_vm is null || _scroll is null)
+            return null;
+        if (_scroll.Offset.Y <= 0.5)
+            return 0;
+        foreach (var container in _grid.GetRealizedContainers())
+        {
+            if (container.TranslatePoint(default, _scroll) is not { } top)
+                continue;
+            if (top.Y <= 0.5 && top.Y + container.Bounds.Height > 0.5)
+                return _vm.RowOffset(_grid.IndexFromContainer(container)) - top.Y;
+        }
+        return null;
+    }
+
+    /// <summary>Scrolls so that an exact grid position is at the top: bring its row into view, then line it up.</summary>
+    void SeekTo(double offset)
+    {
+        if (_vm is null || _scroll is null)
+            return;
+        var (index, within) = _vm.RowAt(offset);
+        _grid.ScrollIntoView(index);
+        _grid.UpdateLayout();
+        if (_grid.ContainerFromIndex(index) is { } container && container.TranslatePoint(default, _scroll) is { } top)
+        {
+            var target = _scroll.Offset.Y + top.Y + within;
+            _scroll.Offset = new Vector(_scroll.Offset.X, Math.Clamp(target, 0, Math.Max(0, _scroll.Extent.Height - _scroll.Viewport.Height)));
+        }
+        UpdateScrubber();
     }
 
     void UpdateLayout(double width)
     {
         var scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
-        // Leave room for the list padding and the scrollbar.
-        _vm?.SetLayout(width - 12, scaling);
+        // Leave room for the list padding (which also holds the scrollbar when there's no date rail).
+        _vm?.SetLayout(width - _grid.Padding.Right, scaling);
     }
 
     void UpdateViewerPixels()
@@ -118,6 +167,7 @@ public partial class PhotosView : UserControl
         if (_vm is null)
             return;
         _vm.PropertyChanged += OnViewModelChanged;
+        UpdateScrollBar();
         if (_grid.Bounds.Width > 0)
             UpdateLayout(_grid.Bounds.Width);
     }
@@ -131,6 +181,9 @@ public partial class PhotosView : UserControl
                 break;
             case nameof(PhotosViewModel.Rows):
                 _scroll?.ScrollToHome();
+                break;
+            case nameof(PhotosViewModel.HasSections):
+                UpdateScrollBar();
                 break;
             case nameof(PhotosViewModel.Markers) or nameof(PhotosViewModel.ShowMap):
                 Avalonia.Threading.Dispatcher.UIThread.Post(UpdateAreaButton, Avalonia.Threading.DispatcherPriority.Background);

@@ -291,6 +291,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     {
         if (_columns == 0 || _buckets.Count == 0)
         {
+            _rowOffsets = [0];
             Rows = [];
             Sections = [];
             return;
@@ -312,15 +313,41 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             for (var start = 0; start < bucket.Count; start += _columns)
                 rows.Add(new AssetRowViewModel(this, bucket, start, Math.Min(_columns, bucket.Count - start), tile));
         }
+        _rowOffsets = new double[rows.Count + 1];
+        for (var i = 0; i < rows.Count; i++)
+            _rowOffsets[i + 1] = _rowOffsets[i] + (rows[i] is AssetRowViewModel row ? row.RowHeight : HeaderHeight);
         Rows = new ObservableCollection<object>(rows);
         // The rail is for the timeline; one big group (e.g. search results) has no dates to show.
         Sections = sections.Count > 1 && sections.Any(s => s.Year is not null) ? sections : [];
+    }
+
+    // Exact positions of the grid's rows. The list only estimates the height of rows it hasn't drawn,
+    // so the date rail works from these instead of the scrollbar.
+    double[] _rowOffsets = [0];
+
+    /// <summary>Total height of the grid's rows.</summary>
+    public double ContentHeight => _rowOffsets[^1];
+
+    /// <summary>Where row <paramref name="index"/> starts.</summary>
+    public double RowOffset(int index) => _rowOffsets[Math.Clamp(index, 0, _rowOffsets.Length - 1)];
+
+    /// <summary>The row at a position (and how far into it the position is).</summary>
+    public (int Index, double Within) RowAt(double offset)
+    {
+        if (_rowOffsets.Length < 2)
+            return (0, 0);
+        var i = Array.BinarySearch(_rowOffsets, offset);
+        if (i < 0)
+            i = ~i - 1;
+        i = Math.Clamp(i, 0, _rowOffsets.Length - 2);
+        return (i, offset - _rowOffsets[i]);
     }
 
     void ReleaseRows()
     {
         foreach (var row in Rows.OfType<AssetRowViewModel>())
             row.Unrealize();
+        _rowOffsets = [0];
         Rows = [];
         Sections = [];
         _buckets = [];

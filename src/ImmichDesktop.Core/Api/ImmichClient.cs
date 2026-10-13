@@ -26,7 +26,12 @@ public sealed class ImmichClient : IDisposable
         _http.BaseAddress = ApiUrl;
 
         if (credential is { Kind: AuthKind.AccessToken })
+        {
             _http.DefaultRequestHeaders.Authorization = new("Bearer", credential.Secret);
+            // Immich redirects some image requests (e.g. full size → original), and .NET drops the
+            // Authorization header on redirects. Immich's own header survives them.
+            _http.DefaultRequestHeaders.Add("x-immich-user-token", credential.Secret);
+        }
         else if (credential is { Kind: AuthKind.ApiKey })
             _http.DefaultRequestHeaders.Add("x-api-key", credential.Secret);
     }

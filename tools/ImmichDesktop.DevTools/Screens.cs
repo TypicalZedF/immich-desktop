@@ -148,6 +148,19 @@ static class Screens
 
             shell.Navigate(ShellPage.Photos);
             Shot(main, outDir, $"15-photos-{suffix}", height: 860, settle: TimeSpan.FromSeconds(3));
+            // Hover the date rail between labels (where hovering used to do nothing).
+            Shot(main, outDir, $"15b-photos-rail-hover-{suffix}", height: 860, settle: TimeSpan.FromSeconds(1),
+                interact: w => w.MouseMove(new Avalonia.Point(1060 - 40, 520)));
+            // Click near the bottom of the rail: jumps to the oldest months.
+            Shot(main, outDir, $"15c-photos-rail-jump-{suffix}", height: 860, settle: TimeSpan.FromSeconds(1), interact: w =>
+            {
+                var at = new Avalonia.Point(1060 - 40, 800);
+                w.MouseMove(at);
+                w.MouseDown(at, Avalonia.Input.MouseButton.Left);
+                w.MouseUp(at, Avalonia.Input.MouseButton.Left);
+                Pump(TimeSpan.FromSeconds(1.5));
+                w.MouseMove(new Avalonia.Point(700, 500));
+            });
             var photos = (PhotosViewModel)Page(shell, ShellPage.Photos);
             var cell = photos.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).First(c => c.Asset is not null && c.Index == 4);
             photos.OpenViewer(cell);
@@ -260,7 +273,8 @@ static class Screens
         }
     }
 
-    static void Shot(MainWindowViewModel vm, string dir, string name, int width = 1060, int height = 720, TimeSpan? settle = null)
+    static void Shot(MainWindowViewModel vm, string dir, string name, int width = 1060, int height = 720, TimeSpan? settle = null,
+        Action<MainWindow>? interact = null)
     {
         var window = new MainWindow { DataContext = vm, Width = width, Height = height };
         window.Show();
@@ -271,6 +285,11 @@ static class Screens
         }
         if (settle is { } wait)
             Pump(wait);
+        if (interact is not null)
+        {
+            interact(window);
+            Pump(TimeSpan.FromMilliseconds(300));
+        }
         var frame = window.CaptureRenderedFrame();
         frame?.Save(Path.Combine(dir, name + ".png"));
         window.DataContext = null;

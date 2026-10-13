@@ -166,6 +166,11 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         {
             _owner.FullsizeSupported = false; // older server: the preview is the best there is
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The preview is already showing; a sharper version failing isn't worth an error.
+            Log.Info($"Full-size image unavailable for {asset.Id}: {ex.Message}");
+        }
     }
 
     async Task SwapInAsync(TimelineAsset asset, Func<Task<Bitmap>> load, CancellationToken ct)
