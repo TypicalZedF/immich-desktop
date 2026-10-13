@@ -33,9 +33,23 @@
 
 ## Install (end users)
 
-Download and run **`ImmichDesktop-win-Setup.exe`**. No admin rights or .NET install needed; it installs per-user into `%LocalAppData%\ImmichDesktop`.
+1. Open the repository's **[Releases](../../releases/latest)** page.
+2. Download **`ImmichDesktop-win-Setup.exe`** and run it. That's it: no admin rights, no .NET install. It installs per-user, adds Start menu and desktop shortcuts, and opens the setup screen.
+   - Prefer no install? Download **`ImmichDesktop-win-Portable.zip`**, unzip anywhere and run `ImmichDesktop.exe`.
+3. Uninstall any time from **Settings → Apps → Installed apps → Immich Desktop**.
 
-Uninstall from **Settings → Apps → Installed apps → Immich Desktop**.
+> Until the installer is code-signed, Windows SmartScreen shows "Windows protected your PC". Click **More info → Run anyway**.
+
+## Releasing a new version
+
+Releases are built automatically by GitHub Actions (`.github/workflows/release.yml`):
+
+```bash
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+A few minutes later the new `Setup.exe` appears on the Releases page. You can also start it from the **Actions** tab → *Release* → *Run workflow*.
 
 ## Build from source
 
@@ -91,5 +105,5 @@ To-do for a polished Linux release: test on GNOME/KDE, add libsecret, and publis
 ## Before you publish a release
 
 1. **Code signing.** Unsigned installers trigger a SmartScreen warning. Get a certificate (or Azure Trusted Signing) and pass `--signParams` / `--azureTrustedSignFile` to `vpk pack`.
-2. **Auto-updates.** Set `AppInfo.UpdateRepositoryUrl` (in `src/ImmichDesktop.Core/AppInfo.cs`) to your GitHub repo, then upload the contents of `artifacts/releases/win-x64` to a GitHub Release (`vpk upload github ...`).
+2. **Auto-updates.** The release workflow already publishes everything the updater needs. Set `AppInfo.UpdateRepositoryUrl` (in `src/ImmichDesktop.Core/AppInfo.cs`) to the repo URL to turn on in-app updates. This only works once the repository is public; installed apps can't read releases from a private repo.
 3. **Name & branding.** This is an unofficial client. Check [Immich's brand guidelines](https://immich.app) before using "Immich" in a public product name. `AppInfo.Name` is the single place to rename it.
