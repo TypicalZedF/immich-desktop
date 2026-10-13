@@ -110,6 +110,17 @@ public class OnDeviceModelTests
     }
 
     [Fact]
+    public void Telemetry_is_off_and_model_fingerprints_are_known()
+    {
+        Assert.True(OnDeviceModels.TelemetryDisabled);
+        var files = OnDeviceModels.Files();
+        Assert.Equal(3, files.Count);
+        Assert.All(files, f => Assert.Matches("^[0-9a-f]{64}$", f.Sha256));
+        // The NSFWJS conversion in this repo (tools/models/nsfwjs_to_onnx.py) produces exactly this file.
+        Assert.Equal("6fa22cc593949f9f47757f0b91310113f068ea91a9e701df82c8155d8a8c7c94", files.Single(f => f.File == NsfwClassifier.ModelFile).Sha256);
+    }
+
+    [Fact]
     public void A_landscape_has_no_text()
     {
         using var photo = Landscape(0xFF7AB8E8, 0xFF2E7D32);

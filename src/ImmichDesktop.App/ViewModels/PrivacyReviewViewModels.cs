@@ -37,6 +37,77 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
         AppServices.PrivacyScan.StatusChanged += OnStatus;
         Apply(AppServices.PrivacyScan.Status);
         _ = LoadAsync();
+        _ = LoadModelsAsync();
+    }
+
+    // ---- How it works (shown on the page, so it's clear what the check does and can see) ----
+
+    [ObservableProperty]
+    public partial bool ShowDetails { get; set; }
+
+    public string ServerHost => Uri.TryCreate(AppServices.Settings.Current.ServerUrl, UriKind.Absolute, out var uri) ? uri.Host : Tr.T("your Immich server");
+    public string DatabasePath => AppPaths.DatabaseFile;
+    public string ModelsFolder => OnDeviceModels.Directory;
+    public string SourceUrl => "https://github.com/TypicalZedF/immich-desktop/tree/main/src/ImmichDesktop.Core/Privacy";
+
+    [ObservableProperty]
+    public partial string RunsOn { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string TelemetryText { get; set; } = "";
+
+    public ObservableCollection<PrivacyModelViewModel> Models { get; } = [];
+
+    async Task LoadModelsAsync()
+    {
+        try
+        {
+            var (files, telemetryOff) = await Task.Run(() => (OnDeviceModels.Files(), OnDeviceModels.TelemetryDisabled));
+            TelemetryText = telemetryOff
+                ? Tr.T("One detail: the engine that runs the models (ONNX Runtime, made by Microsoft) has a built-in option to report usage statistics to Microsoft through Windows' diagnostic settings. Never your photos or results, only things like which version is running. This app switches that option off before the check starts, so not even that is sent.")
+                : Tr.T("Couldn't confirm that ONNX Runtime's usage statistics are switched off; see the log.");
+            string Describe(string file) => file switch
+            {
+                NsfwClassifier.ModelFile => Tr.T("Nudity detector. NSFWJS MobileNetV2 by Infinite Red, MIT license. Looks at the whole picture shrunk to 224×224 and scores it as drawing, hentai, neutral, porn or sexy. Flagged as Nudity when porn + hentai is over 60%, Revealing when sexy is over 85%."),
+                PhotoTextReader.DetectModelFile => Tr.T("Text finder. PaddleOCR PP-OCRv4 detection by PaddlePaddle (via RapidOCR), Apache 2.0 license. Marks where lines of text are."),
+                PhotoTextReader.ReadModelFile => Tr.T("Text reader. PaddleOCR PP-OCRv4 recognition, Apache 2.0 license. Reads each line. The text is only checked against the rules below, then thrown away."),
+                _ => file,
+            };
+            Models.Clear();
+            foreach (var f in files)
+                Models.Add(new PrivacyModelViewModel(f.File, Describe(f.File), f.Bytes > 0 ? Format.Bytes(f.Bytes) : Tr.T("missing"), f.Sha256));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Could not describe the privacy models", ex);
+        }
+    }
+
+    [RelayCommand]
+    void ToggleDetails() => ShowDetails = !ShowDetails;
+
+    [RelayCommand]
+    void OpenModelsFolder() => Core.Platform.ShellLauncher.Open(ModelsFolder);
+
+    [RelayCommand]
+    void OpenSource() => Core.Platform.ShellLauncher.Open(SourceUrl);
+
+    /// <summary>Deletes every stored result (and your "not sensitive" choices); the check starts over if it's on.</summary>
+    [RelayCommand]
+    async Task ForgetResultsAsync()
+    {
+        if (!await _owner.ConfirmAsync(Tr.T("Forget all results?"),
+                Tr.T("Deletes what the check found and your \"not sensitive\" choices from this PC. Your photos aren't touched. If the check is on, it starts over."),
+                Tr.T("Forget results"), danger: true))
+            return;
+        AppServices.Database.ClearPrivacyScans();
+        foreach (var item in Items)
+            item.Dispose();
+        Items.Clear();
+        Count = 0;
+        UpdateSelection();
+        AppServices.PrivacyScan.Restart();
+        _owner.ShowNotice(Tr.T("Results forgotten"));
     }
 
     public ObservableCollection<PrivacySuggestionViewModel> Items { get; } = [];
@@ -95,6 +166,11 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
 
     void Apply(PrivacyScanStatus status)
     {
+        RunsOn = Tr.T("Entirely on this PC, on {0}.", status.State is PrivacyScanState.Off or PrivacyScanState.Unavailable
+            ? (OperatingSystem.IsWindows() && AppServices.Settings.Current.PrivacyScanUseGpu
+                ? Tr.T("the graphics card when it runs (DirectML), or the processor if the graphics card can't")
+                : Tr.T("the processor when it runs"))
+            : status.OnGpu ? Tr.T("the graphics card (DirectML)") : Tr.T("the processor"));
         StatusText = Describe(status);
         ShowProgress = status.State is PrivacyScanState.Scanning or PrivacyScanState.Paused && status.Total > 0;
         Progress = status.Total > 0 ? status.Checked / (double)status.Total : 0;
@@ -254,6 +330,16 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
         foreach (var item in Items)
             item.Dispose();
     }
+}
+
+/// <summary>One bundled model, as described on the page.</summary>
+public sealed class PrivacyModelViewModel(string file, string description, string size, string sha256)
+{
+    public string File { get; } = file;
+    public string Description { get; } = description;
+    public string Size { get; } = size;
+    public string Sha256 { get; } = sha256;
+    public string Fingerprint => $"{File} · {Size} · SHA-256 {Sha256}";
 }
 
 public sealed partial class PrivacySuggestionViewModel(PrivacyReviewViewModel owner, string id, SensitiveKind kinds, double score) : ViewModelBase, IDisposable

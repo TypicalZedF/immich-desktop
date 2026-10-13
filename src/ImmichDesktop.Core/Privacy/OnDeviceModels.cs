@@ -19,6 +19,43 @@ public static class OnDeviceModels
 
     public static string PathOf(string file) => Path.Combine(Directory, file);
 
+    /// <summary>
+    /// Official Windows builds of ONNX Runtime can report usage events to Microsoft through
+    /// Windows' diagnostics. They never include pictures, but this check promises that nothing
+    /// leaves the PC, so it's switched off before any model is loaded.
+    /// </summary>
+    static readonly Lazy<bool> TelemetryOff = new(() =>
+    {
+        try
+        {
+            OrtEnv.Instance().DisableTelemetryEvents();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Couldn't switch off ONNX Runtime telemetry", ex);
+            return false;
+        }
+    });
+
+    /// <summary>True once ONNX Runtime's usage telemetry is confirmed off.</summary>
+    public static bool TelemetryDisabled => TelemetryOff.Value;
+
+    /// <summary>A bundled model file: its size and SHA-256, so anyone can check it's the published one.</summary>
+    public sealed record ModelFile(string File, string FullPath, long Bytes, string Sha256);
+
+    public static IReadOnlyList<ModelFile> Files() =>
+        new[] { NsfwClassifier.ModelFile, PhotoTextReader.DetectModelFile, PhotoTextReader.ReadModelFile }
+            .Select(file =>
+            {
+                var path = PathOf(file);
+                if (!File.Exists(path))
+                    return new ModelFile(file, path, 0, "");
+                using var stream = File.OpenRead(path);
+                return new ModelFile(file, path, stream.Length, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(stream)));
+            })
+            .ToList();
+
     public static bool Available =>
         File.Exists(PathOf(NsfwClassifier.ModelFile)) && File.Exists(PathOf(PhotoTextReader.DetectModelFile)) && File.Exists(PathOf(PhotoTextReader.ReadModelFile));
 
@@ -26,6 +63,7 @@ public static class OnDeviceModels
     public static InferenceSession Open(string file, bool useGpu, out bool onGpu)
     {
         var path = PathOf(file);
+        _ = TelemetryOff.Value;
         if (useGpu && OperatingSystem.IsWindows())
         {
             try

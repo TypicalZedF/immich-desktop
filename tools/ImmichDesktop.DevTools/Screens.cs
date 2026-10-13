@@ -242,7 +242,17 @@ static class Screens
             // then shows what it suggests for the locked folder.
             if (suffix == "light")
             {
+                // On public Wi-Fi it waits...
+                ImmichDesktop.Core.Platform.NetworkStatus.Override = new ImmichDesktop.Core.Platform.NetworkSnapshot("Cafe Wi-Fi", false, IsPrivate: false);
+                Task.Run(() => AppServices.Network.CheckAsync()).GetAwaiter().GetResult(); // off the UI thread: it awaits
                 AppServices.Settings.Update(s => { s.PrivacyScanEnabled = true; s.PrivacyScanUseGpu = false; });
+                Pump(TimeSpan.FromSeconds(4));
+                Console.WriteLine($"Privacy check on public Wi-Fi: {AppServices.PrivacyScan.Status.State} ({AppServices.PrivacyScan.Status.Detail}), checked {AppServices.PrivacyScan.Status.Checked}");
+                if (AppServices.PrivacyScan.Status.State != ImmichDesktop.Core.Privacy.PrivacyScanState.Paused)
+                    throw new InvalidOperationException("The privacy check ran on a public network");
+                // ...and runs at home.
+                ImmichDesktop.Core.Platform.NetworkStatus.Override = new ImmichDesktop.Core.Platform.NetworkSnapshot("Home", false, IsPrivate: true);
+                Task.Run(() => AppServices.Network.CheckAsync()).GetAwaiter().GetResult(); // off the UI thread: it awaits
                 var started = DateTime.UtcNow;
                 while (AppServices.PrivacyScan.Status.State is not (ImmichDesktop.Core.Privacy.PrivacyScanState.Done or ImmichDesktop.Core.Privacy.PrivacyScanState.Error)
                        && DateTime.UtcNow - started < TimeSpan.FromMinutes(6))
@@ -257,6 +267,9 @@ static class Screens
             Shot(main, outDir, $"19p-privacy-{suffix}", height: 860, settle: TimeSpan.FromSeconds(2));
             if (suffix == "light" && privacyPage.Privacy is { } review)
             {
+                review.ShowDetails = true;
+                Shot(main, outDir, "19p3-privacy-how-it-works", height: 2100, settle: TimeSpan.FromSeconds(1));
+                review.ShowDetails = false;
                 review.ShowPictures = true;
                 Shot(main, outDir, "19p2-privacy-shown", height: 860, settle: TimeSpan.FromSeconds(0.5));
                 // Move the card to the locked folder, mark the prescription as fine.

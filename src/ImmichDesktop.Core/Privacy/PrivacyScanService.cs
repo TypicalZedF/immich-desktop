@@ -36,14 +36,21 @@ public sealed class PrivacyScanService : IDisposable
     readonly StateDatabase _db;
     readonly AccountService _account;
     readonly Func<bool> _isMetered;
+    readonly Func<bool> _isPrivateNetwork;
     readonly Func<byte[], BgraImage?> _decode;
     readonly Lock _gate = new();
     CancellationTokenSource? _run;
     Task? _task;
     bool? _runningWithGpu;
 
-    public PrivacyScanService(SettingsStore settings, StateDatabase db, AccountService account, Func<bool> isMetered, Func<byte[], BgraImage?> decode)
+    /// <param name="isPrivateNetwork">
+    /// True on a home (private) network. The check only runs then: never on public Wi-Fi, even
+    /// though it only talks to your own server.
+    /// </param>
+    public PrivacyScanService(SettingsStore settings, StateDatabase db, AccountService account, Func<bool> isMetered,
+        Func<bool> isPrivateNetwork, Func<byte[], BgraImage?> decode)
     {
+        _isPrivateNetwork = isPrivateNetwork;
         _settings = settings;
         _db = db;
         _account = account;
@@ -109,6 +116,8 @@ public sealed class PrivacyScanService : IDisposable
             {
                 if (_account.Client is not { } client)
                     return;
+                // Not even the photo list is fetched until it's allowed to run (e.g. on a home network).
+                await WaitUntilAllowedAsync(Status.Checked, Status.Total, onGpu, ct);
                 var library = await ListLibraryAsync(client, ct);
                 var done = await Task.Run(() => _db.GetPrivacyScanned(ChecksVersion), ct);
                 var todo = library.Where(id => !done.Contains(id)).ToList();
@@ -116,12 +125,13 @@ public sealed class PrivacyScanService : IDisposable
                 var lastReport = DateTime.MinValue;
 
                 // Fetch the next preview while the current one is being checked.
-                Task<byte[]?>? next = todo.Count > 0 ? FetchAsync(client, todo[0], ct) : null;
+                // (Only ever one ahead, and only while it's allowed to run.)
+                Task<byte[]?>? next = null;
                 for (var i = 0; i < todo.Count; i++)
                 {
                     await WaitUntilAllowedAsync(checkedCount, library.Count, onGpu, ct);
-                    var data = await next!;
-                    next = i + 1 < todo.Count ? FetchAsync(client, todo[i + 1], ct) : null;
+                    var data = await (next ?? FetchAsync(client, todo[i], ct));
+                    next = i + 1 < todo.Count && PauseReason() is null ? FetchAsync(client, todo[i + 1], ct) : null;
                     if (data is not null && _decode(data) is { } image)
                     {
                         var (kinds, score) = Check(classifier, reader, image);
@@ -242,6 +252,8 @@ public sealed class PrivacyScanService : IDisposable
     string? PauseReason()
     {
         var s = _settings.Current;
+        if (!_isPrivateNetwork())
+            return Loc.T("Paused: only runs on a private network, like at home");
         if (PowerStatus.IsOnBattery())
             return Loc.T("Paused while on battery");
         if (_isMetered())
@@ -249,6 +261,18 @@ public sealed class PrivacyScanService : IDisposable
         if (s.PrivacyScanOnlyWhenIdle && UserIdle.Duration() is { } idle && idle < IdleNeeded)
             return Loc.T("Waiting until the PC isn't being used");
         return null;
+    }
+
+    /// <summary>Starts over (e.g. after its results were forgotten).</summary>
+    public void Restart()
+    {
+        lock (_gate)
+        {
+            _run?.Cancel();
+            _run = null;
+            _runningWithGpu = null;
+        }
+        Apply();
     }
 
     /// <summary>The suggestions were acted on (moved or dismissed): refresh the count.</summary>

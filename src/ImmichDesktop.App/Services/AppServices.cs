@@ -35,7 +35,7 @@ public static class AppServices
         Updates = new UpdateService();
         Profile = new ProfileService();
         Wallpaper = new WallpaperService();
-        PrivacyScan = new PrivacyScanService(Settings, Database, Account, () => Network.IsMetered, DecodeForPrivacyCheck);
+        PrivacyScan = new PrivacyScanService(Settings, Database, Account, () => Network.IsMetered, IsPrivateNetwork, DecodeForPrivacyCheck);
         Account.SessionChanged += () =>
         {
             if (Account.IsSignedIn)
@@ -46,6 +46,12 @@ public static class AppServices
         if (Account.IsSignedIn)
             _ = Profile.RefreshAsync();
     }
+
+    /// <summary>
+    /// A home network, for the privacy check: one set to Private in Windows, or the one where the
+    /// app reaches your server at its home (local) address.
+    /// </summary>
+    public static bool IsPrivateNetwork() => Network.IsUsingLocal || Network.Network.IsPrivate == true;
 
     /// <summary>Decodes a preview for the on-device privacy check (upright, at most 1280 pixels).</summary>
     static BgraImage? DecodeForPrivacyCheck(byte[] data)

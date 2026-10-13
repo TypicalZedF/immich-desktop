@@ -2,8 +2,11 @@ using System.Diagnostics;
 
 namespace ImmichDesktop.Core.Platform;
 
-/// <summary>The network this PC is on: its name (the Wi-Fi name, or the wired network's name) and whether it's metered.</summary>
-public sealed record NetworkSnapshot(string? Name, bool IsMetered)
+/// <summary>
+/// The network this PC is on: its name (the Wi-Fi name, or the wired network's name), whether it's
+/// metered, and whether the system calls it private (home or work) rather than public (null: unknown).
+/// </summary>
+public sealed record NetworkSnapshot(string? Name, bool IsMetered, bool? IsPrivate = null)
 {
     public static NetworkSnapshot Unknown { get; } = new(null, false);
 }
