@@ -86,6 +86,12 @@ sealed class FakeImmichServer : HttpMessageHandler
             case ("POST", "/api/albums"):
             {
                 using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+                // Like Immich v3 (zod): optional fields may be omitted, but not null.
+                foreach (var property in doc.RootElement.EnumerateObject())
+                {
+                    if (property.Value.ValueKind == JsonValueKind.Null && property.Name != "description")
+                        return Json(HttpStatusCode.BadRequest, new { message = "Validation failed", statusCode = 400 });
+                }
                 var id = Guid.NewGuid().ToString();
                 var name = doc.RootElement.GetProperty("albumName").GetString()!;
                 Albums[id] = (name, []);

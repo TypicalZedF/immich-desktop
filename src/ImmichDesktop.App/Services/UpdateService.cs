@@ -102,7 +102,13 @@ public sealed class UpdateService : IDisposable
                 return;
             }
 
-            var path = Path.Combine(DownloadDirectory, Release.Installer.Name);
+            // Every release's installer has the same asset name, so cache it under its version
+            // (reusing an older download here is what kept re-installing the previous version).
+            var version = Release.Version.ToString(3);
+            var path = Path.Combine(DownloadDirectory, $"ImmichDesktop-{version}-Setup.exe");
+            RemoveOtherDownloads(path);
+            if (File.Exists(path) && !IsInstallerFor(path, Release.Version))
+                File.Delete(path);
             if (!File.Exists(path))
             {
                 DownloadProgress = 0;
@@ -112,6 +118,11 @@ public sealed class UpdateService : IDisposable
                     DownloadProgress = p;
                     Changed?.Invoke();
                 }, CancellationToken.None);
+            }
+            if (!IsInstallerFor(path, Release.Version))
+            {
+                File.Delete(path);
+                throw new UpdateException($"The downloaded installer isn't version {version}. It was discarded; try again later.");
             }
             _installerPath = path;
             SetState(UpdateState.Ready);
@@ -152,6 +163,33 @@ public sealed class UpdateService : IDisposable
             Log.Error("Could not start the update installer", ex);
             Error = "The update couldn't be started. You can download it from the release page instead.";
             SetState(UpdateState.Failed);
+        }
+    }
+
+    /// <summary>The installer is stamped with its version (VersionInfoVersion in installer.iss).</summary>
+    static bool IsInstallerFor(string path, Version expected)
+    {
+        try
+        {
+            var info = FileVersionInfo.GetVersionInfo(path);
+            return GitHubUpdateChecker.ParseVersion(info.ProductVersion ?? info.FileVersion) == expected;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    static void RemoveOtherDownloads(string keep)
+    {
+        if (!Directory.Exists(DownloadDirectory))
+            return;
+        foreach (var file in Directory.EnumerateFiles(DownloadDirectory))
+        {
+            if (!string.Equals(file, keep, StringComparison.OrdinalIgnoreCase))
+            {
+                try { File.Delete(file); } catch { /* in use; next time */ }
+            }
         }
     }
 

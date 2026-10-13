@@ -8,7 +8,12 @@ namespace ImmichDesktop.Core.Api;
 /// <summary>Typed client for the subset of the Immich REST API this app needs.</summary>
 public sealed class ImmichClient : IDisposable
 {
-    static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    // Leave unset fields out entirely: Immich v3 validates strictly and rejects null for optional fields
+    // (e.g. "assetIds": null when creating an album fails with "Validation failed").
+    static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
     static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
 
     readonly HttpClient _http;
@@ -425,6 +430,9 @@ public sealed class ImmichClient : IDisposable
         {
             var body = await response.Content.ReadAsStringAsync(ct);
             detail = ParseErrorMessage(body);
+            // Keep the server's full explanation (e.g. which field failed validation) for troubleshooting.
+            if ((int)response.StatusCode is >= 400 and < 500 && response.StatusCode != HttpStatusCode.Unauthorized && body.Length > 0)
+                Log.Warn($"{(int)response.StatusCode} from {response.RequestMessage?.Method} {response.RequestMessage?.RequestUri?.AbsolutePath}: {(body.Length > 600 ? body[..600] : body)}");
         }
         catch
         {
