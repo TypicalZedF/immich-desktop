@@ -106,6 +106,12 @@ public sealed class AppSettings
     public bool LaunchAtStartup { get; set; } = true;
     public AppTheme Theme { get; set; } = AppTheme.System;
 
+    /// <summary>Draw the app with the graphics card (smoother). Off: the processor draws it. Applies after a restart.</summary>
+    public bool GpuRendering { get; set; } = true;
+
+    /// <summary>Photo grid thumbnail size in pixels (the zoom slider in Photos).</summary>
+    public int ThumbnailSize { get; set; } = 168;
+
     /// <summary>App language code (e.g. "de"); null follows the system language.</summary>
     public string? Language { get; set; }
 

@@ -31,6 +31,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         ServerVersion = s.ServerVersion ?? "";
 
         LaunchAtStartup = Autostart.IsEnabled();
+        GpuRendering = s.GpuRendering;
         _theme = s.Theme;
         LanguageOptions = [new Option<string?>(Tr.T("System ({0})", Tr.Languages.First(l => l.Code == Tr.SystemLanguage).Name), null),
             .. Tr.Languages.Select(l => new Option<string?>(l.Name, l.Code))];
@@ -384,6 +385,28 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     AppTheme _theme;
+
+    // ---- Graphics ----
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GpuStatus))]
+    public partial bool GpuRendering { get; set; }
+
+    partial void OnGpuRenderingChanged(bool value)
+    {
+        if (_loading) return;
+        AppServices.Settings.Update(s => s.GpuRendering = value);
+    }
+
+    /// <summary>What's drawing the app now, and whether a restart is needed for the setting.</summary>
+    public string GpuStatus
+    {
+        get
+        {
+            var now = Program.IsGpuActive ? Tr.T("Right now the graphics card draws the app.") : Tr.T("Right now the processor draws the app.");
+            return GpuRendering != Program.GpuRequested ? now + " " + Tr.T("Restart the app to apply the change.") : now;
+        }
+    }
 
     // ---- Language ----
 

@@ -24,6 +24,19 @@ public partial class MainWindow : Window
         if (AssetLoader.Exists(icon))
             Icon = new WindowIcon(AssetLoader.Open(icon));
 
+        Opened += async (_, _) =>
+        {
+            // Find out whether the graphics card actually ended up drawing (it falls back to the processor).
+            try
+            {
+                if (Avalonia.Rendering.Composition.ElementComposition.GetElementVisual(this)?.Compositor is { } compositor)
+                    Program.IsGpuActive = await compositor.TryGetCompositionGpuInterop() is not null;
+            }
+            catch (Exception ex)
+            {
+                Core.Log.Info($"Couldn't tell how the app is drawn: {ex.Message}");
+            }
+        };
         AddHandler(PointerMovedEvent, (_, _) => _lastInput = DateTime.UtcNow, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(KeyDownEvent, (_, _) => _lastInput = DateTime.UtcNow, RoutingStrategies.Tunnel, handledEventsToo: true);
         _idleTimer = new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, (_, _) =>

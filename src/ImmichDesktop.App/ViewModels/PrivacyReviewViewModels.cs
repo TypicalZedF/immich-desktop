@@ -186,7 +186,8 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
             PrivacyScanState.Off => Tr.T("Off. Turn it on to check your library on this PC."),
             PrivacyScanState.Unavailable => status.Detail ?? Tr.T("Not available on this PC."),
             PrivacyScanState.Starting => Tr.T("Starting…"),
-            PrivacyScanState.Scanning => Tr.T("Checking {0} of {1} ({2})", status.Checked.ToString("N0"), status.Total.ToString("N0"), where),
+            PrivacyScanState.Scanning => Tr.T("Checking {0} of {1} ({2})", status.Checked.ToString("N0"), status.Total.ToString("N0"), where)
+                + (status.Remaining is { } left ? " · " + Format.TimeLeft(left) : ""),
             PrivacyScanState.Paused => Tr.T("{0} · {1} of {2} checked", status.Detail ?? Tr.T("Paused"), status.Checked.ToString("N0"), status.Total.ToString("N0")),
             PrivacyScanState.Done => Tr.T("All {0} photos and videos checked. New ones are checked as they arrive.", status.Total.ToString("N0")),
             PrivacyScanState.Error => Tr.T("Stopped: {0} Trying again soon.", status.Detail ?? ""),

@@ -9,7 +9,9 @@ namespace ImmichDesktop.Core.Privacy;
 public enum PrivacyScanState { Off, Unavailable, Starting, Scanning, Paused, Done, Error }
 
 /// <summary>Where the privacy check is, for the Utilities page.</summary>
-public sealed record PrivacyScanStatus(PrivacyScanState State, int Checked, int Total, int Suggestions, bool OnGpu, string? Detail = null)
+/// <param name="Remaining">Estimated time to finish, from the recent pace (null until there's enough to go on).</param>
+public sealed record PrivacyScanStatus(PrivacyScanState State, int Checked, int Total, int Suggestions, bool OnGpu, string? Detail = null,
+    TimeSpan? Remaining = null)
 {
     public static PrivacyScanStatus Off { get; } = new(PrivacyScanState.Off, 0, 0, 0, false);
 }
@@ -123,13 +125,16 @@ public sealed class PrivacyScanService : IDisposable
                 var todo = library.Where(id => !done.Contains(id)).ToList();
                 var checkedCount = library.Count - todo.Count;
                 var lastReport = DateTime.MinValue;
+                // Pace over the last photos (not since the start: pauses and the first slow model load would skew it).
+                var recent = new Queue<DateTime>();
 
                 // Fetch the next preview while the current one is being checked.
                 // (Only ever one ahead, and only while it's allowed to run.)
                 Task<byte[]?>? next = null;
                 for (var i = 0; i < todo.Count; i++)
                 {
-                    await WaitUntilAllowedAsync(checkedCount, library.Count, onGpu, ct);
+                    if (await WaitUntilAllowedAsync(checkedCount, library.Count, onGpu, ct))
+                        recent.Clear(); // a pause isn't part of the pace
                     var data = await (next ?? FetchAsync(client, todo[i], ct));
                     next = i + 1 < todo.Count && PauseReason() is null ? FetchAsync(client, todo[i + 1], ct) : null;
                     if (data is not null && _decode(data) is { } image)
@@ -142,11 +147,17 @@ public sealed class PrivacyScanService : IDisposable
                         _db.SavePrivacyScan(todo[i], ChecksVersion, 0, 0); // no picture to check (e.g. a format we can't open)
                     }
                     checkedCount++;
+                    recent.Enqueue(DateTime.UtcNow);
+                    while (recent.Count > 50)
+                        recent.Dequeue();
                     ct.ThrowIfCancellationRequested();
                     if (DateTime.UtcNow - lastReport > TimeSpan.FromSeconds(0.5) || i == todo.Count - 1)
                     {
                         lastReport = DateTime.UtcNow;
-                        ReportRun(new PrivacyScanStatus(PrivacyScanState.Scanning, checkedCount, library.Count, Suggestions, onGpu), ct);
+                        TimeSpan? remaining = recent.Count >= 5
+                            ? (recent.Last() - recent.Peek()) / (recent.Count - 1) * (library.Count - checkedCount)
+                            : null;
+                        ReportRun(new PrivacyScanStatus(PrivacyScanState.Scanning, checkedCount, library.Count, Suggestions, onGpu, Remaining: remaining), ct);
                     }
                 }
                 ReportRun(new PrivacyScanStatus(PrivacyScanState.Done, library.Count, library.Count, Suggestions, onGpu), ct);
@@ -237,13 +248,16 @@ public sealed class PrivacyScanService : IDisposable
         }
     }
 
-    async Task WaitUntilAllowedAsync(int checkedCount, int total, bool onGpu, CancellationToken ct)
+    /// <summary>Waits while it isn't allowed to run; true if it had to wait.</summary>
+    async Task<bool> WaitUntilAllowedAsync(int checkedCount, int total, bool onGpu, CancellationToken ct)
     {
+        var waited = false;
         while (true)
         {
             var reason = PauseReason();
             if (reason is null)
-                return;
+                return waited;
+            waited = true;
             if (Status.State != PrivacyScanState.Paused || Status.Detail != reason)
                 ReportRun(new PrivacyScanStatus(PrivacyScanState.Paused, checkedCount, total, Suggestions, onGpu, reason), ct);
             await Task.Delay(TimeSpan.FromSeconds(15), ct);

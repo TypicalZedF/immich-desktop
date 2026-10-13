@@ -69,9 +69,42 @@ internal static class Program
         }
     }
 
+    /// <summary>Whether this run draws with the graphics card (Settings → Graphics acceleration; read at startup).</summary>
+    public static bool GpuRequested { get; private set; } = true;
+
     // Also used by the visual designer.
-    public static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<App>()
+    public static AppBuilder BuildAvaloniaApp()
+    {
+        try
+        {
+            GpuRequested = new Core.Settings.SettingsStore(AppPaths.SettingsFile).Current.GpuRendering;
+        }
+        catch (Exception ex)
+        {
+            Log.Info($"Couldn't read the graphics setting: {ex.Message}");
+        }
+        var gpu = GpuRequested;
+        return AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            // Graphics card first (Direct3D through ANGLE, then OpenGL), the processor as the last resort.
+            .With(new Win32PlatformOptions
+            {
+                RenderingMode = gpu
+                    ? [Win32RenderingMode.AngleEgl, Win32RenderingMode.Wgl, Win32RenderingMode.Software]
+                    : [Win32RenderingMode.Software],
+                CompositionMode = gpu
+                    ? [Win32CompositionMode.WinUIComposition, Win32CompositionMode.DirectComposition, Win32CompositionMode.RedirectionSurface]
+                    : [Win32CompositionMode.RedirectionSurface],
+            })
+            .With(new X11PlatformOptions
+            {
+                RenderingMode = gpu ? [X11RenderingMode.Glx, X11RenderingMode.Egl, X11RenderingMode.Software] : [X11RenderingMode.Software],
+            })
+            // Room on the graphics card for many thumbnails, so scrolling back doesn't re-upload them.
+            .With(new SkiaOptions { MaxGpuResourceSizeBytes = 512L * 1024 * 1024 })
             .LogToTrace();
+    }
+
+    /// <summary>How the app is being drawn right now (set once the window is up), for Settings.</summary>
+    public static bool IsGpuActive { get; internal set; }
 }

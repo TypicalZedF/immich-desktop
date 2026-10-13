@@ -116,6 +116,15 @@
             </StackPanel>
             <ComboBox Grid.Column="1" Width="190" VerticalAlignment="Center" ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding SelectedLanguage}" />
           </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Graphics acceleration" />
+              <TextBlock Classes="caption" l:Tr.Text="Use the graphics card to draw the app, for smoother scrolling and maps. Turn off if you see flickering or blank windows." TextWrapping="Wrap" />
+              <TextBlock Classes="caption tertiary" Text="{Binding GpuStatus}" TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding GpuRendering}" />
+          </Grid>
           <Border Classes="divider" IsVisible="{Binding AutostartSupported}" />
           <Grid Classes="row" ColumnDefinitions="*,Auto" IsVisible="{Binding AutostartSupported}">
             <StackPanel>
