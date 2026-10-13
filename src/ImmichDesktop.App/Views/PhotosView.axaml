@@ -720,10 +720,10 @@
                       </StackPanel>
                     </Grid>
                   </StackPanel>
-                  <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="28,0,12,24">
-                    <StackPanel Spacing="14">
+                  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="14" Margin="28,0,24,24">
                       <!-- Transparency: where it runs, what leaves the PC, what's kept, the models and the rules -->
-                      <Border Classes="card" Padding="20,18" CornerRadius="16" IsVisible="{Binding ShowDetails}" Margin="0,0,12,0">
+                      <Border Classes="card" Padding="20,18" CornerRadius="16" IsVisible="{Binding ShowDetails}">
                         <StackPanel Spacing="16">
                           <Grid ColumnDefinitions="*,Auto">
                             <TextBlock Classes="h2" l:Tr.Text="How this works" VerticalAlignment="Center" />
