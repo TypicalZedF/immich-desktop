@@ -128,7 +128,7 @@ public sealed class TrayController : IDisposable
     {
         if (AppServices.Updates.State == UpdateState.Ready && !_menu.Items.Contains(_updateItem))
         {
-            _updateItem.Header = $"Restart to update to {AppServices.Updates.Release?.Version.ToString(3)}";
+            _updateItem.Header = $"Restart to update to {AppServices.Updates.Release?.Version}";
             _menu.Items.Insert(0, _updateItem);
             _menu.Items.Insert(1, _updateSeparator);
         }

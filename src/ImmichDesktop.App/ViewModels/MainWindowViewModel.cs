@@ -26,6 +26,24 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial DialogViewModel? Dialog { get; set; }
 
+    /// <summary>A larger in-window dialog, such as choosing a profile picture.</summary>
+    [ObservableProperty]
+    public partial ViewModelBase? Overlay { get; set; }
+
+    public void ShowOverlay(ViewModelBase overlay)
+    {
+        CloseOverlay(Overlay);
+        Overlay = overlay;
+    }
+
+    public void CloseOverlay(ViewModelBase? overlay)
+    {
+        if (overlay is null || !ReferenceEquals(Overlay, overlay))
+            return;
+        Overlay = null;
+        (overlay as IDisposable)?.Dispose();
+    }
+
     /// <summary>Provided by the window: shows a native folder picker and returns the chosen path.</summary>
     public Func<string, Task<string?>>? PickFolder { get; set; }
 
@@ -66,6 +84,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (!IsLockEnabled || IsLocked || Content is OnboardingViewModel)
             return;
         Dialog?.CancelCommand.Execute(null);
+        CloseOverlay(Overlay);
         _pendingPage = (Content as ShellViewModel)?.SelectedNav.Page ?? ShellPage.Overview;
         Replace(new LockViewModel(this, Unlock));
     }
@@ -89,6 +108,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     void Replace(ViewModelBase content)
     {
+        CloseOverlay(Overlay);
         var old = Content;
         Content = content;
         (old as IDisposable)?.Dispose();
@@ -98,6 +118,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         Dialog?.CancelCommand.Execute(null);
+        CloseOverlay(Overlay);
         (Content as IDisposable)?.Dispose();
     }
 }

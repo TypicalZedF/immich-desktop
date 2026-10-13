@@ -7,6 +7,15 @@ public enum AppTheme
     Dark,
 }
 
+/// <summary>Which releases the app updates to.</summary>
+public enum UpdateChannel
+{
+    Stable,
+
+    /// <summary>Also pre-releases, built from the beta branch: new features first, maybe rough edges.</summary>
+    Beta,
+}
+
 public enum AppLockMode
 {
     Off,
@@ -78,6 +87,7 @@ public sealed class AppSettings
     public string? LockPasswordHash { get; set; }
 
     public bool AutoInstallUpdates { get; set; } = true;
+    public UpdateChannel UpdateChannel { get; set; } = UpdateChannel.Stable;
 
     public bool IsConfigured => !string.IsNullOrEmpty(ServerUrl) && !string.IsNullOrEmpty(UserId);
 }

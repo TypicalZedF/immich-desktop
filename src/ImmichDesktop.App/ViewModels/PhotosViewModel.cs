@@ -25,11 +25,24 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     int _columns;
     double _width;
 
+    readonly Action<AssetCellViewModel>? _pick;
+
     public PhotosViewModel(ShellViewModel shell)
     {
         _ = shell;
         _ = LoadAsync();
     }
+
+    PhotosViewModel(Action<AssetCellViewModel> pick)
+    {
+        _pick = pick;
+        _ = LoadAsync();
+    }
+
+    /// <summary>The same grid for choosing a photo (e.g. a profile picture): clicking a photo picks it instead of opening it.</summary>
+    public static PhotosViewModel ForPicking(Action<AssetCellViewModel> pick) => new(pick);
+
+    public bool IsPicker => _pick is not null;
 
     internal ImmichClient? Client => AppServices.Account.Client;
     internal ThumbnailLoader? Thumbnails { get; private set; }
@@ -147,6 +160,12 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     {
         if (cell.Asset is null)
             return;
+        if (_pick is not null)
+        {
+            if (cell.Asset.IsImage)
+                _pick(cell);
+            return;
+        }
         Viewer = new PhotoViewerViewModel(this, cell.Bucket, cell.Index, cell.Asset, cell.Thumbnail);
     }
 
@@ -277,7 +296,7 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
     public double TileSize { get; } = tile;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsVideo), nameof(IsFavorite), nameof(DurationText), nameof(IsMissing))]
+    [NotifyPropertyChangedFor(nameof(IsVideo), nameof(IsFavorite), nameof(DurationText), nameof(IsMissing), nameof(CanOpen))]
     public partial TimelineAsset? Asset { get; set; }
 
     [ObservableProperty]
@@ -287,6 +306,9 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
 
     public bool IsMissing => _bound && Asset is null;
     public bool IsVideo => Asset is { IsImage: false };
+
+    /// <summary>Videos can't be picked as a profile picture.</summary>
+    public bool CanOpen => !(owner.IsPicker && IsVideo);
     public bool IsFavorite => Asset?.IsFavorite == true;
     public string DurationText => Asset?.DurationMs is { } ms and > 0 ? FormatDuration(ms) : "";
 

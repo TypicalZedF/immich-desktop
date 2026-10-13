@@ -39,6 +39,12 @@
       <Setter Property="Background" Value="{DynamicResource AppNeutralSoftBrush}" />
       <Setter Property="Opacity" Value="0.85" />
     </Style>
+    <Style Selector="Button.tile:disabled">
+      <Setter Property="Opacity" Value="0.35" />
+    </Style>
+    <Style Selector="Button.tile:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppNeutralSoftBrush}" />
+    </Style>
     <Style Selector="Button.viewerNav">
       <Setter Property="Width" Value="48" />
       <Setter Property="Height" Value="48" />
@@ -56,7 +62,7 @@
   <Panel>
     <DockPanel>
       <!-- Header -->
-      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="32,24,32,12">
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="32,24,32,12" IsVisible="{Binding !IsPicker}">
         <StackPanel Spacing="4">
           <TextBlock Classes="h1" Text="Photos" />
           <TextBlock Classes="secondary" Text="{Binding Summary}" />
@@ -85,7 +91,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:AssetCellViewModel">
                     <Button Classes="tile" Width="{Binding TileSize}" Height="{Binding TileSize}" VerticalAlignment="Top"
-                            Command="{Binding OpenCommand}" IsVisible="{Binding !IsMissing}">
+                            Command="{Binding OpenCommand}" IsVisible="{Binding !IsMissing}" IsEnabled="{Binding CanOpen}">
                       <Panel>
                         <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
                         <!-- Video badge -->

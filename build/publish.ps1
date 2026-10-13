@@ -56,7 +56,8 @@ if (-not $iscc) {
 }
 if (-not $iscc) { throw "Inno Setup 6 not found. Install it with: winget install JRSoftware.InnoSetup" }
 
-& $iscc /Qp "/DAppVersion=$Version" "/DSourceDir=$publishDir" "/DOutputDir=$outputDir" (Join-Path $PSScriptRoot "installer.iss")
+$fileVersion = $Version.Split('-')[0]
+& $iscc /Qp "/DAppVersion=$Version" "/DFileVersion=$fileVersion" "/DSourceDir=$publishDir" "/DOutputDir=$outputDir" (Join-Path $PSScriptRoot "installer.iss")
 if ($LASTEXITCODE -ne 0) { throw "Installer build failed" }
 
 Write-Host ""

@@ -18,7 +18,7 @@
 - **Looks like Immich.** Official Immich logo, Google Sans, Immich's colors and layout (top bar, sidebar, storage meter and server status).
 - **Light, dark or follow Windows.** One click on the sun/moon in the top bar, or choose in Settings.
 - **Browse your library.** Your Immich timeline right in the app: grouped by month, thumbnails load as you scroll, full-size viewer with arrow keys (videos open in Immich).
-- **Your profile picture.** Shown from Immich, and you can change or remove it from Settings.
+- **Your profile picture.** Shown from Immich. Change it in Settings by picking a photo from your Immich library (or your PC), then move, zoom and rotate it in the circle, just like the web app.
 - **Every way to sign in.** Email & password, **SSO / OAuth** (Authentik, Keycloak, Google, …) through your browser, or an API key.
 - **App lock.** Require **Windows Hello** (face, fingerprint, PIN) or an app password to open the window. Backup keeps running while it's locked; it re-locks when the window closes or after 5 minutes idle.
 - **Choose exactly what syncs.** Per folder: photos and/or videos, subfolders, skip patterns (`Screenshots`, `*.png`, `Trips/2019/**`), and an optional album.
@@ -65,6 +65,8 @@ Installed copies check this repository's **latest GitHub Release** every few hou
 - **automatically** while the window is closed and nothing is uploading (if enabled), or
 - when you click **Restart to update**.
 
+**Beta channel.** Settings → Updates → Update channel → **Beta** also installs pre-releases, so you get new features first. Switching back to **Stable** never downgrades; you move over with the next stable version.
+
 > Installed apps can only see releases of a **public** repository. While this repo is private, update checks report that no releases were found. To enable updates, make the repo public or publish releases to a public repo and change `AppInfo.UpdateRepository`.
 
 ## Releasing a new version
@@ -74,7 +76,9 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-GitHub Actions tests, builds `ImmichDesktop-Setup.exe` + the portable zip and publishes the release. Every push also runs CI, which installs, launches, quits and uninstalls the app on a clean Windows machine.
+GitHub Actions tests, builds `ImmichDesktop-Setup.exe` + the portable zip and publishes the release.
+
+**Betas:** push to the `beta` branch. Each push publishes a pre-release numbered after the latest stable version (e.g. `v1.3.1-beta.42` after `v1.3.0`), which Beta-channel installs pick up. Merge `beta` into `main` and tag it to ship it to everyone. Every push also runs CI, which installs, launches, quits and uninstalls the app on a clean Windows machine.
 
 ## Build from source
 

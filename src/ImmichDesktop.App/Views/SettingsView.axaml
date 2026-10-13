@@ -35,8 +35,8 @@
               <StackPanel Orientation="Horizontal" Spacing="4" Margin="-8,4,0,0">
                 <Button Classes="ghost" Padding="8,4" Command="{Binding ChangePhotoCommand}">
                   <StackPanel Orientation="Horizontal" Spacing="6">
-                    <mi:MaterialIcon Kind="CameraOutline" Width="16" Height="16" />
-                    <TextBlock Text="Change photo" FontSize="13" />
+                    <mi:MaterialIcon Kind="ImageMultipleOutline" Width="16" Height="16" />
+                    <TextBlock Text="Choose from Immich" FontSize="13" />
                   </StackPanel>
                 </Button>
                 <Button Classes="ghost" Padding="8,4" Command="{Binding RemovePhotoCommand}" IsVisible="{Binding HasPhoto}">
@@ -256,6 +256,29 @@
               <TextBlock Classes="caption" Text="Looks for new versions on GitHub every few hours." TextWrapping="Wrap" />
             </StackPanel>
             <ToggleSwitch Grid.Column="1" IsChecked="{Binding CheckForUpdates}" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Update channel" />
+              <TextBlock Classes="caption" Text="{Binding ChannelDescription}" TextWrapping="Wrap" />
+            </StackPanel>
+            <Border Grid.Column="1" Classes="segmented" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton Classes="segment" GroupName="channel" IsChecked="{Binding ChannelStable}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="ShieldCheckOutline" Width="16" Height="16" />
+                    <TextBlock Text="Stable" />
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Classes="segment" GroupName="channel" IsChecked="{Binding ChannelBeta}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="FlaskOutline" Width="16" Height="16" />
+                    <TextBlock Text="Beta" />
+                  </StackPanel>
+                </RadioButton>
+              </StackPanel>
+            </Border>
           </Grid>
           <Border Classes="divider" IsVisible="{Binding CanSelfUpdate}" />
           <Grid Classes="row" ColumnDefinitions="*,Auto" IsVisible="{Binding CanSelfUpdate}">

@@ -38,6 +38,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         PauseOnBattery = s.PauseOnBattery;
         CheckForUpdates = s.CheckForUpdates;
         AutoInstallUpdates = s.AutoInstallUpdates;
+        _channel = s.UpdateChannel;
         _lockMode = s.AppLock;
         _loading = false;
 
@@ -64,20 +65,10 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     void OnProfileChanged() => OnPropertyChanged(nameof(HasPhoto));
 
     [RelayCommand]
-    async Task ChangePhotoAsync()
+    void ChangePhoto()
     {
         PhotoError = null;
-        var path = await _shell.Main.PickImageAsync("Choose a profile picture");
-        if (path is null)
-            return;
-        try
-        {
-            await AppServices.Profile.SetPictureAsync(path);
-        }
-        catch (Exception ex)
-        {
-            PhotoError = $"Couldn't change your picture. {NetworkErrors.Describe(ex)}";
-        }
+        _shell.Main.ShowOverlay(new ProfilePhotoViewModel(_shell.Main));
     }
 
     [RelayCommand]
@@ -387,6 +378,30 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     {
         if (_loading) return;
         AppServices.Settings.Update(s => s.CheckForUpdates = value);
+    }
+
+    // ---- Update channel ----
+
+    UpdateChannel _channel;
+
+    public bool ChannelStable { get => _channel == UpdateChannel.Stable; set { if (value) SetChannel(UpdateChannel.Stable); } }
+    public bool ChannelBeta { get => _channel == UpdateChannel.Beta; set { if (value) SetChannel(UpdateChannel.Beta); } }
+
+    public string ChannelDescription => _channel == UpdateChannel.Beta
+        ? "You get new features first. Betas can have rough edges. Switching back to Stable takes effect with the next stable version."
+        : "Get the beta to try new features before everyone else.";
+
+    void SetChannel(UpdateChannel channel)
+    {
+        if (_channel == channel)
+            return;
+        _channel = channel;
+        AppServices.Settings.Update(s => s.UpdateChannel = channel);
+        OnPropertyChanged(nameof(ChannelStable));
+        OnPropertyChanged(nameof(ChannelBeta));
+        OnPropertyChanged(nameof(ChannelDescription));
+        if (!_loading)
+            _ = AppServices.Updates.RecheckAsync();
     }
 
     [ObservableProperty]

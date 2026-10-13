@@ -9,6 +9,12 @@
   <Panel>
     <ContentControl Content="{Binding Content}" />
 
+    <!-- Larger in-window dialogs (e.g. choosing a profile picture) -->
+    <Panel IsVisible="{Binding Overlay, Converter={x:Static ObjectConverters.IsNotNull}}"
+           Background="{DynamicResource AppOverlayBrush}">
+      <ContentControl Content="{Binding Overlay}" />
+    </Panel>
+
     <!-- In-window confirmation dialog -->
     <Panel IsVisible="{Binding Dialog, Converter={x:Static ObjectConverters.IsNotNull}}"
            Background="{DynamicResource AppOverlayBrush}">

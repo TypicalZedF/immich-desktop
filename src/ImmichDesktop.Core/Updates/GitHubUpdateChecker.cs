@@ -7,7 +7,7 @@ namespace ImmichDesktop.Core.Updates;
 
 public sealed record ReleaseAsset(string Name, long Size, string DownloadUrl, string? Sha256);
 
-public sealed record ReleaseInfo(Version Version, string Tag, string Title, string? Notes, string PageUrl, ReleaseAsset? Installer);
+public sealed record ReleaseInfo(ReleaseVersion Version, string Tag, string Title, string? Notes, string PageUrl, ReleaseAsset? Installer);
 
 /// <summary>Finds new versions on GitHub Releases and downloads the installer, verifying its SHA-256 digest.</summary>
 public sealed class GitHubUpdateChecker(string repository, HttpMessageHandler? handler = null) : IDisposable
@@ -26,23 +26,52 @@ public sealed class GitHubUpdateChecker(string repository, HttpMessageHandler? h
         return http;
     }
 
-    public static Version CurrentVersion => ParseVersion(AppInfo.Version) ?? new Version(0, 0, 0);
+    public static ReleaseVersion CurrentVersion => ReleaseVersion.Parse(AppInfo.Version) ?? new ReleaseVersion(new Version(0, 0, 0));
 
-    /// <summary>Returns the latest release if it is newer than this build, otherwise null.</summary>
-    public async Task<ReleaseInfo?> CheckAsync(CancellationToken ct)
+    /// <summary>Returns the latest stable release if it is newer than this build, otherwise null.</summary>
+    public Task<ReleaseInfo?> CheckAsync(CancellationToken ct) => CheckAsync(includeBetas: false, ct);
+
+    /// <summary>
+    /// Returns the newest release if it is newer than this build, otherwise null. With
+    /// <paramref name="includeBetas"/>, betas (GitHub pre-releases) count too. Never offers an older
+    /// version, so leaving the beta channel waits for the next stable release.
+    /// </summary>
+    public async Task<ReleaseInfo?> CheckAsync(bool includeBetas, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(30));
 
-        using var response = await _http.GetAsync($"https://api.github.com/repos/{repository}/releases/latest", cts.Token);
+        // "latest" is the newest stable release (GitHub leaves out drafts and pre-releases).
+        var url = includeBetas
+            ? $"https://api.github.com/repos/{repository}/releases?per_page=30"
+            : $"https://api.github.com/repos/{repository}/releases/latest";
+        using var response = await _http.GetAsync(url, cts.Token);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new UpdateException("No published releases were found. (If the GitHub repository is private, installed apps can't see its releases.)");
         if (!response.IsSuccessStatusCode)
             throw new UpdateException($"GitHub returned an error ({(int)response.StatusCode}). Try again later.");
 
-        var release = await response.Content.ReadFromJsonAsync<ReleaseDto>(cts.Token)
+        ReleaseDto? release;
+        ReleaseVersion? version;
+        if (includeBetas)
+        {
+            var releases = await response.Content.ReadFromJsonAsync<List<ReleaseDto>>(cts.Token)
+                           ?? throw new UpdateException("GitHub returned an unexpected response.");
+            (release, version) = releases
+                .Where(r => !r.Draft)
+                .Select(r => (Release: r, Version: ReleaseVersion.Parse(r.TagName)))
+                .Where(r => r.Version is not null)
+                .OrderByDescending(r => r.Version)
+                .FirstOrDefault();
+            if (release is null)
+                throw new UpdateException("No published releases were found. (If the GitHub repository is private, installed apps can't see its releases.)");
+        }
+        else
+        {
+            release = await response.Content.ReadFromJsonAsync<ReleaseDto>(cts.Token)
                       ?? throw new UpdateException("GitHub returned an unexpected response.");
-        var version = ParseVersion(release.TagName);
+            version = ReleaseVersion.Parse(release.TagName);
+        }
         if (version is null || version <= CurrentVersion)
             return null;
 
@@ -110,7 +139,9 @@ public sealed class GitHubUpdateChecker(string repository, HttpMessageHandler? h
         [property: JsonPropertyName("name")] string? Name,
         [property: JsonPropertyName("body")] string? Body,
         [property: JsonPropertyName("html_url")] string HtmlUrl,
-        [property: JsonPropertyName("assets")] List<AssetDto>? Assets);
+        [property: JsonPropertyName("assets")] List<AssetDto>? Assets,
+        [property: JsonPropertyName("draft")] bool Draft = false,
+        [property: JsonPropertyName("prerelease")] bool Prerelease = false);
 
     sealed record AssetDto(
         [property: JsonPropertyName("name")] string Name,

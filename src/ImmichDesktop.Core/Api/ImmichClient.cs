@@ -184,18 +184,12 @@ public sealed class ImmichClient : IDisposable
     }
 
     /// <summary>Sets the profile picture (same as changing it in the Immich web app).</summary>
-    public async Task SetProfileImageAsync(string filePath, CancellationToken ct)
+    public async Task SetProfileImageAsync(byte[] image, string fileName, string contentType, CancellationToken ct)
     {
         using var form = new MultipartFormDataContent();
-        var file = new StreamContent(File.OpenRead(filePath));
-        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(Path.GetExtension(filePath).ToLowerInvariant() switch
-        {
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            ".heic" or ".heif" => "image/heic",
-            _ => "image/jpeg",
-        });
-        form.Add(file, "file", Path.GetFileName(filePath));
+        var file = new ByteArrayContent(image);
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        form.Add(file, "file", fileName);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromMinutes(2));
         using var response = await _http.PostAsync("users/profile-image", form, cts.Token);

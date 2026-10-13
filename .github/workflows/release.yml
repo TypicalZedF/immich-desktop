@@ -1,16 +1,21 @@
 # Builds the Windows installer and publishes a GitHub Release.
 #
-# To ship a new version:
+# To ship a new stable version:
 #   git tag v1.2.0
 #   git push origin v1.2.0
 # ...or run it by hand from the Actions tab ("Run workflow") and type a version.
 #
-# Installed copies of the app check this repository's latest release for updates.
+# Betas: every push to the `beta` branch publishes a pre-release named after the next version,
+# e.g. v1.2.1-beta.57 after v1.2.0. A tag with a suffix (v1.3.0-beta.1) is published as a beta too.
+#
+# Installed copies check for updates: the Stable channel sees only the latest stable release,
+# the Beta channel (Settings → Updates) also sees pre-releases.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+    branches: [beta]
   workflow_dispatch:
     inputs:
       version:
@@ -25,6 +30,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags, to number betas after the latest stable version
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -33,17 +40,38 @@ jobs:
       - name: Work out the version
         shell: pwsh
         run: |
-          $version = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.version }}" } else { "${{ github.ref_name }}".TrimStart("v") }
+          $skip = "false"
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ inputs.version }}"
+          } elseif ("${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}".TrimStart("v")
+          } else {
+            # Push to the beta branch: next patch after the latest stable release, numbered by run.
+            $stable = git tag --list "v*" | Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } |
+              Sort-Object { [version]$_.TrimStart("v") } | Select-Object -Last 1
+            if (-not $stable) { $stable = "v0.0.0" }
+            $v = [version]$stable.TrimStart("v")
+            $version = "{0}.{1}.{2}-beta.{3}" -f $v.Major, $v.Minor, ($v.Build + 1), "${{ github.run_number }}"
+            # Nothing new if the beta branch is exactly a stable release (e.g. right after creating it).
+            if (git tag --points-at HEAD | Where-Object { $_ -match '^v\d+\.\d+\.\d+$' }) { $skip = "true" }
+          }
+          $prerelease = if ($version.Contains("-")) { "true" } else { "false" }
           "VERSION=$version" >> $env:GITHUB_ENV
+          "PRERELEASE=$prerelease" >> $env:GITHUB_ENV
+          "SKIP=$skip" >> $env:GITHUB_ENV
+          Write-Host "Version $version (beta: $prerelease, skip: $skip)"
 
       - name: Install Inno Setup
+        if: env.SKIP != 'true'
         run: choco install innosetup -y --no-progress
 
       - name: Test and build installer
+        if: env.SKIP != 'true'
         shell: pwsh
         run: ./build/publish.ps1 -Version $env:VERSION
 
       - name: Publish GitHub release
+        if: env.SKIP != 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -54,9 +82,14 @@ jobs:
 
           Prefer no install? Use **ImmichDesktop-Portable.zip**.
           "@
+          $extra = @()
+          if ($env:PRERELEASE -eq "true") {
+            $notes = "**Beta.** Installed copies on the Beta update channel (Settings → Updates) get this automatically.`n`n" + $notes
+            $extra = @("--prerelease", "--target", "${{ github.sha }}")
+          }
           gh release create "v$env:VERSION" `
             artifacts/installer/ImmichDesktop-Setup.exe `
             artifacts/installer/ImmichDesktop-Portable.zip `
             --title "Immich Desktop $env:VERSION" `
             --notes $notes `
-            --generate-notes
+            --generate-notes @extra

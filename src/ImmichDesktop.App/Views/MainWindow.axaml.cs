@@ -59,6 +59,11 @@ public partial class MainWindow : Window
             dialog.CancelCommand.Execute(null);
             e.Handled = true;
         }
+        else if (e.Key == Key.Escape && DataContext is MainWindowViewModel { Overlay: ProfilePhotoViewModel photo } && !photo.IsSaving)
+        {
+            photo.CloseCommand.Execute(null);
+            e.Handled = true;
+        }
         base.OnKeyDown(e);
     }
 
@@ -68,7 +73,7 @@ public partial class MainWindow : Window
         {
             Title = title,
             AllowMultiple = false,
-            FileTypeFilter = [new FilePickerFileType("Images") { Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.heic"] }],
+            FileTypeFilter = [new FilePickerFileType("Images") { Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.bmp"] }],
         });
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }

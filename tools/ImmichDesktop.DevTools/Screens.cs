@@ -159,7 +159,18 @@ static class Screens
             Shot(main, outDir, $"30-activity-{suffix}", height: 860);
 
             shell.Navigate(ShellPage.Settings);
-            Shot(main, outDir, $"40-settings-{suffix}", height: 1200);
+            Shot(main, outDir, $"40-settings-{suffix}", height: 1440);
+
+            // Profile picture: choose from the library, then crop.
+            var photo = new ProfilePhotoViewModel(main);
+            main.ShowOverlay(photo);
+            Shot(main, outDir, $"42-profile-pick-{suffix}", height: 760, settle: TimeSpan.FromSeconds(3));
+            var pick = photo.Library.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).First(c => c.Asset is { IsImage: true } && c.Index == 2);
+            photo.Library.OpenViewer(pick);
+            Pump(TimeSpan.FromSeconds(2));
+            photo.Cropper?.ZoomAt(1.6, 200, 150);
+            Shot(main, outDir, $"43-profile-crop-{suffix}", height: 760);
+            main.CloseOverlay(photo);
 
             AppServices.Settings.Update(s => s.AppLock = AppLockMode.Password);
             main.Lock();

@@ -44,8 +44,9 @@ public sealed class ProfileService
             {
                 picture = await Task.Run(() =>
                 {
-                    using var stream = new MemoryStream(bytes);
-                    return Bitmap.DecodeToWidth(stream, 160, BitmapInterpolationMode.HighQuality);
+                    // Upright: pictures uploaded straight from a phone can carry an EXIF rotation.
+                    using var upright = ProfileImage.DecodeUpright(bytes, 160);
+                    return ProfileImage.ToAvalonia(upright);
                 });
             }
 
@@ -64,11 +65,12 @@ public sealed class ProfileService
         }
     }
 
-    public async Task SetPictureAsync(string filePath)
+    /// <summary>Uploads an already cropped JPEG (see <see cref="ProfileImage.RenderCrop"/>).</summary>
+    public async Task SetPictureAsync(byte[] jpeg)
     {
         if (AppServices.Account.Client is not { } client)
             return;
-        await client.SetProfileImageAsync(filePath, CancellationToken.None);
+        await client.SetProfileImageAsync(jpeg, "profile.jpg", "image/jpeg", CancellationToken.None);
         await RefreshAsync();
     }
 

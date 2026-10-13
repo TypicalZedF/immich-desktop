@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using ImmichDesktop.Core;
 using ImmichDesktop.Core.Platform;
+using ImmichDesktop.Core.Settings;
 using ImmichDesktop.Core.Updates;
 
 namespace ImmichDesktop.App.Services;
@@ -60,9 +61,9 @@ public sealed class UpdateService : IDisposable
     {
         UpdateState.Checking => "Checking for updates…",
         UpdateState.UpToDate => LastChecked is { } t ? $"You're up to date · checked {Format.Relative(t)}" : "You're up to date",
-        UpdateState.Available => $"Version {Release?.Version.ToString(3)} is available.",
-        UpdateState.Downloading => $"Downloading version {Release?.Version.ToString(3)}… {DownloadProgress:P0}",
-        UpdateState.Ready => $"Version {Release?.Version.ToString(3)} is ready to install.",
+        UpdateState.Available => $"Version {Release?.Version} is available.",
+        UpdateState.Downloading => $"Downloading version {Release?.Version}… {DownloadProgress:P0}",
+        UpdateState.Ready => $"Version {Release?.Version} is ready to install.",
         UpdateState.Failed => Error ?? "Couldn't check for updates.",
         _ => "",
     };
@@ -86,7 +87,8 @@ public sealed class UpdateService : IDisposable
                 return;
 
             SetState(UpdateState.Checking);
-            Release = await _checker.CheckAsync(CancellationToken.None);
+            var beta = AppServices.Settings.Current.UpdateChannel == UpdateChannel.Beta;
+            Release = await _checker.CheckAsync(beta, CancellationToken.None);
             LastChecked = DateTimeOffset.Now;
 
             if (Release is null)
@@ -104,7 +106,7 @@ public sealed class UpdateService : IDisposable
 
             // Every release's installer has the same asset name, so cache it under its version
             // (reusing an older download here is what kept re-installing the previous version).
-            var version = Release.Version.ToString(3);
+            var version = Release.Version.ToString();
             var path = Path.Combine(DownloadDirectory, $"ImmichDesktop-{version}-Setup.exe");
             RemoveOtherDownloads(path);
             if (File.Exists(path) && !IsInstallerFor(path, Release.Version))
@@ -166,13 +168,35 @@ public sealed class UpdateService : IDisposable
         }
     }
 
-    /// <summary>The installer is stamped with its version (VersionInfoVersion in installer.iss).</summary>
-    static bool IsInstallerFor(string path, Version expected)
+    /// <summary>
+    /// Forgets a found or downloaded update and checks again, e.g. after switching between stable and beta.
+    /// </summary>
+    public async Task RecheckAsync()
+    {
+        if (_checker is null)
+            return;
+        await _gate.WaitAsync();
+        try
+        {
+            Release = null;
+            _installerPath = null;
+            Error = null;
+            SetState(UpdateState.Idle);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+        await CheckAsync();
+    }
+
+    /// <summary>The installer is stamped with its full version (VersionInfoProductTextVersion in installer.iss).</summary>
+    static bool IsInstallerFor(string path, ReleaseVersion expected)
     {
         try
         {
             var info = FileVersionInfo.GetVersionInfo(path);
-            return GitHubUpdateChecker.ParseVersion(info.ProductVersion ?? info.FileVersion) == expected;
+            return ReleaseVersion.Parse(info.ProductVersion ?? info.FileVersion) == expected;
         }
         catch
         {

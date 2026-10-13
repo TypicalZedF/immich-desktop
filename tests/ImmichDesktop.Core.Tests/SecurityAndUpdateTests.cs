@@ -109,7 +109,7 @@ public class UpdateCheckerTests
         var release = await checker.CheckAsync(CancellationToken.None);
 
         Assert.NotNull(release);
-        Assert.Equal(new Version(99, 0, 0), release.Version);
+        Assert.Equal(new ReleaseVersion(new Version(99, 0, 0)), release.Version);
         Assert.Equal("ImmichDesktop-Setup.exe", release.Installer?.Name);
     }
 
@@ -150,4 +150,70 @@ public class UpdateCheckerTests
     [InlineData("v2.0.0-beta.1", "2.0.0")]
     public void Parses_tags(string tag, string expected) =>
         Assert.Equal(Version.Parse(expected), GitHubUpdateChecker.ParseVersion(tag));
+
+    /// <summary>A repository with a stable release, two betas and an unpublished draft.</summary>
+    sealed class FakeGitHubWithBetas : HttpMessageHandler
+    {
+        static object Release(string tag, bool prerelease, bool draft = false) => new
+        {
+            tag_name = tag,
+            name = $"Immich Desktop {tag}",
+            body = "notes",
+            html_url = "https://github.com/x/y/releases/tag/" + tag,
+            draft,
+            prerelease,
+            assets = new[] { new { name = "ImmichDesktop-Setup.exe", size = 3L, browser_download_url = "https://dl/" + tag, digest = (string?)null } },
+        };
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            object body = request.RequestUri!.AbsolutePath.EndsWith("/releases/latest", StringComparison.Ordinal)
+                ? Release("v99.0.0", false)
+                : new[] { Release("v100.0.0", false, draft: true), Release("v99.0.1-beta.9", true), Release("v99.0.1-beta.10", true), Release("v99.0.0", false) };
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json"),
+            });
+        }
+    }
+
+    [Fact]
+    public async Task Stable_channel_ignores_betas()
+    {
+        using var checker = new GitHubUpdateChecker("x/y", new FakeGitHubWithBetas());
+        var release = await checker.CheckAsync(includeBetas: false, CancellationToken.None);
+        Assert.Equal("v99.0.0", release?.Tag);
+    }
+
+    [Fact]
+    public async Task Beta_channel_finds_the_newest_beta_but_never_a_draft()
+    {
+        using var checker = new GitHubUpdateChecker("x/y", new FakeGitHubWithBetas());
+        var release = await checker.CheckAsync(includeBetas: true, CancellationToken.None);
+        Assert.Equal("v99.0.1-beta.10", release?.Tag);
+        Assert.Equal("https://dl/v99.0.1-beta.10", release?.Installer?.DownloadUrl);
+    }
+
+    [Theory]
+    [InlineData("1.2.3", "1.2.4-beta.1")]
+    [InlineData("1.2.4-beta.1", "1.2.4-beta.2")]
+    [InlineData("1.2.4-beta.9", "1.2.4-beta.10")]
+    [InlineData("1.2.4-beta.10", "1.2.4")]
+    [InlineData("v1.2.4", "1.3.0-beta.1")]
+    public void Orders_versions_with_betas(string older, string newer)
+    {
+        var a = ReleaseVersion.Parse(older)!;
+        var b = ReleaseVersion.Parse(newer)!;
+        Assert.True(a < b);
+        Assert.True(b > a);
+        Assert.Equal(-1, Math.Sign(a.CompareTo(b)));
+    }
+
+    [Fact]
+    public void Round_trips_beta_versions()
+    {
+        Assert.Equal("1.3.1-beta.12", ReleaseVersion.Parse("v1.3.1-beta.12+abc123")!.ToString());
+        Assert.Equal(ReleaseVersion.Parse("1.3.0"), ReleaseVersion.Parse("v1.3"));
+        Assert.Null(ReleaseVersion.Parse("nightly"));
+    }
 }

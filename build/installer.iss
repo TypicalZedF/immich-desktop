@@ -12,6 +12,11 @@
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
+; Windows file versions are numbers only, so a beta like 1.3.1-beta.7 is stamped 1.3.1 here and keeps
+; its full name in the product version (which the in-app updater checks).
+#ifndef FileVersion
+  #define FileVersion AppVersion
+#endif
 #ifndef SourceDir
   #define SourceDir "..\artifacts\publish\win-x64"
 #endif
@@ -29,7 +34,8 @@ AppPublisher={#AppName}
 AppPublisherURL={#AppUrl}
 AppSupportURL={#AppUrl}/issues
 AppUpdatesURL={#AppUrl}/releases
-VersionInfoVersion={#AppVersion}
+VersionInfoVersion={#FileVersion}
+VersionInfoProductTextVersion={#AppVersion}
 VersionInfoProductName={#AppName}
 VersionInfoDescription={#AppName} Setup
 
