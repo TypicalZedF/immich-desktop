@@ -57,7 +57,7 @@ public sealed class AlbumCardViewModel(PhotosViewModel owner, AlbumInfo album) :
 {
     public AlbumInfo Album { get; } = album;
     public override string Title => Album.AlbumName;
-    public override string Subtitle => Format.Plural(Album.AssetCount, "item") + (Album.Shared ? " · Shared" : "");
+    public override string Subtitle => Format.Plural(Album.AssetCount, "item") + (Album.Shared ? Tr.T(" · Shared") : "");
 
     protected override Task<Bitmap?> LoadAsync(ThumbnailLoader loader, int decodeWidth, CancellationToken ct) =>
         Album.AlbumThumbnailAssetId is { } cover ? loader.LoadAsync(cover, AssetImageSize.Thumbnail, decodeWidth, ct) : Task.FromResult<Bitmap?>(null);
@@ -68,7 +68,7 @@ public sealed class AlbumCardViewModel(PhotosViewModel owner, AlbumInfo album) :
 public sealed class PersonCardViewModel(PhotosViewModel owner, PersonInfo person) : LibraryCardViewModel(owner)
 {
     public PersonInfo Person { get; } = person;
-    public override string Title => Person.Name.Length > 0 ? Person.Name : "Unnamed";
+    public override string Title => Person.Name.Length > 0 ? Person.Name : Tr.T("Unnamed");
     public override string Subtitle => "";
     public bool IsNamed => Person.Name.Length > 0;
 
@@ -111,11 +111,11 @@ public sealed partial class SharePanelViewModel : ViewModelBase
 
     public IReadOnlyList<Option<int>> Expiries { get; } =
     [
-        new("Never", 0),
-        new("1 hour", 60),
-        new("1 day", 60 * 24),
-        new("7 days", 60 * 24 * 7),
-        new("30 days", 60 * 24 * 30),
+        new(Tr.T("Never"), 0),
+        new(Tr.T("1 hour"), 60),
+        new(Tr.T("1 day"), 60 * 24),
+        new(Tr.T("7 days"), 60 * 24 * 7),
+        new(Tr.T("30 days"), 60 * 24 * 30),
     ];
 
     [ObservableProperty]
@@ -157,12 +157,12 @@ public sealed partial class SharePanelViewModel : ViewModelBase
         }
         catch (ImmichApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
         {
-            Error = "Your account or API key isn't allowed to create shared links.";
+            Error = Tr.T("Your account or API key isn't allowed to create shared links.");
         }
         catch (Exception ex)
         {
             Log.Warn("Could not create a shared link", ex);
-            Error = $"Couldn't create the link. {NetworkErrors.Describe(ex)}";
+            Error = Tr.T("Couldn't create the link. {0}", NetworkErrors.Describe(ex));
         }
         finally
         {
@@ -226,7 +226,7 @@ public sealed partial class AlbumPickerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Error = $"Couldn't load your albums. {NetworkErrors.Describe(ex)}";
+            Error = Tr.T("Couldn't load your albums. {0}", NetworkErrors.Describe(ex));
         }
         finally
         {
@@ -264,13 +264,13 @@ public sealed partial class AlbumPickerViewModel : ViewModelBase
         {
             var name = await action(client);
             _owner.ClosePanel(this);
-            _owner.ShowNotice($"Added {What} to “{name}”");
+            _owner.ShowNotice(Tr.T("Added {0} to “{1}”", What, name));
             _owner.OnAlbumsChanged();
         }
         catch (Exception ex)
         {
             Log.Warn("Could not add to album", ex);
-            Error = $"Couldn't add to the album. {NetworkErrors.Describe(ex)}";
+            Error = Tr.T("Couldn't add to the album. {0}", NetworkErrors.Describe(ex));
         }
         finally
         {

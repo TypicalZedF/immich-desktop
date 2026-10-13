@@ -102,9 +102,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     void Unlock() => ShowShell(_pendingPage);
 
-    public async Task<bool> ConfirmAsync(string title, string message, string confirmText, string cancelText = "Cancel", bool danger = false)
+    public async Task<bool> ConfirmAsync(string title, string message, string confirmText, string? cancelText = null, bool danger = false)
     {
-        var dialog = new DialogViewModel(title, message, confirmText, cancelText, danger);
+        var dialog = new DialogViewModel(title, message, confirmText, cancelText ?? Tr.T("Cancel"), danger);
         Dialog = dialog;
         try
         {

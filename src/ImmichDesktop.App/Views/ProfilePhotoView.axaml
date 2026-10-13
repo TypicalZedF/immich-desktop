@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichDesktop.App.Services"
              xmlns:vm="using:ImmichDesktop.App.ViewModels"
              xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="ImmichDesktop.App.Views.ProfilePhotoView"
@@ -12,7 +13,7 @@
       <!-- Header -->
       <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="20,18,18,14">
         <Button Classes="ghost icon" VerticalAlignment="Center" Margin="0,0,8,0" Command="{Binding BackCommand}"
-                IsVisible="{Binding !IsPicking}" IsEnabled="{Binding !IsSaving}" ToolTip.Tip="Back to your photos">
+                IsVisible="{Binding !IsPicking}" IsEnabled="{Binding !IsSaving}" l:Tr.Tip="Back to your photos">
           <mi:MaterialIcon Kind="ArrowLeft" Width="20" Height="20" />
         </Button>
         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center" Margin="8,0,0,0">
@@ -23,11 +24,11 @@
                 Command="{Binding UploadFromComputerCommand}" IsVisible="{Binding IsPicking}">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <mi:MaterialIcon Kind="Upload" />
-            <TextBlock Text="Upload from this PC" />
+            <TextBlock l:Tr.Text="Upload from this PC" />
           </StackPanel>
         </Button>
         <Button Grid.Column="3" Classes="ghost icon" VerticalAlignment="Center" Command="{Binding CloseCommand}"
-                IsEnabled="{Binding !IsSaving}" ToolTip.Tip="Close (Esc)">
+                IsEnabled="{Binding !IsSaving}" l:Tr.Tip="Close (Esc)">
           <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
         </Button>
       </Grid>
@@ -45,11 +46,11 @@
       <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource AppDividerBrush}" BorderThickness="0,1,0,0"
               Padding="20,14" IsVisible="{Binding !IsPicking}">
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-          <Button Classes="secondary" Content="Cancel" Command="{Binding CloseCommand}" IsEnabled="{Binding !IsSaving}" />
+          <Button Classes="secondary" l:Tr.Content="Cancel" Command="{Binding CloseCommand}" IsEnabled="{Binding !IsSaving}" />
           <Button Classes="primary" Command="{Binding SaveCommand}" IsEnabled="{Binding !IsSaving}">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <mi:MaterialIcon Kind="Loading" Classes="spin" Width="16" Height="16" IsVisible="{Binding IsSaving}" />
-              <TextBlock Text="Set as profile picture" />
+              <TextBlock l:Tr.Text="Set as profile picture" />
             </StackPanel>
           </Button>
         </StackPanel>
@@ -84,19 +85,19 @@
 
           <!-- Zoom and rotate -->
           <Grid ColumnDefinitions="Auto,*,Auto,Auto" Width="{Binding Viewport}">
-            <Button Classes="ghost icon" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Zoom out">
+            <Button Classes="ghost icon" Command="{Binding ZoomOutCommand}" l:Tr.Tip="Zoom out">
               <mi:MaterialIcon Kind="MagnifyMinusOutline" Width="20" Height="20" />
             </Button>
             <Slider Grid.Column="1" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}" Value="{Binding Zoom}"
                     VerticalAlignment="Center" Margin="6,0" />
-            <Button Grid.Column="2" Classes="ghost icon" Command="{Binding ZoomInCommand}" ToolTip.Tip="Zoom in">
+            <Button Grid.Column="2" Classes="ghost icon" Command="{Binding ZoomInCommand}" l:Tr.Tip="Zoom in">
               <mi:MaterialIcon Kind="MagnifyPlusOutline" Width="20" Height="20" />
             </Button>
-            <Button Grid.Column="3" Classes="ghost icon" Margin="6,0,0,0" Command="{Binding RotateCommand}" ToolTip.Tip="Rotate">
+            <Button Grid.Column="3" Classes="ghost icon" Margin="6,0,0,0" Command="{Binding RotateCommand}" l:Tr.Tip="Rotate">
               <mi:MaterialIcon Kind="RotateRight" Width="20" Height="20" />
             </Button>
           </Grid>
-          <Button Classes="link" HorizontalAlignment="Center" Content="Reset" Command="{Binding ResetCommand}" />
+          <Button Classes="link" HorizontalAlignment="Center" l:Tr.Content="Reset" Command="{Binding ResetCommand}" />
         </StackPanel>
         </Panel>
 
@@ -105,7 +106,7 @@
           <Border Classes="card" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="22,16">
             <StackPanel Orientation="Horizontal" Spacing="12">
               <mi:MaterialIcon Kind="Loading" Classes="spin" Width="22" Height="22" Foreground="{DynamicResource AppPrimaryBrush}" />
-              <TextBlock Text="Opening photo…" VerticalAlignment="Center" />
+              <TextBlock l:Tr.Text="Opening photo…" VerticalAlignment="Center" />
             </StackPanel>
           </Border>
         </Panel>

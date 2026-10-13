@@ -37,8 +37,8 @@ public sealed partial class LockViewModel : ViewModelBase
     public bool UsesPassword => _mode == AppLockMode.Password;
 
     public string Subtitle => UsesHello
-        ? "Use Windows Hello to unlock. Backup keeps running in the background."
-        : "Enter your app password to unlock. Backup keeps running in the background.";
+        ? Tr.T("Use Windows Hello to unlock. Backup keeps running in the background.")
+        : Tr.T("Enter your app password to unlock. Backup keeps running in the background.");
 
     [ObservableProperty]
     public partial string Password { get; set; } = "";
@@ -78,7 +78,7 @@ public sealed partial class LockViewModel : ViewModelBase
         IsBusy = true;
         try
         {
-            var result = await WindowsHello.VerifyAsync(_main.GetWindowHandle?.Invoke() ?? IntPtr.Zero, "Unlock Immich Desktop");
+            var result = await WindowsHello.VerifyAsync(_main.GetWindowHandle?.Invoke() ?? IntPtr.Zero, Tr.T("Unlock Immich Desktop"));
             switch (result)
             {
                 case HelloResult.Verified:
@@ -87,10 +87,10 @@ public sealed partial class LockViewModel : ViewModelBase
                 case HelloResult.Canceled:
                     break;
                 case HelloResult.Unavailable:
-                    Error = "Windows Hello isn't available right now. If it was turned off, use “Forgot how to unlock?” below.";
+                    Error = Tr.T("Windows Hello isn't available right now. If it was turned off, use “Forgot how to unlock?” below.");
                     break;
                 default:
-                    Error = "Windows Hello couldn't verify you. Try again.";
+                    Error = Tr.T("Windows Hello couldn't verify you. Try again.");
                     break;
             }
         }
@@ -106,12 +106,12 @@ public sealed partial class LockViewModel : ViewModelBase
         Error = null;
         if (DateTime.UtcNow < _lockedOutUntil)
         {
-            Error = $"Too many attempts. Try again in {(int)Math.Ceiling((_lockedOutUntil - DateTime.UtcNow).TotalSeconds)} seconds.";
+            Error = Tr.T("Too many attempts. Try again in {0} seconds.", (int)Math.Ceiling((_lockedOutUntil - DateTime.UtcNow).TotalSeconds));
             return;
         }
         if (Password.Length == 0)
         {
-            Error = "Enter your app password.";
+            Error = Tr.T("Enter your app password.");
             return;
         }
 
@@ -133,11 +133,11 @@ public sealed partial class LockViewModel : ViewModelBase
             if (_failedAttempts >= MaxAttemptsBeforeDelay)
             {
                 _lockedOutUntil = DateTime.UtcNow.AddSeconds(30);
-                Error = "Too many attempts. Try again in 30 seconds.";
+                Error = Tr.T("Too many attempts. Try again in 30 seconds.");
             }
             else
             {
-                Error = "That password isn't right.";
+                Error = Tr.T("That password isn't right.");
             }
         }
         finally
@@ -150,9 +150,9 @@ public sealed partial class LockViewModel : ViewModelBase
     async Task ForgotAsync()
     {
         var confirmed = await _main.ConfirmAsync(
-            "Reset the app lock?",
-            "You'll be signed out and need to sign in to Immich again. Your folders and settings are kept, and backup resumes once you're signed in.",
-            "Sign out and reset", danger: true);
+            Tr.T("Reset the app lock?"),
+            Tr.T("You'll be signed out and need to sign in to Immich again. Your folders and settings are kept, and backup resumes once you're signed in."),
+            Tr.T("Sign out and reset"), danger: true);
         if (!confirmed)
             return;
 

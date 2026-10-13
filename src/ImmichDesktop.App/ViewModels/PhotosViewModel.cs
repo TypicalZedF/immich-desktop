@@ -138,12 +138,12 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
 
     public string Heading => Drill?.Title ?? Tab switch
     {
-        PhotosTab.Favorites => "Favorites",
-        PhotosTab.Albums => "Albums",
-        PhotosTab.People => "People",
-        PhotosTab.Places => "Places",
-        PhotosTab.Map => "Map",
-        _ => "Photos",
+        PhotosTab.Favorites => Tr.T("Favorites"),
+        PhotosTab.Albums => Tr.T("Albums"),
+        PhotosTab.People => Tr.T("People"),
+        PhotosTab.Places => Tr.T("Places"),
+        PhotosTab.Map => Tr.T("Map"),
+        _ => Tr.T("Photos"),
     };
 
     [RelayCommand]
@@ -211,8 +211,8 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     }
 
     GridQuery CurrentQuery => Drill ?? (Tab == PhotosTab.Favorites
-        ? new GridQuery("Favorites", (c, ct) => TimelineAsync(c, new TimelineFilter(Favorites: true), ct))
-        : new GridQuery("Photos", (c, ct) => TimelineAsync(c, TimelineFilter.All, ct)));
+        ? new GridQuery(Tr.T("Favorites"), (c, ct) => TimelineAsync(c, new TimelineFilter(Favorites: true), ct))
+        : new GridQuery(Tr.T("Photos"), (c, ct) => TimelineAsync(c, TimelineFilter.All, ct)));
 
     static async Task<List<BucketState>> TimelineAsync(ImmichClient client, TimelineFilter filter, CancellationToken ct)
     {
@@ -224,7 +224,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     {
         if (Client is not { } client)
         {
-            Error = "Sign in to see your library.";
+            Error = Tr.T("Sign in to see your library.");
             IsLoading = false;
             return;
         }
@@ -244,11 +244,11 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
                 return;
             _buckets = buckets;
             var total = _buckets.Sum(b => b.Count);
-            Summary = Format.Plural(total, "photo or video", "photos and videos");
+            Summary = Format.Plural(total, Tr.T("photo or video"), Tr.T("photos and videos"));
             IsEmpty = total == 0;
-            EmptyText = Drill is not null ? "Nothing here."
-                : Tab == PhotosTab.Favorites ? "No favorites yet. Tap the heart on a photo to add it here."
-                : "No photos yet. They'll appear here once they're backed up.";
+            EmptyText = Drill is not null ? Tr.T("Nothing here.")
+                : Tab == PhotosTab.Favorites ? Tr.T("No favorites yet. Tap the heart on a photo to add it here.")
+                : Tr.T("No photos yet. They'll appear here once they're backed up.");
             RebuildRows();
         }
         catch (OperationCanceledException)
@@ -256,12 +256,12 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         }
         catch (ImmichApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
         {
-            Error = "Your API key doesn't allow viewing the library. Give it the asset.read and asset.view permissions, or sign in with your password or SSO.";
+            Error = Tr.T("Your API key doesn't allow viewing the library. Give it the asset.read and asset.view permissions, or sign in with your password or SSO.");
         }
         catch (Exception ex)
         {
             Log.Warn("Could not load the library", ex);
-            Error = $"Couldn't load your library. {NetworkErrors.Describe(ex)}";
+            Error = Tr.T("Couldn't load your library. {0}", NetworkErrors.Describe(ex));
         }
         finally
         {
@@ -345,7 +345,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             {
                 // Smart search finds "dog on the beach" (needs machine learning on the server)…
                 var results = await client.SmartSearchAsync(text, 250, ct);
-                return BucketState.FromAssets(results, "Best matches");
+                return BucketState.FromAssets(results, Tr.T("Best matches"));
             }
             catch (ImmichApiException ex) when (ex.StatusCode is not System.Net.HttpStatusCode.Unauthorized)
             {
@@ -374,7 +374,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         var albums = await c.GetAlbumsAsync(_lifetime.Token);
         return albums.OrderByDescending(a => a.AssetCount > 0).ThenBy(a => a.AlbumName, StringComparer.CurrentCultureIgnoreCase)
             .Select(a => new AlbumCardViewModel(this, a)).ToList();
-    }, "No albums yet. Create one from selected photos with “Add to album”.");
+    }, Tr.T("No albums yet. Create one from selected photos with “Add to album”."));
 
     Task LoadPeopleAsync() => LoadCollectionAsync(People, async c =>
     {
@@ -382,14 +382,14 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         var people = await c.GetPeopleAsync(_lifetime.Token);
         // Named people first, like the web app.
         return people.OrderByDescending(p => p.Name.Length > 0).Select(p => new PersonCardViewModel(this, p)).ToList();
-    }, "No people yet. Immich finds faces when machine learning is turned on in your server settings.");
+    }, Tr.T("No people yet. Immich finds faces when machine learning is turned on in your server settings."));
 
     Task LoadPlacesAsync() => LoadCollectionAsync(Places, async c =>
     {
         _placesLoaded = true;
         var places = await c.GetPlacesAsync(_lifetime.Token);
         return places.Select(p => new PlaceCardViewModel(this, p)).ToList();
-    }, "No places yet. Photos with a location show up here.");
+    }, Tr.T("No places yet. Photos with a location show up here."));
 
     async Task LoadCollectionAsync<T>(ObservableCollection<T> target, Func<ImmichClient, Task<List<T>>> load, string emptyText)
         where T : LibraryCardViewModel
@@ -418,7 +418,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             Log.Warn("Could not load the library page", ex);
-            CollectionMessage = $"Couldn't load this page. {NetworkErrors.Describe(ex)}";
+            CollectionMessage = Tr.T("Couldn't load this page. {0}", NetworkErrors.Describe(ex));
         }
         finally
         {
@@ -430,7 +430,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         OpenDrill(new GridQuery(album.AlbumName, (c, ct) => TimelineAsync(c, new TimelineFilter(AlbumId: album.Id), ct), album));
 
     internal void OpenPerson(PersonInfo person) =>
-        OpenDrill(new GridQuery(person.Name.Length > 0 ? person.Name : "Unnamed person", (c, ct) => TimelineAsync(c, new TimelineFilter(PersonId: person.Id), ct)));
+        OpenDrill(new GridQuery(person.Name.Length > 0 ? person.Name : Tr.T("Unnamed person"), (c, ct) => TimelineAsync(c, new TimelineFilter(PersonId: person.Id), ct)));
 
     internal void OpenPlace(PlaceInfo place) =>
         OpenDrill(new GridQuery(place.City, async (c, ct) => BucketState.FromAssets(await c.SearchAsync(null, place.City, 2000, ct))));
@@ -453,7 +453,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             _markersLoaded = true;
             Markers = await client.GetMapMarkersAsync(_lifetime.Token);
             if (Markers.Count == 0)
-                CollectionMessage = "No photos with a location yet.";
+                CollectionMessage = Tr.T("No photos with a location yet.");
         }
         catch (OperationCanceledException)
         {
@@ -461,7 +461,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             Log.Warn("Could not load the map", ex);
-            CollectionMessage = $"Couldn't load the map. {NetworkErrors.Describe(ex)}";
+            CollectionMessage = Tr.T("Couldn't load the map. {0}", NetworkErrors.Describe(ex));
         }
         finally
         {
@@ -476,7 +476,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             return;
         var place = markers.Select(m => m.City).Where(c => !string.IsNullOrWhiteSpace(c)).GroupBy(c => c).OrderByDescending(g => g.Count()).FirstOrDefault()?.Key;
         var assets = markers.Select(m => new TimelineAsset(m.Id, true, false, 1, null, null)).ToList();
-        OpenDrill(new GridQuery(place is null ? "This area" : $"Around {place}",
+        OpenDrill(new GridQuery(place is null ? Tr.T("This area") : Tr.T("Around {0}", place),
             (_, _) => Task.FromResult(BucketState.FromAssets(assets, Format.Plural(assets.Count, "photo")))));
     }
 
@@ -487,7 +487,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     public partial int SelectionCount { get; set; }
 
     public bool IsSelecting => SelectionCount > 0;
-    public string SelectionText => $"{SelectionCount} selected";
+    public string SelectionText => Tr.T("{0} selected", SelectionCount);
 
     internal bool IsAssetSelected(string id) => _selected.Contains(id);
 
@@ -554,7 +554,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     void ShareAlbum()
     {
         if (Drill?.Album is { } album)
-            Panel = new SharePanelViewModel(this, $"the album “{album.AlbumName}”", null, album.Id);
+            Panel = new SharePanelViewModel(this, Tr.T("the album “{0}”", album.AlbumName), null, album.Id);
     }
 
     internal void ShowAlbumPicker(IReadOnlyList<string> assetIds) => Panel = new AlbumPickerViewModel(this, assetIds);
@@ -573,12 +573,12 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             foreach (var cell in VisibleCells.Where(c => c.Asset is { } a && set.Contains(a.Id)))
                 cell.Asset = cell.Asset! with { IsFavorite = favorite };
             if (ids.Count > 1)
-                ShowNotice(favorite ? $"Added {Format.Plural(ids.Count, "photo")} to favorites" : "Removed from favorites");
+                ShowNotice(favorite ? Tr.T("Added {0} to favorites", Format.Plural(ids.Count, "photo")) : Tr.T("Removed from favorites"));
             return true;
         }
         catch (Exception ex)
         {
-            ShowNotice($"Couldn't change favorites. {NetworkErrors.Describe(ex)}");
+            ShowNotice(Tr.T("Couldn't change favorites. {0}", NetworkErrors.Describe(ex)));
             return false;
         }
     }
@@ -592,34 +592,34 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             if (ids.Count == 1)
             {
                 var details = await client.GetAssetAsync(ids[0], CancellationToken.None);
-                var path = await _main.PickSaveFileAsync("Save photo", details.OriginalFileName ?? $"{ids[0]}.jpg");
+                var path = await _main.PickSaveFileAsync(Tr.T("Save photo"), details.OriginalFileName ?? $"{ids[0]}.jpg");
                 if (path is null)
                     return;
                 await using (var file = File.Create(path))
                     await client.DownloadOriginalAsync(ids[0], file, CancellationToken.None);
-                ShowNotice($"Saved {Path.GetFileName(path)}");
+                ShowNotice(Tr.T("Saved {0}", Path.GetFileName(path)));
                 return;
             }
 
-            var folder = await _main.PickFolderAsync($"Save {ids.Count} photos to…");
+            var folder = await _main.PickFolderAsync(Tr.T("Save {0} photos to…", ids.Count));
             if (folder is null)
                 return;
             var done = 0;
             foreach (var id in ids)
             {
-                ShowNotice($"Downloading {done + 1} of {ids.Count}…", sticky: true);
+                ShowNotice(Tr.T("Downloading {0} of {1}…", done + 1, ids.Count), sticky: true);
                 var details = await client.GetAssetAsync(id, CancellationToken.None);
                 var path = UniquePath(folder, details.OriginalFileName ?? $"{id}.jpg");
                 await using (var file = File.Create(path))
                     await client.DownloadOriginalAsync(id, file, CancellationToken.None);
                 done++;
             }
-            ShowNotice($"Saved {Format.Plural(done, "photo")} to {Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar))}");
+            ShowNotice(Tr.T("Saved {0} to {1}", Format.Plural(done, "photo"), Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar))));
         }
         catch (Exception ex)
         {
             Log.Warn("Download failed", ex);
-            ShowNotice($"Couldn't download. {NetworkErrors.Describe(ex)}");
+            ShowNotice(Tr.T("Couldn't download. {0}", NetworkErrors.Describe(ex)));
         }
     }
 
@@ -637,20 +637,20 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         if (Client is not { } client || _main is null || ids.Count == 0)
             return false;
         var what = Format.Plural(ids.Count, "photo");
-        if (!await _main.ConfirmAsync($"Move {what} to the trash?",
-                "They're removed from your library on every device. You can restore them from the trash in Immich for a while.",
-                "Move to trash", danger: true))
+        if (!await _main.ConfirmAsync(Tr.T("Move {0} to the trash?", what),
+                Tr.T("They're removed from your library on every device. You can restore them from the trash in Immich for a while."),
+                Tr.T("Move to trash"), danger: true))
             return false;
         try
         {
             await client.TrashAssetsAsync(ids, CancellationToken.None);
-            ShowNotice($"Moved {what} to the trash");
+            ShowNotice(Tr.T("Moved {0} to the trash", what));
             _ = LoadGridAsync();
             return true;
         }
         catch (Exception ex)
         {
-            ShowNotice($"Couldn't move to the trash. {NetworkErrors.Describe(ex)}");
+            ShowNotice(Tr.T("Couldn't move to the trash. {0}", NetworkErrors.Describe(ex)));
             return false;
         }
     }

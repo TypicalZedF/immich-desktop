@@ -106,7 +106,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
     public partial bool OffersPassword { get; set; } = true;
 
     [ObservableProperty]
-    public partial string SsoButtonText { get; set; } = "Sign in with SSO";
+    public partial string SsoButtonText { get; set; } = Tr.T("Sign in with SSO");
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowSignInForm))]
@@ -157,7 +157,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _oauth = null;
-            SignInError = $"Couldn't start SSO sign-in: {NetworkErrors.Describe(ex)}";
+            SignInError = Tr.T("Couldn't start SSO sign-in: {0}", NetworkErrors.Describe(ex));
         }
         finally
         {
@@ -198,7 +198,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             IsWaitingForBrowser = false;
-            SignInError = $"SSO sign-in didn't complete: {NetworkErrors.Describe(ex)}";
+            SignInError = Tr.T("SSO sign-in didn't complete: {0}", NetworkErrors.Describe(ex));
         }
         finally
         {
@@ -254,7 +254,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
         SignInError = null;
         if (UseApiKey ? string.IsNullOrWhiteSpace(ApiKey) : string.IsNullOrWhiteSpace(Email) || string.IsNullOrEmpty(Password))
         {
-            SignInError = UseApiKey ? "Paste your API key." : "Enter your email and password.";
+            SignInError = UseApiKey ? Tr.T("Paste your API key.") : Tr.T("Enter your email and password.");
             return;
         }
 
@@ -273,7 +273,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
         }
         catch (ImmichApiException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.BadRequest)
         {
-            SignInError = UseApiKey ? "That API key wasn't accepted." : "Incorrect email or password.";
+            SignInError = UseApiKey ? Tr.T("That API key wasn't accepted.") : Tr.T("Incorrect email or password.");
         }
         catch (Exception ex)
         {
@@ -313,8 +313,8 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
     public bool AutostartSupported => Autostart.IsSupported;
 
     public string AutostartLabel => OperatingSystem.IsWindows()
-        ? "Start automatically when I sign in to Windows"
-        : "Start automatically when I log in";
+        ? Tr.T("Start automatically when I sign in to Windows")
+        : Tr.T("Start automatically when I log in");
 
     void LoadFolderChoices(AppSettings settings)
     {
@@ -349,7 +349,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
     async Task AddFolderAsync()
     {
         FolderError = null;
-        var path = await _main.PickFolderAsync("Choose a folder to back up");
+        var path = await _main.PickFolderAsync(Tr.T("Choose a folder to back up"));
         if (path is null)
             return;
 
@@ -373,7 +373,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
             {
                 if (i != j && FolderRules.IsInside(selected[i].Path, selected[j].Path))
                 {
-                    FolderError = $"“{selected[i].Name}” is inside “{selected[j].Name}”. Choose just one of them.";
+                    FolderError = Tr.T("“{0}” is inside “{1}”. Choose just one of them.", selected[i].Name, selected[j].Name);
                     return;
                 }
             }
@@ -393,7 +393,7 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
 
         var count = selected.Count;
         AppServices.Activity.Add(ActivityKind.Info,
-            count == 0 ? "Setup complete" : $"Setup complete — backing up {Format.Plural(count, "folder")}");
+            count == 0 ? Tr.T("Setup complete") : Tr.T("Setup complete — backing up {0}", Format.Plural(count, "folder")));
         AppServices.Engine.SyncNow();
         _main.ShowShell();
     }
@@ -416,7 +416,7 @@ public sealed partial class FolderChoiceViewModel(string path, MaterialIconKind 
     public partial bool IsSelected { get; set; }
 
     [ObservableProperty]
-    public partial string Detail { get; set; } = "Counting…";
+    public partial string Detail { get; set; } = Tr.T("Counting…");
 
     /// <summary>Counts photos and videos in the background so people know what they're choosing.</summary>
     public async Task CountAsync(CancellationToken ct)
@@ -445,9 +445,9 @@ public sealed partial class FolderChoiceViewModel(string path, MaterialIconKind 
 
             Detail = count switch
             {
-                0 => "No photos or videos yet",
-                >= cap => $"{Format.Count(cap)}+ photos and videos",
-                _ => Format.Plural(count, "photo or video", "photos and videos"),
+                0 => Tr.T("No photos or videos yet"),
+                >= cap => Tr.T("{0}+ photos and videos", Format.Count(cap)),
+                _ => Format.Plural(count, Tr.T("photo or video"), Tr.T("photos and videos")),
             };
         }
         catch (OperationCanceledException)

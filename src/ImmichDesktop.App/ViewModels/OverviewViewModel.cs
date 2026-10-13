@@ -40,7 +40,7 @@ public sealed partial class OverviewViewModel : ViewModelBase, IDisposable
         get
         {
             var hour = DateTime.Now.Hour;
-            var part = hour < 5 ? "Good evening" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+            var part = hour < 5 ? Tr.T("Good evening") : hour < 12 ? Tr.T("Good morning") : hour < 18 ? Tr.T("Good afternoon") : Tr.T("Good evening");
             var name = AppServices.Settings.Current.UserName?.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
             return string.IsNullOrEmpty(name) ? part : $"{part}, {name}";
         }
@@ -70,7 +70,7 @@ public sealed partial class OverviewViewModel : ViewModelBase, IDisposable
     [NotifyPropertyChangedFor(nameof(PauseText), nameof(PauseIcon))]
     public partial bool IsPaused { get; set; }
 
-    public string PauseText => IsPaused ? "Resume" : "Pause";
+    public string PauseText => IsPaused ? Tr.T("Resume") : Tr.T("Pause");
     public MaterialIconKind PauseIcon => IsPaused ? MaterialIconKind.Play : MaterialIconKind.Pause;
 
     [ObservableProperty]
@@ -125,11 +125,18 @@ public sealed partial class OverviewViewModel : ViewModelBase, IDisposable
         ShowProgress = s.IsBusy;
         IsIndeterminate = s.State == SyncState.Scanning || s.RunTotal == 0;
         ProgressPercent = s.RunTotal == 0 ? 0 : 100.0 * s.RunDone / s.RunTotal;
-        ProgressText = s.State == SyncState.Scanning ? "Scanning folders…" : $"{Format.Count(s.RunDone)} of {Format.Plural(s.RunTotal, "file")}";
+        ProgressText = s.State == SyncState.Scanning ? Tr.T("Scanning folders…") : Tr.T("{0} of {1}", Format.Count(s.RunDone), Format.Plural(s.RunTotal, "file"));
+        TimeLeftText = s.State != SyncState.Uploading ? ""
+            : s.Remaining is { } left ? Format.TimeLeft(left)
+            : s.RunTotal > 0 ? Tr.T("Estimating time left…") : "";
         SpeedText = s.BytesPerSecond > 1 ? Format.Speed(s.BytesPerSecond) : "";
 
         SyncUploads(s.Active);
     }
+
+    /// <summary>How long until everything is backed up, from the upload speed so far.</summary>
+    [ObservableProperty]
+    public partial string TimeLeftText { get; set; } = "";
 
     void SyncUploads(IReadOnlyList<ActiveUpload> active)
     {
@@ -249,7 +256,7 @@ public sealed partial class UploadItemViewModel(string path, long size) : ViewMo
     {
         Percent = upload.Fraction * 100;
         SizeText = upload.Sent > 0 && upload.Sent < upload.Size
-            ? $"{Format.Bytes(upload.Sent)} of {Format.Bytes(upload.Size)}"
+            ? Tr.T("{0} of {1}", Format.Bytes(upload.Sent), Format.Bytes(upload.Size))
             : Format.Bytes(upload.Size);
     }
 }
@@ -263,8 +270,8 @@ public sealed class FolderSummaryViewModel(SyncFolder folder, StatusCounts count
     public bool IsComplete { get; } = counts.Total > 0 && counts.BackedUp == counts.Total;
 
     public string StatsText { get; } = !folder.Enabled
-        ? "Paused for this folder"
+        ? Tr.T("Paused for this folder")
         : counts.Total == 0
-            ? "No photos or videos found yet"
-            : $"{Format.Count(counts.BackedUp)} of {Format.Count(counts.Total)} backed up";
+            ? Tr.T("No photos or videos found yet")
+            : Tr.T("{0} of {1} backed up", Format.Count(counts.BackedUp), Format.Count(counts.Total));
 }

@@ -83,6 +83,7 @@ static class Screens
         RunTotal = 45,
         RunDone = 17,
         BytesPerSecond = 8.4 * 1024 * 1024,
+        Remaining = TimeSpan.FromMinutes(134),
         Active =
         [
             new ActiveUpload(Path.Combine(_root, "Phone Camera", "VID_20261011_180233.mp4"), 184_000_000, 121_000_000),

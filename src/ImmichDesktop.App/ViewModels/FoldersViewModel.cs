@@ -38,7 +38,7 @@ public sealed partial class FoldersViewModel : ViewModelBase, IDisposable
     async Task AddFolderAsync()
     {
         AddError = null;
-        var path = await _shell.Main.PickFolderAsync("Choose a folder to back up");
+        var path = await _shell.Main.PickFolderAsync(Tr.T("Choose a folder to back up"));
         if (path is null)
             return;
 
@@ -51,7 +51,7 @@ public sealed partial class FoldersViewModel : ViewModelBase, IDisposable
 
         var folder = new SyncFolder { Path = FolderRules.Normalize(path) };
         AppServices.Settings.Update(s => s.Folders.Add(folder));
-        AppServices.Activity.Add(ActivityKind.Info, $"Added folder “{folder.DisplayName}”");
+        AppServices.Activity.Add(ActivityKind.Info, Tr.T("Added folder “{0}”", folder.DisplayName));
         var item = new FolderItemViewModel(this, folder) { IsExpanded = true };
         Folders.Add(item);
         IsEmpty = false;
@@ -61,14 +61,14 @@ public sealed partial class FoldersViewModel : ViewModelBase, IDisposable
     internal async Task RemoveAsync(FolderItemViewModel item)
     {
         var confirmed = await _shell.Main.ConfirmAsync(
-            $"Stop backing up “{item.Name}”?",
-            "Photos and videos already uploaded stay in Immich. New files in this folder won't be backed up anymore.",
-            "Remove folder", danger: true);
+            Tr.T("Stop backing up “{0}”?", item.Name),
+            Tr.T("Photos and videos already uploaded stay in Immich. New files in this folder won't be backed up anymore."),
+            Tr.T("Remove folder"), danger: true);
         if (!confirmed)
             return;
 
         AppServices.Settings.Update(s => s.Folders.RemoveAll(f => f.Id == item.Id));
-        AppServices.Activity.Add(ActivityKind.Info, $"Removed folder “{item.Name}”");
+        AppServices.Activity.Add(ActivityKind.Info, Tr.T("Removed folder “{0}”", item.Name));
         Folders.Remove(item);
         IsEmpty = Folders.Count == 0;
     }
@@ -150,7 +150,7 @@ public sealed partial class FolderItemViewModel : ViewModelBase
         {
             _saveTimer.Stop();
             FoldersViewModel.Save(this);
-            SaveHint = "Saved \u00B7 applied to backup";
+            SaveHint = Tr.T("Saved \u00B7 applied to backup");
             _hintTimer.Stop();
             _hintTimer.Start();
         };
@@ -232,7 +232,7 @@ public sealed partial class FolderItemViewModel : ViewModelBase
             base.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs(nameof(SkipScreenshots)));
         if (e.PropertyName is nameof(Enabled) or nameof(IncludeSubfolders) or nameof(IncludePhotos) or nameof(IncludeVideos) or nameof(AlbumName) or nameof(ExcludePatterns))
         {
-            SaveHint = "Saving\u2026";
+            SaveHint = Tr.T("Saving\u2026");
             _saveTimer.Stop();
             _saveTimer.Start();
         }
@@ -266,13 +266,13 @@ public sealed partial class FolderItemViewModel : ViewModelBase
         Percent = c.Total == 0 ? 0 : 100.0 * c.BackedUp / c.Total;
         IsComplete = c.Total > 0 && c.BackedUp == c.Total;
         StatsText = IsMissing
-            ? "Folder not found — is the drive connected?"
+            ? Tr.T("Folder not found — is the drive connected?")
             : !Enabled
-                ? "Backup turned off for this folder"
+                ? Tr.T("Backup turned off for this folder")
                 : c.Total == 0
-                    ? "No photos or videos found yet"
-                    : $"{Format.Count(c.BackedUp)} of {Format.Count(c.Total)} backed up";
-        IssueText = c.Failed > 0 ? $"{Format.Plural(c.Failed, "file")} couldn't be uploaded" : null;
+                    ? Tr.T("No photos or videos found yet")
+                    : Tr.T("{0} of {1} backed up", Format.Count(c.BackedUp), Format.Count(c.Total));
+        IssueText = c.Failed > 0 ? Tr.T("{0} couldn't be uploaded", Format.Plural(c.Failed, "file")) : null;
     }
 
     [RelayCommand]

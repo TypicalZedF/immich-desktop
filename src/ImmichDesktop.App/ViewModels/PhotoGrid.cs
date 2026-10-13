@@ -47,7 +47,7 @@ public sealed class BucketState
         foreach (var month in assets.GroupBy(a => MonthKey(a.FileCreatedAt)))
         {
             var items = month.ToList();
-            groups.Add(new BucketState(month.Key is { } key ? MonthLabel(key) : "Other", items.Count, groups.Count, () => Task.FromResult(items),
+            groups.Add(new BucketState(month.Key is { } key ? MonthLabel(key) : Tr.T("Other"), items.Count, groups.Count, () => Task.FromResult(items),
                 month.Key is { } k ? ParseMonth(k) : null));
         }
         return groups;

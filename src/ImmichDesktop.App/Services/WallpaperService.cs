@@ -31,9 +31,9 @@ public sealed class WallpaperService : IDisposable
     public event Action? Changed;
 
     public string StatusText =>
-        IsChanging ? "Changing your background…"
+        IsChanging ? Tr.T("Changing your background…")
         : Error is { } error ? error
-        : LastChanged is { } t ? $"Changed {Format.Relative(t)}"
+        : LastChanged is { } t ? Tr.T("Changed {0}", Format.Relative(t))
         : "";
 
     /// <summary>(Re)starts the timer from the current settings.</summary>
@@ -70,9 +70,9 @@ public sealed class WallpaperService : IDisposable
             {
                 Error = settings.WallpaperSource switch
                 {
-                    WallpaperSource.Album => "That album has no photos to use.",
-                    WallpaperSource.Favorites => "You have no favorite photos yet. Tap the heart on a photo, or pick an album.",
-                    _ => "Your library has no photos yet.",
+                    WallpaperSource.Album => Tr.T("That album has no photos to use."),
+                    WallpaperSource.Favorites => Tr.T("You have no favorite photos yet. Tap the heart on a photo, or pick an album."),
+                    _ => Tr.T("Your library has no photos yet."),
                 };
                 return;
             }
@@ -105,7 +105,7 @@ public sealed class WallpaperService : IDisposable
         catch (Exception ex)
         {
             Log.Warn("Could not change the desktop background", ex);
-            Error = $"Couldn't change your background. {NetworkErrors.Describe(ex)}";
+            Error = Tr.T("Couldn't change your background. {0}", NetworkErrors.Describe(ex));
         }
         finally
         {

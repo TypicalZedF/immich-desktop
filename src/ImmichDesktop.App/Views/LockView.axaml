@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichDesktop.App.Services"
              xmlns:vm="using:ImmichDesktop.App.ViewModels"
              xmlns:c="using:ImmichDesktop.App.Controls"
              xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
@@ -17,7 +18,7 @@
       </Panel>
 
       <StackPanel Spacing="6">
-        <TextBlock Classes="h1" Text="Immich Desktop is locked" HorizontalAlignment="Center" />
+        <TextBlock Classes="h1" l:Tr.Text="Immich Desktop is locked" HorizontalAlignment="Center" />
         <TextBlock Classes="secondary" Text="{Binding Subtitle}" TextAlignment="Center" TextWrapping="Wrap" />
       </StackPanel>
 
@@ -27,13 +28,13 @@
         <StackPanel Orientation="Horizontal" Spacing="10">
           <mi:MaterialIcon Kind="Loading" Classes="spin" IsVisible="{Binding IsBusy}" />
           <mi:MaterialIcon Kind="FaceRecognition" IsVisible="{Binding !IsBusy}" />
-          <TextBlock Text="Unlock with Windows Hello" />
+          <TextBlock l:Tr.Text="Unlock with Windows Hello" />
         </StackPanel>
       </Button>
 
       <!-- Password -->
       <StackPanel Spacing="12" IsVisible="{Binding UsesPassword}">
-        <TextBox Name="PasswordBox" Text="{Binding Password}" PasswordChar="&#x2022;" Watermark="App password">
+        <TextBox Name="PasswordBox" Text="{Binding Password}" PasswordChar="&#x2022;" l:Tr.Watermark="App password">
           <TextBox.InnerLeftContent>
             <mi:MaterialIcon Kind="LockOutline" Width="18" Height="18" Margin="14,0,0,0"
                              Foreground="{DynamicResource AppTextTertiaryBrush}" />
@@ -45,7 +46,7 @@
         <Button Classes="primary large" HorizontalAlignment="Stretch" Command="{Binding UnlockWithPasswordCommand}">
           <StackPanel Orientation="Horizontal" Spacing="10">
             <mi:MaterialIcon Kind="Loading" Classes="spin" IsVisible="{Binding IsBusy}" />
-            <TextBlock Text="Unlock" />
+            <TextBlock l:Tr.Text="Unlock" />
           </StackPanel>
         </Button>
       </StackPanel>
@@ -54,7 +55,7 @@
         <TextBlock Text="{Binding Error}" TextWrapping="Wrap" />
       </Border>
 
-      <Button Classes="link" HorizontalAlignment="Center" Content="Forgot how to unlock?" Command="{Binding ForgotCommand}" />
+      <Button Classes="link" HorizontalAlignment="Center" l:Tr.Content="Forgot how to unlock?" Command="{Binding ForgotCommand}" />
     </StackPanel>
   </Grid>
 </UserControl>

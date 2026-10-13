@@ -90,7 +90,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         Asset = asset;
         IsFavorite = asset.IsFavorite;
         DateText = DateTimeOffset.TryParse(asset.FileCreatedAt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
-            ? date.ToLocalTime().ToString("dddd, MMMM d, yyyy · h:mm tt", CultureInfo.CurrentCulture)
+            ? date.ToLocalTime() is var local ? $"{local.ToString("D", CultureInfo.CurrentCulture)} · {local.ToString("t", CultureInfo.CurrentCulture)}" : ""
             : "";
         Error = null;
         Details = null;
@@ -129,7 +129,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         catch (Exception ex)
         {
             if (ReferenceEquals(asset, Asset))
-                Error = $"Couldn't load this photo. {NetworkErrors.Describe(ex)}";
+                Error = Tr.T("Couldn't load this photo. {0}", NetworkErrors.Describe(ex));
         }
         finally
         {

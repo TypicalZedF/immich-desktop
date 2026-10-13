@@ -75,7 +75,7 @@ public partial class MainWindow : Window
         {
             Title = title,
             AllowMultiple = false,
-            FileTypeFilter = [new FilePickerFileType("Images") { Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.bmp"] }],
+            FileTypeFilter = [new FilePickerFileType(Tr.T("Images")) { Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.bmp"] }],
         });
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }

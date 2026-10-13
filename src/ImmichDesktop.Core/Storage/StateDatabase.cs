@@ -255,6 +255,16 @@ public sealed class StateDatabase
         return Convert.ToInt32(cmd.ExecuteScalar());
     }
 
+    /// <summary>Total size of the files waiting to upload (for the time estimate).</summary>
+    public long SumCandidateBytes(IReadOnlyCollection<string> folderIds)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.Parameters.AddWithValue("$now", Now);
+        cmd.CommandText = $"SELECT COALESCE(SUM(size), 0) FROM files WHERE {CandidateWhere}" + FolderFilter(cmd, folderIds);
+        return Convert.ToInt64(cmd.ExecuteScalar());
+    }
+
     /// <summary>Next files to upload, newest first (like the mobile app).</summary>
     public List<FileRecord> GetCandidates(IReadOnlyCollection<string> folderIds, int limit)
     {

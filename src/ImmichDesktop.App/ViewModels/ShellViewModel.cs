@@ -41,11 +41,11 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
         Main = main;
         NavItems =
         [
-            new NavItem(ShellPage.Overview, "Overview", MaterialIconKind.ViewDashboardOutline, MaterialIconKind.ViewDashboard, () => new OverviewViewModel(this)),
-            new NavItem(ShellPage.Photos, "Photos", MaterialIconKind.ImageMultipleOutline, MaterialIconKind.ImageMultiple, () => new PhotosViewModel(this)),
-            new NavItem(ShellPage.Folders, "Folders", MaterialIconKind.FolderOutline, MaterialIconKind.Folder, () => new FoldersViewModel(this)),
-            new NavItem(ShellPage.Activity, "Activity", MaterialIconKind.History, MaterialIconKind.History, () => new ActivityViewModel(this)),
-            new NavItem(ShellPage.Settings, "Settings", MaterialIconKind.CogOutline, MaterialIconKind.Cog, () => new SettingsViewModel(this)),
+            new NavItem(ShellPage.Overview, Tr.T("Overview"), MaterialIconKind.ViewDashboardOutline, MaterialIconKind.ViewDashboard, () => new OverviewViewModel(this)),
+            new NavItem(ShellPage.Photos, Tr.T("Photos"), MaterialIconKind.ImageMultipleOutline, MaterialIconKind.ImageMultiple, () => new PhotosViewModel(this)),
+            new NavItem(ShellPage.Folders, Tr.T("Folders"), MaterialIconKind.FolderOutline, MaterialIconKind.Folder, () => new FoldersViewModel(this)),
+            new NavItem(ShellPage.Activity, Tr.T("Activity"), MaterialIconKind.History, MaterialIconKind.History, () => new ActivityViewModel(this)),
+            new NavItem(ShellPage.Settings, Tr.T("Settings"), MaterialIconKind.CogOutline, MaterialIconKind.Cog, () => new SettingsViewModel(this)),
         ];
         SelectedNav = NavItems[0];
 
@@ -114,7 +114,7 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     {
         var dark = ThemeService.IsDark;
         ThemeIcon = dark ? MaterialIconKind.WeatherSunny : MaterialIconKind.WeatherNight;
-        ThemeTip = dark ? "Switch to light theme" : "Switch to dark theme";
+        ThemeTip = dark ? Tr.T("Switch to light theme") : Tr.T("Switch to dark theme");
     }
 
     [RelayCommand]
@@ -150,7 +150,7 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     public partial bool IsServerOnline { get; set; } = true;
 
     [ObservableProperty]
-    public partial string ServerStatusText { get; set; } = "Online";
+    public partial string ServerStatusText { get; set; } = Tr.T("Online");
 
     async Task LoadStorageAsync()
     {
@@ -162,7 +162,7 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
                 {
                     var storage = await client.GetStorageAsync(_lifetime.Token);
                     StoragePercent = storage.Fraction * 100;
-                    StorageText = $"{Format.Bytes(storage.Used)} of {Format.Bytes(storage.Total)} used";
+                    StorageText = Tr.T("{0} of {1} used", Format.Bytes(storage.Used), Format.Bytes(storage.Total));
                     HasStorage = storage.Total > 0;
                 }
                 catch (OperationCanceledException)
@@ -210,9 +210,9 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
         IsServerOnline = status.State is not (SyncState.Offline or SyncState.AuthError);
         ServerStatusText = status.State switch
         {
-            SyncState.Offline => "Offline",
-            SyncState.AuthError => "Signed out",
-            _ => "Online",
+            SyncState.Offline => Tr.T("Offline"),
+            SyncState.AuthError => Tr.T("Signed out"),
+            _ => Tr.T("Online"),
         };
     }
 

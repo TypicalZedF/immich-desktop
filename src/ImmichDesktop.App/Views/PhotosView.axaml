@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichDesktop.App.Services"
              xmlns:vm="using:ImmichDesktop.App.ViewModels"
              xmlns:c="using:ImmichDesktop.App.Controls"
              xmlns:api="using:ImmichDesktop.Core.Api"
@@ -171,7 +172,7 @@
       <!-- Header: back, title, search, actions -->
       <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="28,20,28,10" IsVisible="{Binding !IsSelecting}">
         <Button Classes="ghost icon" VerticalAlignment="Center" Margin="0,0,8,0" Command="{Binding BackCommand}"
-                IsVisible="{Binding IsDrilledIn}" ToolTip.Tip="Back">
+                IsVisible="{Binding IsDrilledIn}" l:Tr.Tip="Back">
           <mi:MaterialIcon Kind="ArrowLeft" Width="22" Height="22" />
         </Button>
         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center" Margin="4,0,16,0" IsVisible="{Binding ShowHeading}">
@@ -179,7 +180,7 @@
           <TextBlock Classes="secondary" Text="{Binding Summary}" IsVisible="{Binding ShowGrid}" />
         </StackPanel>
         <TextBox Grid.Column="2" Name="SearchBox" Width="280" VerticalAlignment="Center" Text="{Binding SearchText}"
-                 Watermark="Search your photos">
+                 l:Tr.Watermark="Search your photos">
           <TextBox.InnerLeftContent>
             <mi:MaterialIcon Kind="Magnify" Width="18" Height="18" Margin="10,0,0,0" Foreground="{DynamicResource AppTextTertiaryBrush}" />
           </TextBox.InnerLeftContent>
@@ -188,10 +189,10 @@
           </TextBox.KeyBindings>
         </TextBox>
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" Margin="8,0,0,0" VerticalAlignment="Center">
-          <Button Classes="ghost icon" Command="{Binding ShareAlbumCommand}" IsVisible="{Binding CanShareAlbum}" ToolTip.Tip="Share album">
+          <Button Classes="ghost icon" Command="{Binding ShareAlbumCommand}" IsVisible="{Binding CanShareAlbum}" l:Tr.Tip="Share album">
             <mi:MaterialIcon Kind="ShareVariantOutline" Width="20" Height="20" />
           </Button>
-          <Button Classes="ghost icon" Command="{Binding RefreshCommand}" ToolTip.Tip="Refresh">
+          <Button Classes="ghost icon" Command="{Binding RefreshCommand}" l:Tr.Tip="Refresh">
             <mi:MaterialIcon Kind="Refresh" Width="20" Height="20" />
           </Button>
         </StackPanel>
@@ -202,25 +203,25 @@
               IsVisible="{Binding IsSelecting}">
         <Grid ColumnDefinitions="Auto,*,Auto">
           <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-            <Button Classes="ghost icon" Command="{Binding ClearSelectionCommand}" ToolTip.Tip="Clear selection (Esc)">
+            <Button Classes="ghost icon" Command="{Binding ClearSelectionCommand}" l:Tr.Tip="Clear selection (Esc)">
               <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
             </Button>
             <TextBlock Text="{Binding SelectionText}" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
           </StackPanel>
           <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
-            <Button Classes="ghost barAction" Command="{Binding ShareSelectionCommand}" ToolTip.Tip="Share">
-              <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="ShareVariantOutline" /><TextBlock Text="Share" /></StackPanel>
+            <Button Classes="ghost barAction" Command="{Binding ShareSelectionCommand}" l:Tr.Tip="Share">
+              <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="ShareVariantOutline" /><TextBlock l:Tr.Text="Share" /></StackPanel>
             </Button>
-            <Button Classes="ghost barAction" Command="{Binding AddSelectionToAlbumCommand}" ToolTip.Tip="Add to album">
-              <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="ImagePlusOutline" /><TextBlock Text="Add to album" /></StackPanel>
+            <Button Classes="ghost barAction" Command="{Binding AddSelectionToAlbumCommand}" l:Tr.Tip="Add to album">
+              <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="ImagePlusOutline" /><TextBlock l:Tr.Text="Add to album" /></StackPanel>
             </Button>
-            <Button Classes="ghost icon" Command="{Binding FavoriteSelectionCommand}" ToolTip.Tip="Favorite">
+            <Button Classes="ghost icon" Command="{Binding FavoriteSelectionCommand}" l:Tr.Tip="Favorite">
               <mi:MaterialIcon Kind="HeartOutline" Width="20" Height="20" />
             </Button>
-            <Button Classes="ghost icon" Command="{Binding DownloadSelectionCommand}" ToolTip.Tip="Download">
+            <Button Classes="ghost icon" Command="{Binding DownloadSelectionCommand}" l:Tr.Tip="Download">
               <mi:MaterialIcon Kind="TrayArrowDown" Width="20" Height="20" />
             </Button>
-            <Button Classes="ghost icon" Command="{Binding TrashSelectionCommand}" ToolTip.Tip="Move to trash">
+            <Button Classes="ghost icon" Command="{Binding TrashSelectionCommand}" l:Tr.Tip="Move to trash">
               <mi:MaterialIcon Kind="TrashCanOutline" Width="20" Height="20" />
             </Button>
           </StackPanel>
@@ -231,22 +232,22 @@
       <ScrollViewer DockPanel.Dock="Top" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" Margin="28,0,28,6">
         <StackPanel Orientation="Horizontal">
           <RadioButton Classes="tab" GroupName="photosTab" IsChecked="{Binding IsPhotosTab}">
-            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="ImageMultipleOutline" Width="16" Height="16" /><TextBlock Text="Photos" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="ImageMultipleOutline" Width="16" Height="16" /><TextBlock l:Tr.Text="Photos" /></StackPanel>
           </RadioButton>
           <RadioButton Classes="tab" GroupName="photosTab" IsChecked="{Binding IsFavoritesTab}">
-            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="HeartOutline" Width="16" Height="16" /><TextBlock Text="Favorites" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="HeartOutline" Width="16" Height="16" /><TextBlock l:Tr.Text="Favorites" /></StackPanel>
           </RadioButton>
           <RadioButton Classes="tab" GroupName="photosTab" IsChecked="{Binding IsAlbumsTab}">
-            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="ImageAlbum" Width="16" Height="16" /><TextBlock Text="Albums" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="ImageAlbum" Width="16" Height="16" /><TextBlock l:Tr.Text="Albums" /></StackPanel>
           </RadioButton>
           <RadioButton Classes="tab" GroupName="photosTab" IsChecked="{Binding IsPeopleTab}">
-            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="AccountMultipleOutline" Width="16" Height="16" /><TextBlock Text="People" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="AccountMultipleOutline" Width="16" Height="16" /><TextBlock l:Tr.Text="People" /></StackPanel>
           </RadioButton>
           <RadioButton Classes="tab" GroupName="photosTab" IsChecked="{Binding IsPlacesTab}">
-            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="MapMarkerOutline" Width="16" Height="16" /><TextBlock Text="Places" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="MapMarkerOutline" Width="16" Height="16" /><TextBlock l:Tr.Text="Places" /></StackPanel>
           </RadioButton>
           <RadioButton Classes="tab" GroupName="photosTab" IsChecked="{Binding IsMapTab}">
-            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="MapOutline" Width="16" Height="16" /><TextBlock Text="Map" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6"><mi:MaterialIcon Kind="MapOutline" Width="16" Height="16" /><TextBlock l:Tr.Text="Map" /></StackPanel>
           </RadioButton>
         </StackPanel>
       </ScrollViewer>
@@ -295,7 +296,7 @@
                                            HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6" />
                           <!-- Select -->
                           <Button Classes="check" Classes.visible="{Binding IsSelected}" Classes.on="{Binding IsSelected}"
-                                  Command="{Binding ToggleSelectCommand}" IsVisible="{Binding CanSelect}" ToolTip.Tip="Select">
+                                  Command="{Binding ToggleSelectCommand}" IsVisible="{Binding CanSelect}" l:Tr.Tip="Select">
                             <Panel>
                               <Ellipse Width="22" Height="22" Fill="White" IsVisible="{Binding IsSelected}" />
                               <mi:MaterialIcon Kind="CheckCircle" Width="26" Height="26" IsVisible="{Binding IsSelected}" />
@@ -316,14 +317,14 @@
           <!-- States -->
           <StackPanel Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsLoading}">
             <mi:MaterialIcon Kind="Loading" Classes="spin" Width="28" Height="28" Foreground="{DynamicResource AppPrimaryBrush}" />
-            <TextBlock Classes="secondary" Text="Loading…" />
+            <TextBlock Classes="secondary" l:Tr.Text="Loading…" />
           </StackPanel>
           <Border Classes="card" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center"
                   IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             <StackPanel Spacing="12">
               <mi:MaterialIcon Kind="CloudOffOutline" Width="32" Height="32" Foreground="{DynamicResource AppTextTertiaryBrush}" />
               <TextBlock Text="{Binding Error}" TextWrapping="Wrap" TextAlignment="Center" />
-              <Button Classes="primary" HorizontalAlignment="Center" Content="Try again" Command="{Binding RefreshCommand}" />
+              <Button Classes="primary" HorizontalAlignment="Center" l:Tr.Content="Try again" Command="{Binding RefreshCommand}" />
             </StackPanel>
           </Border>
           <StackPanel Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsEmpty}" MaxWidth="420">
@@ -417,14 +418,14 @@
             <c:MapView Name="Map" Markers="{Binding Markers}" />
           </Border>
           <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12" Spacing="6">
-            <Button Classes="secondary icon" Name="ZoomInButton" ToolTip.Tip="Zoom in"><mi:MaterialIcon Kind="Plus" Width="18" Height="18" /></Button>
-            <Button Classes="secondary icon" Name="ZoomOutButton" ToolTip.Tip="Zoom out"><mi:MaterialIcon Kind="Minus" Width="18" Height="18" /></Button>
-            <Button Classes="secondary icon" Name="FitButton" ToolTip.Tip="Show all photos"><mi:MaterialIcon Kind="FitToScreenOutline" Width="18" Height="18" /></Button>
+            <Button Classes="secondary icon" Name="ZoomInButton" l:Tr.Tip="Zoom in"><mi:MaterialIcon Kind="Plus" Width="18" Height="18" /></Button>
+            <Button Classes="secondary icon" Name="ZoomOutButton" l:Tr.Tip="Zoom out"><mi:MaterialIcon Kind="Minus" Width="18" Height="18" /></Button>
+            <Button Classes="secondary icon" Name="FitButton" l:Tr.Tip="Show all photos"><mi:MaterialIcon Kind="FitToScreenOutline" Width="18" Height="18" /></Button>
           </StackPanel>
           <Button Name="ShowAreaButton" Classes="primary" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,34">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <mi:MaterialIcon Kind="ImageMultipleOutline" />
-              <TextBlock Name="ShowAreaText" Text="Show photos in this area" />
+              <TextBlock Name="ShowAreaText" l:Tr.Text="Show photos in this area" />
             </StackPanel>
           </Button>
         </Panel>
@@ -452,32 +453,32 @@
         <Border DockPanel.Dock="Right" Width="320" Background="#181818" IsVisible="{Binding ShowInfo}" Padding="22,72,22,22">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
             <StackPanel Spacing="16">
-              <TextBlock Text="Info" Foreground="White" FontSize="18" FontWeight="SemiBold" />
+              <TextBlock l:Tr.Text="Info" Foreground="White" FontSize="18" FontWeight="SemiBold" />
               <StackPanel Spacing="2" IsVisible="{Binding DateText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Classes="infoLabel" Text="Taken" />
+                <TextBlock Classes="infoLabel" l:Tr.Text="Taken" />
                 <TextBlock Classes="infoValue" Text="{Binding DateText}" />
               </StackPanel>
               <StackPanel Spacing="2" IsVisible="{Binding FileName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Classes="infoLabel" Text="File" />
+                <TextBlock Classes="infoLabel" l:Tr.Text="File" />
                 <TextBlock Classes="infoValue" Text="{Binding FileName}" />
                 <TextBlock Classes="infoLabel" Text="{Binding Dimensions}" />
               </StackPanel>
               <StackPanel Spacing="2" IsVisible="{Binding Camera, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Classes="infoLabel" Text="Camera" />
+                <TextBlock Classes="infoLabel" l:Tr.Text="Camera" />
                 <TextBlock Classes="infoValue" Text="{Binding Camera}" />
                 <TextBlock Classes="infoLabel" Text="{Binding Lens}" IsVisible="{Binding Lens, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <TextBlock Classes="infoLabel" Text="{Binding Exposure}" IsVisible="{Binding Exposure, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
               <StackPanel Spacing="2" IsVisible="{Binding Place, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Classes="infoLabel" Text="Location" />
+                <TextBlock Classes="infoLabel" l:Tr.Text="Location" />
                 <TextBlock Classes="infoValue" Text="{Binding Place}" />
               </StackPanel>
               <StackPanel Spacing="2" IsVisible="{Binding People, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Classes="infoLabel" Text="People" />
+                <TextBlock Classes="infoLabel" l:Tr.Text="People" />
                 <TextBlock Classes="infoValue" Text="{Binding People}" />
               </StackPanel>
               <StackPanel Spacing="2" IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Classes="infoLabel" Text="Description" />
+                <TextBlock Classes="infoLabel" l:Tr.Text="Description" />
                 <TextBlock Classes="infoValue" Text="{Binding Description}" />
               </StackPanel>
             </StackPanel>
@@ -498,31 +499,31 @@
 
           <!-- Top bar -->
           <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Top" Margin="14,12">
-            <Button Classes="viewerNav" Command="{Binding CloseCommand}" ToolTip.Tip="Close (Esc)">
+            <Button Classes="viewerNav" Command="{Binding CloseCommand}" l:Tr.Tip="Close (Esc)">
               <mi:MaterialIcon Kind="Close" />
             </Button>
             <TextBlock Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Text="{Binding Error}" Foreground="#FFB4B4" FontSize="12.5"
                        TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
-              <Button Classes="viewerNav" Command="{Binding ToggleFavoriteCommand}" IsVisible="{Binding CanEdit}" ToolTip.Tip="Favorite (F)">
+              <Button Classes="viewerNav" Command="{Binding ToggleFavoriteCommand}" IsVisible="{Binding CanEdit}" l:Tr.Tip="Favorite (F)">
                 <Panel>
                   <mi:MaterialIcon Kind="Heart" IsVisible="{Binding IsFavorite}" />
                   <mi:MaterialIcon Kind="HeartOutline" IsVisible="{Binding !IsFavorite}" />
                 </Panel>
               </Button>
-              <Button Classes="viewerNav" Command="{Binding ShareCommand}" IsVisible="{Binding CanEdit}" ToolTip.Tip="Share">
+              <Button Classes="viewerNav" Command="{Binding ShareCommand}" IsVisible="{Binding CanEdit}" l:Tr.Tip="Share">
                 <mi:MaterialIcon Kind="ShareVariantOutline" />
               </Button>
-              <Button Classes="viewerNav" Command="{Binding AddToAlbumCommand}" IsVisible="{Binding CanEdit}" ToolTip.Tip="Add to album">
+              <Button Classes="viewerNav" Command="{Binding AddToAlbumCommand}" IsVisible="{Binding CanEdit}" l:Tr.Tip="Add to album">
                 <mi:MaterialIcon Kind="ImagePlusOutline" />
               </Button>
-              <Button Classes="viewerNav" Command="{Binding DownloadCommand}" IsVisible="{Binding CanEdit}" ToolTip.Tip="Download">
+              <Button Classes="viewerNav" Command="{Binding DownloadCommand}" IsVisible="{Binding CanEdit}" l:Tr.Tip="Download">
                 <mi:MaterialIcon Kind="TrayArrowDown" />
               </Button>
-              <Button Classes="viewerNav" Command="{Binding ToggleInfoCommand}" ToolTip.Tip="Info (I)">
+              <Button Classes="viewerNav" Command="{Binding ToggleInfoCommand}" l:Tr.Tip="Info (I)">
                 <mi:MaterialIcon Kind="InformationOutline" />
               </Button>
-              <Button Classes="viewerNav" Command="{Binding TrashCommand}" IsVisible="{Binding CanEdit}" ToolTip.Tip="Move to trash (Delete)">
+              <Button Classes="viewerNav" Command="{Binding TrashCommand}" IsVisible="{Binding CanEdit}" l:Tr.Tip="Move to trash (Delete)">
                 <mi:MaterialIcon Kind="TrashCanOutline" />
               </Button>
               <Button Classes="viewerNav" Command="{Binding OpenInImmichCommand}"
@@ -539,11 +540,11 @@
           </Border>
 
           <Button Classes="viewerNav" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0"
-                  Command="{Binding PreviousCommand}" ToolTip.Tip="Newer (←)">
+                  Command="{Binding PreviousCommand}" l:Tr.Tip="Newer (←)">
             <mi:MaterialIcon Kind="ChevronLeft" Width="28" Height="28" />
           </Button>
           <Button Classes="viewerNav" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10,0"
-                  Command="{Binding NextCommand}" ToolTip.Tip="Older (→)">
+                  Command="{Binding NextCommand}" l:Tr.Tip="Older (→)">
             <mi:MaterialIcon Kind="ChevronRight" Width="28" Height="28" />
           </Button>
         </Panel>
@@ -560,7 +561,7 @@
               <StackPanel Spacing="14">
                 <Grid ColumnDefinitions="*,Auto">
                   <StackPanel Spacing="2">
-                    <TextBlock Classes="h2" Text="Share" />
+                    <TextBlock Classes="h2" l:Tr.Text="Share" />
                     <TextBlock Classes="secondary" Text="{Binding What, StringFormat='Anyone with the link can see {0}.'}" TextWrapping="Wrap" />
                   </StackPanel>
                   <Button Grid.Column="1" Classes="ghost icon" VerticalAlignment="Top" Command="{Binding CloseCommand}">
@@ -569,11 +570,11 @@
                 </Grid>
                 <StackPanel Spacing="12" IsVisible="{Binding !HasLink}">
                   <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Text="Link expires" VerticalAlignment="Center" />
+                    <TextBlock l:Tr.Text="Link expires" VerticalAlignment="Center" />
                     <ComboBox Grid.Column="1" Width="150" ItemsSource="{Binding Expiries}" SelectedItem="{Binding SelectedExpiry}" />
                   </Grid>
                   <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Text="Allow downloads" VerticalAlignment="Center" />
+                    <TextBlock l:Tr.Text="Allow downloads" VerticalAlignment="Center" />
                     <ToggleSwitch Grid.Column="1" IsChecked="{Binding AllowDownload}" OnContent="" OffContent="" />
                   </Grid>
                   <Button Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding CreateCommand}"
@@ -581,20 +582,20 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <mi:MaterialIcon Kind="Loading" Classes="spin" Width="16" Height="16" IsVisible="{Binding IsWorking}" />
                       <mi:MaterialIcon Kind="LinkVariant" IsVisible="{Binding !IsWorking}" />
-                      <TextBlock Text="Create link" />
+                      <TextBlock l:Tr.Text="Create link" />
                     </StackPanel>
                   </Button>
                 </StackPanel>
                 <StackPanel Spacing="10" IsVisible="{Binding HasLink}">
                   <TextBox Text="{Binding Link}" IsReadOnly="True" />
                   <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                    <TextBlock Classes="caption" Text="Copied to clipboard" VerticalAlignment="Center" Foreground="{DynamicResource AppSuccessBrush}"
+                    <TextBlock Classes="caption" l:Tr.Text="Copied to clipboard" VerticalAlignment="Center" Foreground="{DynamicResource AppSuccessBrush}"
                                IsVisible="{Binding Copied}" Margin="0,0,6,0" />
                     <Button Classes="secondary" Command="{Binding OpenLinkCommand}">
-                      <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="OpenInNew" /><TextBlock Text="Open" /></StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="OpenInNew" /><TextBlock l:Tr.Text="Open" /></StackPanel>
                     </Button>
                     <Button Classes="primary" Command="{Binding CopyCommand}">
-                      <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="ContentCopy" /><TextBlock Text="Copy" /></StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="ContentCopy" /><TextBlock l:Tr.Text="Copy" /></StackPanel>
                     </Button>
                   </StackPanel>
                 </StackPanel>
@@ -606,7 +607,7 @@
               <StackPanel Spacing="12">
                 <Grid ColumnDefinitions="*,Auto">
                   <StackPanel Spacing="2">
-                    <TextBlock Classes="h2" Text="Add to album" />
+                    <TextBlock Classes="h2" l:Tr.Text="Add to album" />
                     <TextBlock Classes="secondary" Text="{Binding What}" />
                   </StackPanel>
                   <Button Grid.Column="1" Classes="ghost icon" VerticalAlignment="Top" Command="{Binding CloseCommand}">
@@ -614,12 +615,12 @@
                   </Button>
                 </Grid>
                 <Grid ColumnDefinitions="*,Auto">
-                  <TextBox Text="{Binding NewAlbumName}" Watermark="New album name">
+                  <TextBox Text="{Binding NewAlbumName}" l:Tr.Watermark="New album name">
                     <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding CreateCommand}" /></TextBox.KeyBindings>
                   </TextBox>
-                  <Button Grid.Column="1" Classes="primary" Margin="8,0,0,0" Content="Create" Command="{Binding CreateCommand}" IsEnabled="{Binding !IsWorking}" />
+                  <Button Grid.Column="1" Classes="primary" Margin="8,0,0,0" l:Tr.Content="Create" Command="{Binding CreateCommand}" IsEnabled="{Binding !IsWorking}" />
                 </Grid>
-                <TextBlock Classes="section" Text="YOUR ALBUMS" Margin="0,6,0,0" />
+                <TextBlock Classes="section" l:Tr.Text="YOUR ALBUMS" Margin="0,6,0,0" />
                 <ScrollViewer MaxHeight="300" HorizontalScrollBarVisibility="Disabled">
                   <ItemsControl ItemsSource="{Binding Albums}">
                     <ItemsControl.ItemTemplate>

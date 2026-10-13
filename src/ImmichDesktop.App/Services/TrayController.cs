@@ -52,30 +52,30 @@ public sealed class TrayController : IDisposable
         _error = LoadIcon("tray-error");
         _syncFrames = [LoadIcon("tray-sync-1"), LoadIcon("tray-sync-2"), LoadIcon("tray-sync-3"), LoadIcon("tray-sync-4")];
 
-        _statusItem = new NativeMenuItem("Starting…") { IsEnabled = false };
+        _statusItem = new NativeMenuItem(Tr.T("Starting…")) { IsEnabled = false };
         _pauseItems =
         [
-            Item("Pause for 1 hour", () => AppServices.Engine.Pause(TimeSpan.FromHours(1))),
-            Item("Pause until tomorrow", () => AppServices.Engine.Pause(DateTime.Today.AddDays(1) - DateTime.Now)),
-            Item("Pause until I resume", () => AppServices.Engine.Pause()),
+            Item(Tr.T("Pause for 1 hour"), () => AppServices.Engine.Pause(TimeSpan.FromHours(1))),
+            Item(Tr.T("Pause until tomorrow"), () => AppServices.Engine.Pause(DateTime.Today.AddDays(1) - DateTime.Now)),
+            Item(Tr.T("Pause until I resume"), () => AppServices.Engine.Pause()),
         ];
-        _resumeItem = Item("Resume backup", () => AppServices.Engine.Resume());
-        _updateItem = Item("Restart to update", () => AppServices.Updates.InstallAndRestart());
+        _resumeItem = Item(Tr.T("Resume backup"), () => AppServices.Engine.Resume());
+        _updateItem = Item(Tr.T("Restart to update"), () => AppServices.Updates.InstallAndRestart());
         _updateSeparator = new NativeMenuItemSeparator();
 
         _menu = new NativeMenu();
         _menu.Items.Add(_statusItem);
         _menu.Items.Add(new NativeMenuItemSeparator());
-        _menu.Items.Add(Item("Open Immich Desktop", () => _app.ShowMainWindow()));
-        _menu.Items.Add(Item("Open Immich in browser", OpenWeb));
+        _menu.Items.Add(Item(Tr.T("Open Immich Desktop"), () => _app.ShowMainWindow()));
+        _menu.Items.Add(Item(Tr.T("Open Immich in browser"), OpenWeb));
         _menu.Items.Add(new NativeMenuItemSeparator());
         foreach (var item in _pauseItems)
             _menu.Items.Add(item);
         _menu.Items.Add(_resumeItem);
-        _menu.Items.Add(Item("Sync now", () => AppServices.Engine.SyncNow()));
+        _menu.Items.Add(Item(Tr.T("Sync now"), () => AppServices.Engine.SyncNow()));
         _menu.Items.Add(new NativeMenuItemSeparator());
-        _menu.Items.Add(Item("Settings", () => _app.ShowMainWindow(ShellPage.Settings)));
-        _menu.Items.Add(Item($"Quit {AppInfo.Name}", () => _app.Quit()));
+        _menu.Items.Add(Item(Tr.T("Settings"), () => _app.ShowMainWindow(ShellPage.Settings)));
+        _menu.Items.Add(Item(Tr.T("Quit {0}", AppInfo.Name), () => _app.Quit()));
 
         _tray = new TrayIcon
         {
@@ -128,7 +128,7 @@ public sealed class TrayController : IDisposable
     {
         if (AppServices.Updates.State == UpdateState.Ready && !_menu.Items.Contains(_updateItem))
         {
-            _updateItem.Header = $"Restart to update to {AppServices.Updates.Release?.Version}";
+            _updateItem.Header = Tr.T("Restart to update to {0}", AppServices.Updates.Release?.Version);
             _menu.Items.Insert(0, _updateItem);
             _menu.Items.Insert(1, _updateSeparator);
         }
@@ -141,8 +141,8 @@ public sealed class TrayController : IDisposable
         // Menu: coarse, rarely-changing text only.
         var statusText = status.State switch
         {
-            SyncState.Uploading => "Backing up…",
-            SyncState.Scanning => "Checking for new photos…",
+            SyncState.Uploading => Tr.T("Backing up…"),
+            SyncState.Scanning => Tr.T("Checking for new photos…"),
             _ => view.Title,
         };
         if (statusText != _statusText)

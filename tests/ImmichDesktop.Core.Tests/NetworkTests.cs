@@ -87,3 +87,16 @@ public class NetworkTests
         }
     }
 }
+
+public class TimeLeftTests
+{
+    [Theory]
+    [InlineData(20, "Less than a minute left")]
+    [InlineData(10 * 60 + 5, "About 11 minutes left")]
+    [InlineData(2 * 3600 + 13 * 60, "About 2 hours 15 minutes left")]
+    [InlineData(2 * 3600 + 58 * 60, "About 3 hours left")]
+    [InlineData(30 * 3600, "About 30 hours left")]
+    [InlineData(5 * 86400, "About 5 days left")]
+    public void Rounds_estimates_so_they_read_naturally(int seconds, string expected) =>
+        Assert.Equal(expected, Format.TimeLeft(TimeSpan.FromSeconds(seconds)));
+}

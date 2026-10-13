@@ -131,7 +131,7 @@ public sealed partial class ActivityViewModel : ViewModelBase, IDisposable
             Failures.Add(new FailedFileViewModel(f));
         var total = AppServices.Engine.Status.Counts.Failed;
         HasFailures = Failures.Count > 0;
-        FailuresTitle = $"{Format.Plural(Math.Max(total, Failures.Count), "file")} couldn't be uploaded";
+        FailuresTitle = Tr.T("{0} couldn't be uploaded", Format.Plural(Math.Max(total, Failures.Count), "file"));
     }
 
     [RelayCommand]
@@ -166,7 +166,7 @@ public sealed partial class ActivityItemViewModel : ViewModelBase
         _time = entry.Time;
         Kind = entry.Kind;
         Path = entry.Path;
-        Message = entry.Kind == ActivityKind.Uploaded ? $"Uploaded {entry.Message}" : entry.Message;
+        Message = entry.Kind == ActivityKind.Uploaded ? Tr.T("Uploaded {0}", entry.Message) : entry.Message;
         var directory = entry.Path is null ? null : System.IO.Path.GetDirectoryName(entry.Path);
         Detail = directory is null ? null : System.IO.Path.GetFileName(directory);
         DetailTip = entry.Path;
@@ -214,12 +214,12 @@ public sealed partial class ActivityItemViewModel : ViewModelBase
 public sealed partial class FailedFileViewModel(FailedFile file) : ViewModelBase
 {
     public string FileName { get; } = System.IO.Path.GetFileName(file.Path);
-    public string Error { get; } = file.Error ?? "Unknown error";
+    public string Error { get; } = file.Error ?? Tr.T("Unknown error");
     public string Path { get; } = file.Path;
 
     public string RetryText { get; } = file.NextAttempt is { } next && next > DateTimeOffset.UtcNow
-        ? $"Retrying in {Format.Duration(next - DateTimeOffset.UtcNow)}"
-        : "Retrying soon";
+        ? Tr.T("Retrying in {0}", Format.Duration(next - DateTimeOffset.UtcNow))
+        : Tr.T("Retrying soon");
 
     [RelayCommand]
     void Reveal() => ShellLauncher.Reveal(Path);

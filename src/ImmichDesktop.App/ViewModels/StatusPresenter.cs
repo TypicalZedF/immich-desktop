@@ -32,64 +32,66 @@ public static class StatusPresenter
         switch (s.State)
         {
             case SyncState.NotConfigured:
-                return new("Not signed in", "Sign in to start backing up.", null, MaterialIconKind.AccountAlertOutline, StatusTone.Warning);
+                return new(Tr.T("Not signed in"), Tr.T("Sign in to start backing up."), null, MaterialIconKind.AccountAlertOutline, StatusTone.Warning);
 
             case SyncState.Scanning:
-                return new("Looking for new photos", s.Detail ?? "Checking your folders…", null, MaterialIconKind.Sync, StatusTone.Busy);
+                return new(Tr.T("Looking for new photos"), s.Detail ?? Tr.T("Checking your folders…"), null, MaterialIconKind.Sync, StatusTone.Busy);
 
             case SyncState.Uploading:
             {
                 var remaining = Math.Max(0, s.RunTotal - s.RunDone);
-                var progress = $"{Format.Count(s.RunDone)} of {Format.Count(s.RunTotal)}";
+                var progress = Tr.T("{0} of {1}", Format.Count(s.RunDone), Format.Count(s.RunTotal));
                 var trayDetail = s.BytesPerSecond > 1 ? $"{progress} · {Format.Speed(s.BytesPerSecond)}" : progress;
-                var detail = s.Detail ?? "New photos and videos are being uploaded to Immich.";
-                return new($"Backing up {Format.Plural(remaining, "file")}", detail, trayDetail, MaterialIconKind.CloudUploadOutline, StatusTone.Busy);
+                if (s.Remaining is { } left)
+                    trayDetail += $"\n{Format.TimeLeft(left)}";
+                var detail = s.Detail ?? Tr.T("New photos and videos are being uploaded to Immich.");
+                return new(Tr.T("Backing up {0}", Format.Plural(remaining, "file")), detail, trayDetail, MaterialIconKind.CloudUploadOutline, StatusTone.Busy);
             }
 
             case SyncState.Paused:
             {
                 var detail = settings.PausedUntil is { } until
-                    ? $"Resumes automatically {(until.Date == DateTimeOffset.Now.Date ? "at" : "on")} {FormatResume(until)}."
-                    : "New photos won't be uploaded until you resume.";
-                return new("Backup paused", detail, detail, MaterialIconKind.PauseCircleOutline, StatusTone.Paused);
+                    ? (until.Date == DateTimeOffset.Now.Date ? Tr.T("Resumes automatically at {0}.", FormatResume(until)) : Tr.T("Resumes automatically on {0}.", FormatResume(until)))
+                    : Tr.T("New photos won't be uploaded until you resume.");
+                return new(Tr.T("Backup paused"), detail, detail, MaterialIconKind.PauseCircleOutline, StatusTone.Paused);
             }
 
             case SyncState.WaitingForPower:
-                return new("Waiting for power", "Backup continues when your PC is plugged in.", "Waiting for the charger", MaterialIconKind.PowerPlugOutline, StatusTone.Paused);
+                return new(Tr.T("Waiting for power"), Tr.T("Backup continues when your PC is plugged in."), Tr.T("Waiting for the charger"), MaterialIconKind.PowerPlugOutline, StatusTone.Paused);
 
             case SyncState.WaitingForNetwork:
-                return new("Saving data", "Backup is paused on this metered connection. Change this in Settings → Network.",
-                    "Paused on a metered connection", MaterialIconKind.WifiStrengthAlertOutline, StatusTone.Paused);
+                return new(Tr.T("Saving data"), Tr.T("Backup is paused on this metered connection. Change this in Settings → Network."),
+                    Tr.T("Paused on a metered connection"), MaterialIconKind.WifiStrengthAlertOutline, StatusTone.Paused);
 
             case SyncState.Offline:
-                return new("Can't reach your server", s.Detail ?? "Retrying shortly.", "Offline — will retry", MaterialIconKind.CloudOffOutline, StatusTone.Warning);
+                return new(Tr.T("Can't reach your server"), s.Detail ?? Tr.T("Retrying shortly."), Tr.T("Offline — will retry"), MaterialIconKind.CloudOffOutline, StatusTone.Warning);
 
             case SyncState.AuthError:
-                return new("Sign in again", s.Detail ?? "Your sign-in has expired.", "Signed out — open the app to sign in", MaterialIconKind.AccountAlertOutline, StatusTone.Error);
+                return new(Tr.T("Sign in again"), s.Detail ?? Tr.T("Your sign-in has expired."), Tr.T("Signed out — open the app to sign in"), MaterialIconKind.AccountAlertOutline, StatusTone.Error);
 
             case SyncState.Error:
-                return new("Something went wrong", s.Detail ?? "Retrying in a few minutes.", "Something went wrong", MaterialIconKind.AlertCircleOutline, StatusTone.Error);
+                return new(Tr.T("Something went wrong"), s.Detail ?? Tr.T("Retrying in a few minutes."), Tr.T("Something went wrong"), MaterialIconKind.AlertCircleOutline, StatusTone.Error);
         }
 
         // Idle
         if (!settings.Folders.Any(f => f.Enabled))
-            return new("No folders selected", "Add a folder to start backing up.", "No folders selected", MaterialIconKind.FolderAlertOutline, StatusTone.Warning);
+            return new(Tr.T("No folders selected"), Tr.T("Add a folder to start backing up."), Tr.T("No folders selected"), MaterialIconKind.FolderAlertOutline, StatusTone.Warning);
 
         if (c.Failed > 0)
         {
-            return new($"{Format.Plural(c.Failed, "file needs", "files need")} attention",
-                "Some files couldn't be uploaded. They'll be retried automatically.",
-                $"{Format.Plural(c.Failed, "file")} couldn't be uploaded",
+            return new(c.Failed == 1 ? Tr.T("1 file needs attention") : Tr.T("{0} files need attention", Format.Count(c.Failed)),
+                Tr.T("Some files couldn't be uploaded. They'll be retried automatically."),
+                Tr.T("{0} couldn't be uploaded", Format.Plural(c.Failed, "file")),
                 MaterialIconKind.CloudAlertOutline, StatusTone.Warning);
         }
 
         if (c.Pending > 0)
-            return new("Almost done", $"{Format.Plural(c.Pending, "file")} will upload shortly.", $"{Format.Plural(c.Pending, "file")} waiting", MaterialIconKind.ClockOutline, StatusTone.Ok);
+            return new(Tr.T("Almost done"), Tr.T("{0} will upload shortly.", Format.Plural(c.Pending, "file")), Tr.T("{0} waiting", Format.Plural(c.Pending, "file")), MaterialIconKind.ClockOutline, StatusTone.Ok);
 
-        var checkedText = s.LastSync is { } last ? $" · Checked {Format.Relative(last)}" : "";
-        return new("Everything is backed up",
-            $"{Format.Plural(c.BackedUp, "photo or video", "photos and videos")} safe in Immich{checkedText}",
-            $"{Format.Plural(c.BackedUp, "file")} backed up",
+        var checkedText = s.LastSync is { } last ? Tr.T(" · Checked {0}", Format.Relative(last)) : "";
+        return new(Tr.T("Everything is backed up"),
+            Tr.T("{0} safe in Immich{1}", Format.Plural(c.BackedUp, "photo or video", "photos and videos"), checkedText),
+            Tr.T("{0} backed up", Format.Plural(c.BackedUp, "file")),
             MaterialIconKind.CloudCheckOutline, StatusTone.Ok);
     }
 

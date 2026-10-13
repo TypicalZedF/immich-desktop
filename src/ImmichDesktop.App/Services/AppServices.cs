@@ -22,6 +22,7 @@ public static class AppServices
     public static void Initialize()
     {
         Settings = new SettingsStore(AppPaths.SettingsFile);
+        Tr.SetLanguage(Settings.Current.Language);
         Database = new StateDatabase(AppPaths.DatabaseFile);
         Activity = new ActivityLog(Database);
         Account = new AccountService(Settings, Database);

@@ -63,5 +63,8 @@ public sealed record SyncStatus
     public double BytesPerSecond { get; init; }
     public DateTimeOffset? LastSync { get; init; }
 
+    /// <summary>Estimated time until everything queued is uploaded; null until there's enough to go on.</summary>
+    public TimeSpan? Remaining { get; init; }
+
     public bool IsBusy => State is SyncState.Scanning or SyncState.Uploading;
 }

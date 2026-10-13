@@ -105,6 +105,9 @@ public sealed class AppSettings
     // App
     public bool LaunchAtStartup { get; set; } = true;
     public AppTheme Theme { get; set; } = AppTheme.System;
+
+    /// <summary>App language code (e.g. "de"); null follows the system language.</summary>
+    public string? Language { get; set; }
     public bool CheckForUpdates { get; set; } = true;
 
     // Security: ask for Windows Hello or a password before showing the window (backup keeps running).

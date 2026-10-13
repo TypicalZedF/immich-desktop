@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using ImmichDesktop.Core;
 
 namespace ImmichDesktop.Core.Api;
 
@@ -38,19 +39,19 @@ public static class NetworkErrors
             switch (e)
             {
                 case AuthenticationException:
-                    return "The server's security certificate isn't trusted.";
+                    return Loc.T("The server's security certificate isn't trusted.");
                 case SocketException { SocketErrorCode: SocketError.HostNotFound or SocketError.NoData }:
-                    return "Couldn't find that server. Check the address.";
+                    return Loc.T("Couldn't find that server. Check the address.");
                 case SocketException { SocketErrorCode: SocketError.ConnectionRefused }:
-                    return "The server refused the connection. Is Immich running?";
+                    return Loc.T("The server refused the connection. Is Immich running?");
                 case TimeoutException:
-                    return "The server took too long to respond.";
+                    return Loc.T("The server took too long to respond.");
                 case ImmichApiException api:
                     return api.Message;
             }
         }
         return ex is HttpRequestException
-            ? "Couldn't connect to the server. Check the address and your internet connection."
+            ? Loc.T("Couldn't connect to the server. Check the address and your internet connection.")
             : ex.Message;
     }
 }

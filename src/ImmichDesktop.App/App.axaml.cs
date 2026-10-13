@@ -75,6 +75,16 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
+    /// <summary>Applies a new language everywhere: the window is rebuilt and the tray menu recreated.</summary>
+    public void ApplyLanguage(string? code)
+    {
+        Tr.SetLanguage(code);
+        _tray?.Dispose();
+        _tray = new TrayController(this);
+        if (_window?.DataContext is MainWindowViewModel main && !main.IsLocked && main.Content is ShellViewModel)
+            main.ShowShell(ShellPage.Settings);
+    }
+
     void OnCommand(SingleInstance.Command command, string? argument)
     {
         switch (command)

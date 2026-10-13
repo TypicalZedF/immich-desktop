@@ -32,6 +32,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
         LaunchAtStartup = Autostart.IsEnabled();
         _theme = s.Theme;
+        LanguageOptions = [new Option<string?>(Tr.T("System ({0})", Tr.Languages.First(l => l.Code == Tr.SystemLanguage).Name), null),
+            .. Tr.Languages.Select(l => new Option<string?>(l.Name, l.Code))];
+        SelectedLanguage = LanguageOptions.FirstOrDefault(o => o.Value == s.Language) ?? LanguageOptions[0];
         SelectedConcurrency = Concurrency.FirstOrDefault(c => c.Value == s.MaxConcurrentUploads) ?? Concurrency[1];
         SelectedSpeedLimit = SpeedLimits.FirstOrDefault(o => o.Value == s.UploadLimitKBps) ?? SpeedLimits[0];
         SelectedRescan = RescanIntervals.FirstOrDefault(o => o.Value == s.RescanIntervalMinutes) ?? RescanIntervals[2];
@@ -74,9 +77,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
     public IReadOnlyList<Option<MeteredBackup>> MeteredOptions { get; } =
     [
-        new("Back up everything", MeteredBackup.Normal),
-        new("Photos only", MeteredBackup.PhotosOnly),
-        new("Pause backup", MeteredBackup.Pause),
+        new(Tr.T("Back up everything"), MeteredBackup.Normal),
+        new(Tr.T("Photos only"), MeteredBackup.PhotosOnly),
+        new(Tr.T("Pause backup"), MeteredBackup.Pause),
     ];
 
     [ObservableProperty]
@@ -124,11 +127,11 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         get
         {
             var network = AppServices.Network.Network;
-            var where = network.Name is { } name ? $"On “{name}”" : "Network unknown";
+            var where = network.Name is { } name ? Tr.T("On “{0}”", name) : Tr.T("Network unknown");
             if (network.IsMetered)
-                where += " (metered)";
+                where += Tr.T(" (metered)");
             var host = AppServices.Account.Client?.ApiUrl is { } api ? (api.IsDefaultPort ? api.Host : $"{api.Host}:{api.Port}") : null;
-            var through = host is null ? "" : AppServices.Network.IsUsingLocal ? $" · using the local address {host}" : $" · using {host}";
+            var through = host is null ? "" : AppServices.Network.IsUsingLocal ? Tr.T(" · using the local address {0}", host) : Tr.T(" · using {0}", host);
             return where + through;
         }
     }
@@ -146,7 +149,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         }
         else
         {
-            NetworkError = "Couldn't tell which network you're on. Type its name (your Wi-Fi name) instead.";
+            NetworkError = Tr.T("Couldn't tell which network you're on. Type its name (your Wi-Fi name) instead.");
         }
     }
 
@@ -222,9 +225,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
     public IReadOnlyList<Option<WallpaperSource>> WallpaperSources { get; } =
     [
-        new("Favorites", WallpaperSource.Favorites),
-        new("An album", WallpaperSource.Album),
-        new("All photos", WallpaperSource.Library),
+        new(Tr.T("Favorites"), WallpaperSource.Favorites),
+        new(Tr.T("An album"), WallpaperSource.Album),
+        new(Tr.T("All photos"), WallpaperSource.Library),
     ];
 
     [ObservableProperty]
@@ -274,12 +277,12 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
     public IReadOnlyList<Option<int>> WallpaperIntervals { get; } =
     [
-        new("Every 15 minutes", 15),
-        new("Every 30 minutes", 30),
-        new("Every hour", 60),
-        new("Every 3 hours", 180),
-        new("Every 6 hours", 360),
-        new("Once a day", 1440),
+        new(Tr.T("Every 15 minutes"), 15),
+        new(Tr.T("Every 30 minutes"), 30),
+        new(Tr.T("Every hour"), 60),
+        new(Tr.T("Every 3 hours"), 180),
+        new(Tr.T("Every 6 hours"), 360),
+        new(Tr.T("Once a day"), 1440),
     ];
 
     [ObservableProperty]
@@ -329,7 +332,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            PhotoError = $"Couldn't remove your picture. {NetworkErrors.Describe(ex)}";
+            PhotoError = Tr.T("Couldn't remove your picture. {0}", NetworkErrors.Describe(ex));
         }
     }
 
@@ -352,9 +355,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     async Task SignOutAsync()
     {
         var confirmed = await _shell.Main.ConfirmAsync(
-            "Sign out?",
-            "Backup will stop until you sign in again. Your folders and settings are kept, and nothing is removed from Immich.",
-            "Sign out", danger: true);
+            Tr.T("Sign out?"),
+            Tr.T("Backup will stop until you sign in again. Your folders and settings are kept, and nothing is removed from Immich."),
+            Tr.T("Sign out"), danger: true);
         if (!confirmed)
             return;
 
@@ -367,8 +370,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     public bool AutostartSupported => Autostart.IsSupported;
 
     public string AutostartDescription => OperatingSystem.IsWindows()
-        ? "Open in the system tray when you sign in to Windows."
-        : "Open in the system tray when you log in.";
+        ? Tr.T("Open in the system tray when you sign in to Windows.")
+        : Tr.T("Open in the system tray when you log in.");
 
     [ObservableProperty]
     public partial bool LaunchAtStartup { get; set; }
@@ -381,6 +384,21 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     AppTheme _theme;
+
+    // ---- Language ----
+
+    public IReadOnlyList<Option<string?>> LanguageOptions { get; }
+
+    [ObservableProperty]
+    public partial Option<string?> SelectedLanguage { get; set; }
+
+    partial void OnSelectedLanguageChanged(Option<string?> value)
+    {
+        if (_loading || value is null) return;
+        AppServices.Settings.Update(s => s.Language = value.Value);
+        // Rebuild after this change has finished (the rebuild replaces this page).
+        Dispatcher.UIThread.Post(() => (Avalonia.Application.Current as App)?.ApplyLanguage(value.Value));
+    }
 
     public bool ThemeSystem { get => _theme == AppTheme.System; set { if (value) ThemeService.Set(AppTheme.System); } }
     public bool ThemeLight { get => _theme == AppTheme.Light; set { if (value) ThemeService.Set(AppTheme.Light); } }
@@ -432,11 +450,11 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
                 break;
             case AppLockMode.WindowsHello:
                 // Make sure Hello actually works for this user before relying on it.
-                var result = await WindowsHello.VerifyAsync(_shell.Main.GetWindowHandle?.Invoke() ?? IntPtr.Zero, "Confirm it's you to turn on the app lock");
+                var result = await WindowsHello.VerifyAsync(_shell.Main.GetWindowHandle?.Invoke() ?? IntPtr.Zero, Tr.T("Confirm it's you to turn on the app lock"));
                 if (result == HelloResult.Verified)
                     SaveLock(AppLockMode.WindowsHello, null);
                 else if (result != HelloResult.Canceled)
-                    LockError = "Windows Hello isn't set up on this PC. Set it up in Windows Settings → Accounts → Sign-in options, or use a password.";
+                    LockError = Tr.T("Windows Hello isn't set up on this PC. Set it up in Windows Settings → Accounts → Sign-in options, or use a password.");
                 break;
             case AppLockMode.Password:
                 NewPassword = "";
@@ -453,12 +471,12 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         LockError = null;
         if (NewPassword.Length < 4)
         {
-            LockError = "Use at least 4 characters.";
+            LockError = Tr.T("Use at least 4 characters.");
             return;
         }
         if (NewPassword != ConfirmPassword)
         {
-            LockError = "The passwords don't match.";
+            LockError = Tr.T("The passwords don't match.");
             return;
         }
         var password = NewPassword;
@@ -505,11 +523,11 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
     public IReadOnlyList<Option<int>> Concurrency { get; } =
     [
-        new("1 at a time", 1),
-        new("2 at a time", 2),
-        new("3 at a time", 3),
-        new("4 at a time", 4),
-        new("6 at a time", 6),
+        new(Tr.T("1 at a time"), 1),
+        new(Tr.T("2 at a time"), 2),
+        new(Tr.T("3 at a time"), 3),
+        new(Tr.T("4 at a time"), 4),
+        new(Tr.T("6 at a time"), 6),
     ];
 
     [ObservableProperty]
@@ -523,13 +541,13 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
     public IReadOnlyList<Option<int>> SpeedLimits { get; } =
     [
-        new("Unlimited", 0),
-        new("1 MB/s", 1024),
-        new("2 MB/s", 2 * 1024),
-        new("5 MB/s", 5 * 1024),
-        new("10 MB/s", 10 * 1024),
-        new("25 MB/s", 25 * 1024),
-        new("50 MB/s", 50 * 1024),
+        new(Tr.T("Unlimited"), 0),
+        new(Tr.T("1 MB/s"), 1024),
+        new(Tr.T("2 MB/s"), 2 * 1024),
+        new(Tr.T("5 MB/s"), 5 * 1024),
+        new(Tr.T("10 MB/s"), 10 * 1024),
+        new(Tr.T("25 MB/s"), 25 * 1024),
+        new(Tr.T("50 MB/s"), 50 * 1024),
     ];
 
     [ObservableProperty]
@@ -543,11 +561,11 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
     public IReadOnlyList<Option<int>> RescanIntervals { get; } =
     [
-        new("Every 15 minutes", 15),
-        new("Every 30 minutes", 30),
-        new("Every hour", 60),
-        new("Every 3 hours", 180),
-        new("Every 6 hours", 360),
+        new(Tr.T("Every 15 minutes"), 15),
+        new(Tr.T("Every 30 minutes"), 30),
+        new(Tr.T("Every hour"), 60),
+        new(Tr.T("Every 3 hours"), 180),
+        new(Tr.T("Every 6 hours"), 360),
     ];
 
     [ObservableProperty]
@@ -574,9 +592,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     async Task RecheckAllAsync()
     {
         var confirmed = await _shell.Main.ConfirmAsync(
-            "Re-check all files?",
-            "Every file in your folders will be compared with your Immich library again. Nothing is uploaded twice, but this can take a while for large libraries.",
-            "Re-check");
+            Tr.T("Re-check all files?"),
+            Tr.T("Every file in your folders will be compared with your Immich library again. Nothing is uploaded twice, but this can take a while for large libraries."),
+            Tr.T("Re-check"));
         if (confirmed)
             AppServices.Engine.ResetAndRescan();
     }
@@ -589,7 +607,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
     // ---- About & updates ----
 
-    public string Version => $"Version {AppInfo.Version}";
+    public string Version => Tr.T("Version {0}", AppInfo.Version);
     public bool UpdatesEnabled => AppServices.Updates.IsEnabled;
     public bool CanSelfUpdate => UpdateService.IsInstalledCopy;
 
@@ -636,8 +654,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     public bool ChannelBeta { get => _channel == UpdateChannel.Beta; set { if (value) SetChannel(UpdateChannel.Beta); } }
 
     public string ChannelDescription => _channel == UpdateChannel.Beta
-        ? "You get new features first. Betas can have rough edges. Switching back to Stable takes effect with the next stable version."
-        : "Get the beta to try new features before everyone else.";
+        ? Tr.T("You get new features first. Betas can have rough edges. Switching back to Stable takes effect with the next stable version.")
+        : Tr.T("Get the beta to try new features before everyone else.");
 
     void SetChannel(UpdateChannel channel)
     {

@@ -59,12 +59,12 @@ public sealed class UpdateService : IDisposable
 
     public string StatusText => State switch
     {
-        UpdateState.Checking => "Checking for updates…",
-        UpdateState.UpToDate => LastChecked is { } t ? $"You're up to date · checked {Format.Relative(t)}" : "You're up to date",
-        UpdateState.Available => $"Version {Release?.Version} is available.",
-        UpdateState.Downloading => $"Downloading version {Release?.Version}… {DownloadProgress:P0}",
-        UpdateState.Ready => $"Version {Release?.Version} is ready to install.",
-        UpdateState.Failed => Error ?? "Couldn't check for updates.",
+        UpdateState.Checking => Tr.T("Checking for updates…"),
+        UpdateState.UpToDate => LastChecked is { } t ? Tr.T("You're up to date · checked {0}", Format.Relative(t)) : Tr.T("You're up to date"),
+        UpdateState.Available => Tr.T("Version {0} is available.", Release?.Version),
+        UpdateState.Downloading => Tr.T("Downloading version {0}… {1:P0}", Release?.Version, DownloadProgress),
+        UpdateState.Ready => Tr.T("Version {0} is ready to install.", Release?.Version),
+        UpdateState.Failed => Error ?? Tr.T("Couldn't check for updates."),
         _ => "",
     };
 
@@ -124,7 +124,7 @@ public sealed class UpdateService : IDisposable
             if (!IsInstallerFor(path, Release.Version))
             {
                 File.Delete(path);
-                throw new UpdateException($"The downloaded installer isn't version {version}. It was discarded; try again later.");
+                throw new UpdateException(Tr.T("The downloaded installer isn't version {0}. It was discarded; try again later.", version));
             }
             _installerPath = path;
             SetState(UpdateState.Ready);
@@ -132,7 +132,7 @@ public sealed class UpdateService : IDisposable
         catch (Exception ex)
         {
             Log.Warn("Update check failed", ex);
-            Error = ex is UpdateException ? ex.Message : "Couldn't reach GitHub to check for updates.";
+            Error = ex is UpdateException ? ex.Message : Tr.T("Couldn't reach GitHub to check for updates.");
             SetState(UpdateState.Failed);
         }
         finally
@@ -163,7 +163,7 @@ public sealed class UpdateService : IDisposable
         catch (Exception ex)
         {
             Log.Error("Could not start the update installer", ex);
-            Error = "The update couldn't be started. You can download it from the release page instead.";
+            Error = Tr.T("The update couldn't be started. You can download it from the release page instead.");
             SetState(UpdateState.Failed);
         }
     }

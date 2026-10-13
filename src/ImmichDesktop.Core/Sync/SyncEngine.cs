@@ -116,7 +116,73 @@ public sealed class SyncEngine : IAsyncDisposable
         _settings.Changed += OnSettingsChanged;
         _account.SessionChanged += OnSessionChanged;
         _loop = Task.Run(LoopAsync);
+        _holdWatch = new Timer(_ => CheckHolds(), null, HoldCheckInterval, HoldCheckInterval);
         Log.Info("Sync engine started");
+    }
+
+    // ---- Time estimate ----
+    // Remaining bytes ÷ the run's average throughput. The average covers the whole run (hashing,
+    // checks and small-file overhead included), so it's steadier and more honest than the live speed.
+
+    long _remainingAtCount, _bytesAtCount, _bytesAtRunStart;
+    long _runStartTimestamp;
+
+    void StartEstimate(IReadOnlyCollection<string> folderIds)
+    {
+        _bytesAtRunStart = Interlocked.Read(ref _bytesSent);
+        _runStartTimestamp = Stopwatch.GetTimestamp();
+        RecountRemaining(folderIds);
+    }
+
+    void RecountRemaining(IReadOnlyCollection<string> folderIds)
+    {
+        // Files in progress are still counted in full, minus what has been sent of them.
+        var inFlight = _active.Values.Sum(a => a.Sent);
+        _remainingAtCount = Math.Max(0, _db.SumCandidateBytes(folderIds) - inFlight);
+        _bytesAtCount = Interlocked.Read(ref _bytesSent);
+    }
+
+    TimeSpan? EstimateRemaining(long bytesNow)
+    {
+        if (_runStartTimestamp == 0)
+            return null;
+        var elapsed = Stopwatch.GetElapsedTime(_runStartTimestamp).TotalSeconds;
+        var sent = bytesNow - _bytesAtRunStart;
+        if (elapsed < 20 || sent < 2 * 1024 * 1024)
+            return null; // not enough to go on yet
+        var remaining = Math.Max(0, _remainingAtCount - (bytesNow - _bytesAtCount));
+        var rate = sent / elapsed;
+        return rate <= 0 ? null : TimeSpan.FromSeconds(Math.Min(remaining / rate, TimeSpan.FromDays(30).TotalSeconds));
+    }
+
+    /// <summary>How often power and data saving are re-checked between runs.</summary>
+    static readonly TimeSpan HoldCheckInterval = TimeSpan.FromSeconds(10);
+
+    Timer? _holdWatch;
+    bool _lastHold;
+
+    /// <summary>
+    /// Pause on battery and data saving take effect right away: unplugging (a laptop or a UPS) stops
+    /// an upload in progress, and plugging back in resumes, instead of waiting for the next run.
+    /// </summary>
+    internal void CheckHolds()
+    {
+        try
+        {
+            var settings = _settings.Current;
+            var hold = (settings.PauseOnBattery && PowerStatus.IsOnBattery()) || PausedForData(settings);
+            if (hold == _lastHold)
+                return;
+            _lastHold = hold;
+            Log.Info(hold ? "On battery or a metered connection: holding backup" : "Power or network is back: resuming backup");
+            if (hold)
+                _runCts?.Cancel();
+            Wake();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Could not check power and network", ex);
+        }
     }
 
     /// <summary>Re-check right away (full scan, retry failed files).</summary>
@@ -165,6 +231,8 @@ public sealed class SyncEngine : IAsyncDisposable
         _settings.Changed -= OnSettingsChanged;
         _account.SessionChanged -= OnSessionChanged;
         await _shutdown.CancelAsync();
+        if (_holdWatch is not null)
+            await _holdWatch.DisposeAsync();
         DisposeWatchers();
         await _debounceTimer.DisposeAsync();
         await _progressTimer.DisposeAsync();
@@ -669,6 +737,7 @@ public sealed class SyncEngine : IAsyncDisposable
         _runDone = 0;
         if (_runTotal == 0)
             return;
+        StartEstimate(folderIds);
 
         var uploaded = 0;
         var alreadyThere = 0;
@@ -686,6 +755,7 @@ public sealed class SyncEngine : IAsyncDisposable
                     throw new WaitForNetworkException();
 
                 folderIds = _rules.Keys.ToList(); // folders turned off mid-run stop after this batch
+                RecountRemaining(folderIds);
                 var batch = _db.GetCandidates(folderIds, BatchSize);
                 if (batch.Count == 0)
                     break;
@@ -1131,6 +1201,7 @@ public sealed class SyncEngine : IAsyncDisposable
                     .ToList(),
                 BytesPerSecond = _speed,
                 LastSync = _lastSync,
+                Remaining = _state == SyncState.Uploading ? EstimateRemaining(bytes) : null,
             };
             _status = snapshot;
         }

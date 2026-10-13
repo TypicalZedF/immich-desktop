@@ -32,11 +32,11 @@ public sealed partial class ProfilePhotoViewModel : ViewModelBase, IDisposable
 
     public bool IsPicking => Cropper is null;
 
-    public string Title => IsPicking ? "Choose a profile picture" : "Adjust your picture";
+    public string Title => IsPicking ? Tr.T("Choose a profile picture") : Tr.T("Adjust your picture");
 
     public string Subtitle => IsPicking
-        ? "Pick a photo from your Immich library."
-        : "Drag to move it, scroll or use the slider to zoom.";
+        ? Tr.T("Pick a photo from your Immich library.")
+        : Tr.T("Drag to move it, scroll or use the slider to zoom.");
 
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
@@ -58,7 +58,7 @@ public sealed partial class ProfilePhotoViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     async Task UploadFromComputerAsync()
     {
-        var path = await _main.PickImageAsync("Choose a profile picture");
+        var path = await _main.PickImageAsync(Tr.T("Choose a profile picture"));
         if (path is null)
             return;
         await OpenAsync(ct => File.ReadAllBytesAsync(path, ct));
@@ -92,7 +92,7 @@ public sealed partial class ProfilePhotoViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             Log.Warn("Could not open the picture", ex);
-            Error = $"Couldn't open that picture. {NetworkErrors.Describe(ex)}";
+            Error = Tr.T("Couldn't open that picture. {0}", NetworkErrors.Describe(ex));
         }
         finally
         {
@@ -125,7 +125,7 @@ public sealed partial class ProfilePhotoViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             Log.Warn("Could not change the profile picture", ex);
-            Error = $"Couldn't change your picture. {NetworkErrors.Describe(ex)}";
+            Error = Tr.T("Couldn't change your picture. {0}", NetworkErrors.Describe(ex));
         }
         finally
         {

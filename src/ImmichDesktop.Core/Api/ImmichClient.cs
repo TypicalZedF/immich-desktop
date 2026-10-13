@@ -49,7 +49,7 @@ public sealed class ImmichClient : IDisposable
     {
         input = input.Trim();
         if (input.Length == 0)
-            throw new ServerDiscoveryException("Enter the address of your Immich server.");
+            throw new ServerDiscoveryException(Loc.T("Enter the address of your Immich server."));
 
         var candidates = input.Contains("://", StringComparison.Ordinal)
             ? new[] { input }
@@ -61,7 +61,7 @@ public sealed class ImmichClient : IDisposable
         {
             if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || uri.Host.Length == 0)
             {
-                last = new ServerDiscoveryException("That doesn't look like a valid server address.");
+                last = new ServerDiscoveryException(Loc.T("That doesn't look like a valid server address."));
                 continue;
             }
 
@@ -113,11 +113,11 @@ public sealed class ImmichClient : IDisposable
         }
         catch (Exception ex) when (ex is JsonException or ImmichApiException { StatusCode: HttpStatusCode.NotFound })
         {
-            throw new ServerDiscoveryException("This doesn't look like an Immich server.", ex);
+            throw new ServerDiscoveryException(Loc.T("This doesn't look like an Immich server."), ex);
         }
 
         if (!string.Equals(ping?.Res, "pong", StringComparison.OrdinalIgnoreCase))
-            throw new ServerDiscoveryException("This doesn't look like an Immich server.");
+            throw new ServerDiscoveryException(Loc.T("This doesn't look like an Immich server."));
 
         var version = await GetJsonAsync<VersionResponseDto>(http, new Uri(api, "server/version"), TimeSpan.FromSeconds(15), ct);
         return new ServerInfo(web, api, new ServerVersion(version!.Major, version.Minor, version.Patch));
@@ -221,7 +221,7 @@ public sealed class ImmichClient : IDisposable
     {
         var ping = await SendAsync<PingResponseDto>(HttpMethod.Get, "server/ping", null, ct, TimeSpan.FromSeconds(15));
         if (!string.Equals(ping.Res, "pong", StringComparison.OrdinalIgnoreCase))
-            throw new ImmichApiException(HttpStatusCode.ServiceUnavailable, "The server isn't responding normally.");
+            throw new ImmichApiException(HttpStatusCode.ServiceUnavailable, Loc.T("The server isn't responding normally."));
     }
 
     public async Task<ServerVersion> GetVersionAsync(CancellationToken ct)
@@ -272,7 +272,7 @@ public sealed class ImmichClient : IDisposable
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new TimeoutException("The upload timed out.");
+            throw new TimeoutException(Loc.T("The upload timed out."));
         }
     }
 
@@ -340,7 +340,7 @@ public sealed class ImmichClient : IDisposable
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new TimeoutException("The server took too long to send the image.");
+            throw new TimeoutException(Loc.T("The server took too long to send the image."));
         }
     }
 
@@ -523,7 +523,7 @@ public sealed class ImmichClient : IDisposable
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new TimeoutException("The server took too long to respond.");
+            throw new TimeoutException(Loc.T("The server took too long to respond."));
         }
     }
 
@@ -539,7 +539,7 @@ public sealed class ImmichClient : IDisposable
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new TimeoutException("The server took too long to respond.");
+            throw new TimeoutException(Loc.T("The server took too long to respond."));
         }
     }
 
@@ -563,7 +563,7 @@ public sealed class ImmichClient : IDisposable
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new TimeoutException("The server took too long to respond.");
+            throw new TimeoutException(Loc.T("The server took too long to respond."));
         }
     }
 
@@ -588,12 +588,12 @@ public sealed class ImmichClient : IDisposable
 
         var message = response.StatusCode switch
         {
-            HttpStatusCode.Unauthorized => detail ?? "Your session has expired. Please sign in again.",
-            HttpStatusCode.Forbidden => detail ?? "You don't have permission to do that.",
-            HttpStatusCode.NotFound => detail ?? "The server doesn't support this request.",
-            HttpStatusCode.RequestEntityTooLarge => "The file is too large for the server (check your reverse proxy upload limit).",
-            HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout => "The server is temporarily unavailable.",
-            _ => detail ?? $"The server returned an error ({(int)response.StatusCode}).",
+            HttpStatusCode.Unauthorized => detail ?? Loc.T("Your session has expired. Please sign in again."),
+            HttpStatusCode.Forbidden => detail ?? Loc.T("You don't have permission to do that."),
+            HttpStatusCode.NotFound => detail ?? Loc.T("The server doesn't support this request."),
+            HttpStatusCode.RequestEntityTooLarge => Loc.T("The file is too large for the server (check your reverse proxy upload limit)."),
+            HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout => Loc.T("The server is temporarily unavailable."),
+            _ => detail ?? Loc.T("The server returned an error ({0}).", (int)response.StatusCode),
         };
         throw new ImmichApiException(response.StatusCode, message);
     }
