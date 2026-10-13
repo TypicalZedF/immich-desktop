@@ -52,6 +52,30 @@ public class OAuthSessionTests
     }
 }
 
+public class OAuthCallbackTests
+{
+    [Theory]
+    [InlineData("app.immich:///oauth-callback?code=a&state=b")]
+    [InlineData("app.immich:/oauth-callback?code=a&state=b")]   // one slash (seen from browsers)
+    [InlineData("app.immich://oauth-callback?code=a&state=b")]  // two slashes
+    [InlineData("app.immich:///oauth-callback/?code=a&state=b")] // trailing slash
+    [InlineData("APP.IMMICH:///oauth-callback?code=a&state=b")] // upper-cased scheme
+    public void Rebuilds_the_exact_redirect_uri_the_server_expects(string received) =>
+        Assert.Equal("app.immich:///oauth-callback?code=a&state=b", OAuthSession.Normalize(received));
+
+    [Fact]
+    public void Surfaces_provider_errors_and_never_logs_values()
+    {
+        const string url = "app.immich:/oauth-callback?error=access_denied&error_description=User+is+not+allowed&state=s";
+        Assert.Equal("User is not allowed", OAuthSession.ProviderError(url));
+        Assert.Null(OAuthSession.ProviderError("app.immich:///oauth-callback?code=secret&state=s"));
+
+        var described = OAuthSession.Describe("app.immich:///oauth-callback?code=secret123&state=s");
+        Assert.DoesNotContain("secret123", described);
+        Assert.Contains("code, state", described);
+    }
+}
+
 public class UpdateCheckerTests
 {
     sealed class FakeGitHub(string tag, byte[] installer, string? digest) : HttpMessageHandler

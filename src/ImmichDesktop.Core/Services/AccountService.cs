@@ -43,9 +43,22 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
     /// <summary>Completes an SSO sign-in once the browser has redirected back to the app.</summary>
     public async Task<UserInfo> SignInWithOAuthAsync(ServerInfo server, OAuthSession session, string callbackUrl, CancellationToken ct)
     {
+        Log.Info($"SSO callback received: {OAuthSession.Describe(callbackUrl)}");
+        if (OAuthSession.ProviderError(callbackUrl) is { } providerError)
+            throw new InvalidOperationException($"Your sign-in provider refused the request: {providerError}");
+
         string token;
-        using (var anonymous = new ImmichClient(server.ApiUrl, null))
-            token = await anonymous.FinishOAuthAsync(callbackUrl, session.State, session.CodeVerifier, ct);
+        try
+        {
+            using var anonymous = new ImmichClient(server.ApiUrl, null);
+            token = await anonymous.FinishOAuthAsync(OAuthSession.Normalize(callbackUrl), session.State, session.CodeVerifier, ct);
+        }
+        catch (ImmichApiException ex)
+        {
+            Log.Warn("Server rejected the SSO sign-in", ex);
+            throw new ImmichApiException(ex.StatusCode,
+                $"{ex.Message}. Your Immich server's log (\"OAuth login failed\") shows the exact reason.");
+        }
         return await CompleteSignInAsync(server, new AuthCredential(AuthKind.AccessToken, token), ct);
     }
 
