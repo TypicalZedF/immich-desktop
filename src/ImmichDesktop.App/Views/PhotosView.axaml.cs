@@ -80,14 +80,19 @@ public partial class PhotosView : UserControl
     }
 
     /// <summary>With the date rail showing, the grid's own scrollbar would just crowd it.</summary>
-    void UpdateScrollBar()
+    void UpdateScrollBar(bool force = false)
     {
         var rail = _vm?.HasSections == true;
+        if (rail == _railShown && !force)
+            return; // (the rail's months change on every resize; only showing/hiding it matters here)
+        _railShown = rail;
         ScrollViewer.SetVerticalScrollBarVisibility(_grid, rail ? Avalonia.Controls.Primitives.ScrollBarVisibility.Hidden : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto);
         _grid.Padding = new Thickness(0, 0, rail ? 2 : 12, 24);
         if (_grid.Bounds.Width > 0)
             UpdateLayout(_grid.Bounds.Width);
     }
+
+    bool _railShown;
 
     void UpdateScrubber()
     {
@@ -167,7 +172,7 @@ public partial class PhotosView : UserControl
         if (_vm is null)
             return;
         _vm.PropertyChanged += OnViewModelChanged;
-        UpdateScrollBar();
+        UpdateScrollBar(force: true);
         if (_grid.Bounds.Width > 0)
             UpdateLayout(_grid.Bounds.Width);
     }
@@ -312,6 +317,9 @@ public partial class PhotosView : UserControl
                     break;
                 case Key.I:
                     viewer.ToggleInfoCommand.Execute(null);
+                    break;
+                case Key.Space or Key.Enter when viewer.IsVideo:
+                    viewer.PlayCommand.Execute(null);
                     break;
                 case Key.C when e.KeyModifiers.HasFlag(KeyModifiers.Control) && !viewer.IsVideo:
                     viewer.CopyImageCommand.Execute(null);

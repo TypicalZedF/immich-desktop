@@ -265,6 +265,32 @@ public sealed class StateDatabase
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
 
+    /// <summary>Photos and videos in these folders that aren't in Immich yet (waiting, or failed and to be retried).</summary>
+    public List<(string Path, long ModifiedTicks, bool Failed)> GetLocalOnly(IReadOnlyCollection<string> folderIds)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT path, mtime, status FROM files WHERE status IN (0, 3)" + FolderFilter(cmd, folderIds);
+        using var reader = cmd.ExecuteReader();
+        var result = new List<(string, long, bool)>();
+        while (reader.Read())
+            result.Add((reader.GetString(0), reader.GetInt64(1), reader.GetInt32(2) == (int)FileStatus.Failed));
+        return result;
+    }
+
+    /// <summary>Immich assets that came from (or match) a file on this PC, and where that file is.</summary>
+    public Dictionary<string, string> GetAssetsOnDevice()
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT asset_id, path FROM files WHERE status IN (1, 2) AND asset_id IS NOT NULL";
+        using var reader = cmd.ExecuteReader();
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        while (reader.Read())
+            result.TryAdd(reader.GetString(0), reader.GetString(1));
+        return result;
+    }
+
     /// <summary>Next files to upload, newest first (like the mobile app).</summary>
     public List<FileRecord> GetCandidates(IReadOnlyCollection<string> folderIds, int limit)
     {

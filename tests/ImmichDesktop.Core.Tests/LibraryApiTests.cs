@@ -112,4 +112,69 @@ public class LibraryApiTests
         Assert.Equal("", people[1].Name);
         Assert.Equal(2, handler.Requests.Count);
     }
+
+    [Fact]
+    public async Task Duplicates_are_listed_and_resolved_like_the_web_app()
+    {
+        var handler = new Recorder((request, _) => request.Method == HttpMethod.Get
+            ? new object[]
+            {
+                new { duplicateId = "d1", assets = new object[]
+                {
+                    new { id = "a1", type = "IMAGE", originalFileName = "IMG_1.jpg", isFavorite = false, exifInfo = new { exifImageWidth = 4000, exifImageHeight = 3000, fileSizeInByte = 5_000_000L } },
+                    new { id = "a2", type = "IMAGE", originalFileName = "IMG_1 (1).jpg", isFavorite = false, exifInfo = new { exifImageWidth = 1600, exifImageHeight = 1200, fileSizeInByte = 900_000L } },
+                } },
+                new { duplicateId = "d2", assets = new object[] { new { id = "lonely", type = "IMAGE", isFavorite = false } } },
+            }
+            : new { });
+        using var client = Client(handler);
+
+        var groups = await client.GetDuplicatesAsync(CancellationToken.None);
+        await client.ResolveDuplicatesAsync(["a1"], ["a2"], CancellationToken.None);
+        await client.ResolveDuplicatesAsync(["a1", "a2"], [], CancellationToken.None);
+
+        var group = Assert.Single(groups); // a "group" of one isn't a duplicate
+        Assert.Equal(("IMG_1.jpg", 4000, 5_000_000L), (group.Assets[0].FileName, group.Assets[0].Width, group.Assets[0].FileSize));
+        Assert.Equal(("DELETE", "/api/assets"), (handler.Requests[1].Method, handler.Requests[1].PathAndQuery));
+        Assert.Contains("\"force\":false", handler.Requests[1].Body); // to the trash, not deleted for good
+        Assert.Equal("PUT", handler.Requests[2].Method);
+        Assert.Contains("\"duplicateId\":null", handler.Requests[2].Body); // must be sent, or nothing changes
+        Assert.Equal("PUT", handler.Requests[3].Method); // "not duplicates": nothing trashed
+        Assert.Equal(4, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task Large_files_come_biggest_first()
+    {
+        var handler = new Recorder((_, _) => new object[]
+        {
+            new { id = "small", type = "IMAGE", isFavorite = false, exifInfo = new { fileSizeInByte = 20_000_000L } },
+            new { id = "big", type = "VIDEO", isFavorite = false, exifInfo = new { fileSizeInByte = 900_000_000L } },
+        });
+        using var client = Client(handler);
+
+        var files = await client.GetLargeFilesAsync(10_000_000, 250, CancellationToken.None);
+
+        Assert.Equal(["big", "small"], files.Select(f => f.Id));
+        Assert.Equal(900_000_000L, files[0].FileSize);
+        Assert.Equal(("POST", "/api/search/large-assets?minFileSize=10000000&size=250"), (handler.Requests[0].Method, handler.Requests[0].PathAndQuery));
+    }
+}
+
+public class SharedAlbumTests
+{
+    [Fact]
+    public void Only_albums_with_other_people_count_as_shared()
+    {
+        var json = """
+        [
+          {"id":"a1","albumName":"Just mine, has a public link","shared":true,"ownerId":"me","albumUsers":[]},
+          {"id":"a2","albumName":"Family","shared":true,"ownerId":"me","albumUsers":[{"role":"editor","user":{"id":"sam"}}]},
+          {"id":"a3","albumName":"Sam's trip","shared":true,"ownerId":"sam","albumUsers":[]}
+        ]
+        """;
+        var albums = System.Text.Json.JsonSerializer.Deserialize<List<ImmichDesktop.Core.Api.AlbumInfo>>(json,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+        Assert.Equal(["a2", "a3"], albums.Where(a => a.IsSharedWithPeople("me")).Select(a => a.Id));
+    }
 }

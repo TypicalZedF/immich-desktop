@@ -57,7 +57,8 @@ public sealed class AlbumCardViewModel(PhotosViewModel owner, AlbumInfo album) :
 {
     public AlbumInfo Album { get; } = album;
     public override string Title => Album.AlbumName;
-    public override string Subtitle => Format.Plural(Album.AssetCount, "item") + (Album.Shared ? Tr.T(" · Shared") : "");
+    public override string Subtitle => Format.Plural(Album.AssetCount, "item") +
+        (Album.IsSharedWithPeople(AppServices.Settings.Current.UserId) ? Tr.T(" · Shared") : "");
 
     protected override Task<Bitmap?> LoadAsync(ThumbnailLoader loader, int decodeWidth, CancellationToken ct) =>
         Album.AlbumThumbnailAssetId is { } cover ? loader.LoadAsync(cover, AssetImageSize.Thumbnail, decodeWidth, ct) : Task.FromResult<Bitmap?>(null);

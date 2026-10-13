@@ -67,6 +67,28 @@ static class Screens
         Add("camera", "Phone Camera", 1203, 41, 2);
         Add("videos", "Videos", 96, 4, 0);
 
+        // Photos tab: a few October photos came from this PC (both), and a few new files aren't backed up yet.
+        for (var i = 0; i < 23; i += 3)
+        {
+            var path = Path.Combine(_root, "Phone Camera", $"PXL_202610{i:00}.jpg");
+            db.Upsert([new ScannedFile(path, "camera", 3_000_000, DateTime.UtcNow.AddDays(-30).Ticks)]);
+            db.MarkDone(path, FileStatus.Uploaded, $"202610-{i}");
+        }
+        var colors = new[] { (0xFF7AA6C2u, 0xFFE8C07Du), (0xFF5D8A66u, 0xFFCFE3B0u), (0xFFB86B77u, 0xFFF2D0A4u) };
+        for (var i = 0; i < 4; i++)
+        {
+            var path = Path.Combine(_root, "Phone Camera", i == 3 ? "VID_20261013_091500.mp4" : $"PXL_20261013_0{i}1500.jpg");
+            if (i < 3)
+                WriteDemoPhoto(path, colors[i].Item1, colors[i].Item2);
+            else
+                File.WriteAllBytes(path, new byte[1024]);
+            var when = new DateTime(2026, 10, 29, 12 - i, 0, 0, DateTimeKind.Utc); // newest in the demo timeline
+            File.SetLastWriteTimeUtc(path, when);
+            db.Upsert([new ScannedFile(path, "camera", new FileInfo(path).Length, when.Ticks)]);
+            if (i == 2)
+                db.MarkFailed(path, "The server is unreachable.", DateTime.UtcNow.AddMinutes(30));
+        }
+
         var activity = AppServices.Activity;
         activity.Add(ActivityKind.Info, "Setup complete — backing up 3 folders");
         activity.Add(ActivityKind.Success, "Backed up 1,204 new files · 2,910 already on the server");
@@ -74,6 +96,21 @@ static class Screens
         activity.Add(ActivityKind.Error, "Couldn't upload VID_2041.mp4: The file is too large for the server (check your reverse proxy upload limit).", Path.Combine(_root, "Phone Camera", "VID_2041.mp4"));
         foreach (var name in new[] { "IMG_4410.HEIC", "IMG_4411.HEIC", "PXL_20261011_174512.jpg", "VID_20261011_180233.mp4", "IMG_4412.HEIC" })
             activity.Add(ActivityKind.Uploaded, name, Path.Combine(_root, "Phone Camera", name));
+    }
+
+    static void WriteDemoPhoto(string path, uint top, uint bottom)
+    {
+        using var bitmap = new SkiaSharp.SKBitmap(900, 600);
+        using (var canvas = new SkiaSharp.SKCanvas(bitmap))
+        using (var paint = new SkiaSharp.SKPaint())
+        {
+            paint.Shader = SkiaSharp.SKShader.CreateLinearGradient(new(0, 0), new(0, 600), [new SkiaSharp.SKColor(top), new SkiaSharp.SKColor(bottom)], SkiaSharp.SKShaderTileMode.Clamp);
+            canvas.DrawRect(0, 0, 900, 600, paint);
+            paint.Shader = null;
+            paint.Color = new SkiaSharp.SKColor(0x55FFFFFF);
+            canvas.DrawCircle(640, 220, 90, paint);
+        }
+        File.WriteAllBytes(path, ImmichDesktop.App.Services.Images.ToJpeg(bitmap));
     }
 
     static SyncStatus Uploading => new()
@@ -169,9 +206,26 @@ static class Screens
             Shot(main, outDir, $"16b-viewer-info-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1));
             photos.Viewer?.ToggleInfoCommand.Execute(null);
             photos.Viewer?.CloseCommand.Execute(null);
+            // A photo on this PC that isn't backed up yet.
+            var local = photos.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).First(c => c.Asset is { IsLocalOnly: true, IsImage: true });
+            photos.OpenViewer(local);
+            Shot(main, outDir, $"16c-viewer-local-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            photos.Viewer?.CloseCommand.Execute(null);
+
+            // Utilities: the list, the duplicates review and large files.
+            shell.Navigate(ShellPage.Utilities);
+            var utilities = (PhotosViewModel)Page(shell, ShellPage.Utilities);
+            Shot(main, outDir, $"19-utilities-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1.5));
+            utilities.OpenDuplicatesCommand.Execute(null);
+            Shot(main, outDir, $"19b-duplicates-{suffix}", height: 860, settle: TimeSpan.FromSeconds(2));
+            utilities.BackCommand.Execute(null);
+            utilities.OpenLargeFilesCommand.Execute(null);
+            Shot(main, outDir, $"19c-large-files-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            utilities.BackCommand.Execute(null);
+            shell.Navigate(ShellPage.Photos);
 
             // Select a few photos, then share them.
-            foreach (var c in photos.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).Where(c => c.Asset is not null).Take(3))
+            foreach (var c in photos.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).Where(c => c.Asset is not null && c.CanSelect).Take(3))
                 c.ToggleSelectCommand.Execute(null);
             Shot(main, outDir, $"17-photos-selected-{suffix}", height: 860, settle: TimeSpan.FromSeconds(1));
             photos.ShareSelectionCommand.Execute(null);

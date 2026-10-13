@@ -20,10 +20,13 @@ public enum LibraryPage
     Archive,
     Locked,
     Trash,
+    Utilities,
 }
 
 /// <summary>What the grid is showing: a title and how to load its groups.</summary>
-public sealed record GridQuery(string Title, Func<ImmichClient, CancellationToken, Task<List<BucketState>>> Load, AlbumInfo? Album = null);
+/// <param name="ShowSizes">Tiles show each file's size (Large files).</param>
+public sealed record GridQuery(string Title, Func<ImmichClient, CancellationToken, Task<List<BucketState>>> Load, AlbumInfo? Album = null,
+    bool ShowSizes = false);
 
 /// <summary>
 /// One section of your Immich library (see <see cref="LibraryPage"/>): the timeline, Explore (people
@@ -98,6 +101,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         LibraryPage.Sharing => LoadSharingAsync(),
         LibraryPage.Albums => LoadAlbumsAsync(),
         LibraryPage.Locked => CheckLockedAsync(),
+        LibraryPage.Utilities => LoadUtilitiesAsync(),
         _ => LoadGridAsync(),
     };
 
@@ -105,10 +109,10 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowGrid), nameof(ShowAlbums), nameof(ShowExplore), nameof(ShowMap), nameof(ShowSharing),
         nameof(ShowLockedPrompt), nameof(IsDrilledIn), nameof(Heading), nameof(CanShareAlbum), nameof(ShowHeading),
-        nameof(IsTrash), nameof(IsArchive), nameof(ShowTrashActions), nameof(ShowLockAction))]
+        nameof(IsTrash), nameof(IsArchive), nameof(ShowTrashActions), nameof(ShowLockAction), nameof(ShowUtilities))]
     public partial GridQuery? Drill { get; set; }
 
-    public bool IsDrilledIn => Drill is not null;
+    public bool IsDrilledIn => Drill is not null || Duplicates is not null;
 
     /// <summary>The profile picture dialog has its own title, so only show ours once you've opened something.</summary>
     public bool ShowHeading => !IsPicker || IsDrilledIn;
@@ -124,8 +128,9 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     public bool ShowLockAction => Page == LibraryPage.Locked && IsUnlocked && Drill is null;
     public bool CanShareAlbum => Drill?.Album is not null && !IsPicker;
 
-    public string Heading => Drill?.Title ?? Page switch
+    public string Heading => Drill?.Title ?? (Duplicates is not null ? Tr.T("Review duplicates") : null) ?? Page switch
     {
+        LibraryPage.Utilities => Tr.T("Utilities"),
         LibraryPage.Explore => Tr.T("Explore"),
         LibraryPage.Map => Tr.T("Map"),
         LibraryPage.Sharing => Tr.T("Sharing"),
@@ -140,6 +145,13 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     void Back()
     {
+        if (Duplicates is { } duplicates)
+        {
+            Duplicates = null;
+            duplicates.Dispose();
+            _ = LoadUtilitiesAsync();
+            return;
+        }
         if (Drill is null)
             return;
         Drill = null;
@@ -189,7 +201,8 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     public partial PhotoViewerViewModel? Viewer { get; set; }
 
     [RelayCommand]
-    Task Refresh() => ShowGrid ? LoadGridAsync() : LoadPageAsync();
+    Task Refresh() => Duplicates is { } duplicates ? duplicates.RefreshCommand.ExecuteAsync(null)
+        : ShowGrid ? LoadGridAsync() : LoadPageAsync();
 
     GridQuery CurrentQuery => Drill ?? Page switch
     {
@@ -197,8 +210,84 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         LibraryPage.Archive => new GridQuery(Tr.T("Archive"), (c, ct) => TimelineAsync(c, new TimelineFilter(Visibility: "archive"), ct)),
         LibraryPage.Locked => new GridQuery(Tr.T("Locked folder"), (c, ct) => TimelineAsync(c, new TimelineFilter(Visibility: "locked"), ct)),
         LibraryPage.Trash => new GridQuery(Tr.T("Trash"), (c, ct) => TimelineAsync(c, new TimelineFilter(Trashed: true), ct)),
-        _ => new GridQuery(Tr.T("Photos"), (c, ct) => TimelineAsync(c, TimelineFilter.All, ct)),
+        _ => new GridQuery(Tr.T("Photos"), (c, ct) => IsPicker ? TimelineAsync(c, TimelineFilter.All, ct) : TimelineWithLocalAsync(c, ct)),
     };
+
+    // ---- This PC: photos in backup folders, and which Immich photos are also here ----
+
+    Dictionary<string, string> _onDevice = new(StringComparer.Ordinal);
+
+    /// <summary>Tiles show whether each photo is in Immich, on this PC, or both.</summary>
+    internal bool ShowSyncStatus => !IsPicker && !InTrash && !InLocked && Drill?.ShowSizes != true;
+
+    /// <summary>Tiles show file sizes (Large files).</summary>
+    internal bool ShowFileSizes => Drill?.ShowSizes == true;
+
+    /// <summary>The file on this PC an Immich photo came from, if any.</summary>
+    internal string? DevicePathFor(string assetId) => _onDevice.GetValueOrDefault(assetId);
+
+    /// <summary>
+    /// The timeline plus photos and videos in your backup folders that aren't in Immich yet, each in
+    /// its month (like the mobile app's timeline, which shows what's on the phone too).
+    /// </summary>
+    static async Task<List<BucketState>> TimelineWithLocalAsync(ImmichClient client, CancellationToken ct)
+    {
+        var localTask = LocalOnlyAssetsAsync(ct);
+        var server = await client.GetTimeBucketsAsync(TimelineFilter.All, ct);
+        var local = (await localTask)
+            .GroupBy(a => MonthKey(a.FileCreatedAt!))
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.FileCreatedAt, StringComparer.Ordinal).ToList());
+        if (local.Count == 0)
+            return server.Where(b => b.Count > 0).Select((b, i) => BucketState.FromTimeline(client, b, i, TimelineFilter.All)).ToList();
+
+        var serverByMonth = server.Where(b => b.Count > 0).ToDictionary(b => MonthKey(b.Key), b => b);
+        var months = serverByMonth.Keys.Union(local.Keys).OrderByDescending(k => k, StringComparer.Ordinal).ToList();
+        var buckets = new List<BucketState>(months.Count);
+        foreach (var month in months)
+        {
+            serverByMonth.TryGetValue(month, out var bucket);
+            var mine = local.GetValueOrDefault(month) ?? [];
+            if (bucket is null)
+            {
+                var group = BucketState.FromAssets(mine)[0]; // one month, so one group
+                buckets.Add(new BucketState(group.Label, mine.Count, buckets.Count, () => Task.FromResult(mine.ToList()), group.Month));
+                continue;
+            }
+            var template = BucketState.FromTimeline(client, bucket, buckets.Count, TimelineFilter.All);
+            buckets.Add(new BucketState(template.Label, bucket.Count + mine.Count, buckets.Count, async () =>
+            {
+                var assets = await client.GetTimeBucketAsync(bucket.Key, TimelineFilter.All, CancellationToken.None);
+                return assets.Concat(mine).OrderByDescending(a => SortKey(a.FileCreatedAt)).ToList();
+            }, template.Month));
+        }
+        return buckets;
+
+        static string MonthKey(string date) =>
+            DateTimeOffset.TryParse(date, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d)
+                ? $"{d.Year:0000}-{d.Month:00}" : date;
+
+        static DateTimeOffset SortKey(string? date) =>
+            DateTimeOffset.TryParse(date, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d)
+                ? d : DateTimeOffset.MinValue;
+    }
+
+    /// <summary>Photos and videos in your backup folders that aren't in Immich yet, newest first.</summary>
+    internal static Task<List<TimelineAsset>> LocalOnlyAssetsAsync(CancellationToken ct) => Task.Run(() =>
+    {
+        var folders = AppServices.Settings.Current.Folders.Where(f => f.Enabled).Select(f => f.Id).ToList();
+        var media = Core.Sync.MediaTypes.Default;
+        return AppServices.Database.GetLocalOnly(folders)
+            .Where(f => File.Exists(f.Path)) // deleted since the last scan
+            .OrderByDescending(f => f.ModifiedTicks)
+            .Select(f =>
+            {
+                // When the file was last changed: the closest thing to "taken" without reading the file.
+                var when = new DateTimeOffset(new DateTime(f.ModifiedTicks, DateTimeKind.Utc).ToLocalTime());
+                return new TimelineAsset($"local:{f.Path}", media.Classify(f.Path) != Core.Sync.MediaKind.Video, false, 1, null,
+                    when.ToString("o"), f.Path, f.Failed);
+            })
+            .ToList();
+    }, ct);
 
     static async Task<List<BucketState>> TimelineAsync(ImmichClient client, TimelineFilter filter, CancellationToken ct)
     {
@@ -225,6 +314,8 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         ReleaseRows();
         try
         {
+            if (!IsPicker)
+                _onDevice = await Task.Run(AppServices.Database.GetAssetsOnDevice, cts.Token);
             var buckets = await query.Load(client, cts.Token);
             if (cts.IsCancellationRequested)
                 return;
@@ -268,13 +359,26 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             return;
         _width = width;
         var columns = Math.Max(2, (int)((width + Gap) / (TargetTile + Gap)));
-        DecodeWidth = (int)Math.Ceiling(TileSize(columns) * Math.Max(1, scaling));
+        var tile = TileSize(columns);
+        DecodeWidth = (int)Math.Ceiling(tile * Math.Max(1, scaling));
         if (columns != _columns)
         {
             _columns = columns;
+            _builtTile = tile;
             RebuildRows();
         }
+        else if (tile != _builtTile)
+        {
+            // Same columns, different width (the window was resized, or the date rail appeared):
+            // resize the tiles in place so the scroll position and loaded thumbnails stay.
+            _builtTile = tile;
+            foreach (var row in Rows.OfType<AssetRowViewModel>())
+                row.Resize(tile);
+            UpdateOffsets(Rows);
+        }
     }
+
+    double _builtTile;
 
     double TileSize(int columns) => Math.Floor((_width - Gap * (columns - 1)) / columns);
 
@@ -290,6 +394,20 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
 
         var tile = TileSize(_columns);
         var rows = new List<object>();
+        foreach (var bucket in _buckets)
+        {
+            rows.Add(new MonthHeaderViewModel(bucket.Label, Format.Plural(bucket.Count, "item")));
+            for (var start = 0; start < bucket.Count; start += _columns)
+                rows.Add(new AssetRowViewModel(this, bucket, start, Math.Min(_columns, bucket.Count - start), tile));
+        }
+        UpdateOffsets(rows);
+        Rows = new ObservableCollection<object>(rows);
+    }
+
+    /// <summary>Works out where every row and month starts (for the date rail).</summary>
+    void UpdateOffsets(IReadOnlyList<object> rows)
+    {
+        var tile = TileSize(_columns);
         var sections = new List<TimelineSection>();
         double offset = 0;
         foreach (var bucket in _buckets)
@@ -299,15 +417,10 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             var shortLabel = bucket.Month is { } month ? month.ToString("MMM yyyy", System.Globalization.CultureInfo.CurrentCulture) : bucket.Label;
             sections.Add(new TimelineSection(shortLabel, bucket.Month?.Year, offset, height));
             offset += height;
-
-            rows.Add(new MonthHeaderViewModel(bucket.Label, Format.Plural(bucket.Count, "item")));
-            for (var start = 0; start < bucket.Count; start += _columns)
-                rows.Add(new AssetRowViewModel(this, bucket, start, Math.Min(_columns, bucket.Count - start), tile));
         }
         _rowOffsets = new double[rows.Count + 1];
         for (var i = 0; i < rows.Count; i++)
             _rowOffsets[i + 1] = _rowOffsets[i] + (rows[i] is AssetRowViewModel row ? row.RowHeight : HeaderHeight);
-        Rows = new ObservableCollection<object>(rows);
         // The rail is for the timeline; one big group (e.g. search results) has no dates to show.
         Sections = sections.Count > 1 && sections.Any(s => s.Year is not null) ? sections : [];
     }
@@ -532,7 +645,9 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
 
     async Task LoadSharingAsync()
     {
+        var me = AppServices.Settings.Current.UserId;
         var albums = LoadCardsAsync(async c => (await c.GetSharedAlbumsAsync(_lifetime.Token))
+                .Where(a => a.IsSharedWithPeople(me))
                 .OrderBy(a => a.AlbumName, StringComparer.CurrentCultureIgnoreCase).Select(a => new AlbumCardViewModel(this, a)).ToList(),
             SharedAlbums, null, Tr.T("No shared albums yet."), m => SharedAlbumsMessage = m);
         await Task.WhenAll(albums, LoadSharedLinksAsync(), LoadPartnersAsync());
@@ -1107,6 +1222,9 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>Files only on this PC use "local:" plus their path as their id.</summary>
+    internal static string? LocalPathOf(string assetId) => assetId.StartsWith("local:", StringComparison.Ordinal) ? assetId[6..] : null;
+
     internal Task CopyTextAsync(string text) => _main?.CopyTextAsync(text) ?? Task.CompletedTask;
 
     /// <summary>Copies a photo to the clipboard as a picture (full size, capped so it stays pasteable).</summary>
@@ -1117,16 +1235,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         ShowNotice(Tr.T("Copying…"), sticky: true);
         try
         {
-            byte[] data;
-            try
-            {
-                var size = AppServices.Network.IsMetered ? AssetImageSize.Preview : AssetImageSize.Fullsize;
-                data = await client.GetAssetImageAsync(assetId, size, CancellationToken.None);
-            }
-            catch (ImmichApiException)
-            {
-                data = await client.GetAssetImageAsync(assetId, AssetImageSize.Preview, CancellationToken.None);
-            }
+            var data = LocalPathOf(assetId) is { } path ? await File.ReadAllBytesAsync(path) : await DownloadForCopyAsync(client, assetId);
             var window = _main?.GetWindowHandle?.Invoke() ?? IntPtr.Zero;
             await Task.Run(() =>
             {
@@ -1139,6 +1248,19 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         {
             Log.Warn("Could not copy the picture", ex);
             ShowNotice(Tr.T("Couldn't copy the picture. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
+
+    static async Task<byte[]> DownloadForCopyAsync(ImmichClient client, string assetId)
+    {
+        try
+        {
+            var size = AppServices.Network.IsMetered ? AssetImageSize.Preview : AssetImageSize.Fullsize;
+            return await client.GetAssetImageAsync(assetId, size, CancellationToken.None);
+        }
+        catch (ImmichApiException)
+        {
+            return await client.GetAssetImageAsync(assetId, AssetImageSize.Preview, CancellationToken.None);
         }
     }
 
@@ -1211,6 +1333,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         ReleaseRows();
         foreach (var card in Albums.Cast<LibraryCardViewModel>().Concat(People).Concat(Places))
             card.Dispose();
+        Duplicates?.Dispose();
         Thumbnails?.Dispose();
     }
 }

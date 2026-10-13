@@ -44,7 +44,16 @@ public sealed record UploadResult(string Id, string Status)
     public bool IsDuplicate => Status == "duplicate";
 }
 
-public sealed record AlbumInfo(string Id, string AlbumName, string? AlbumThumbnailAssetId = null, int AssetCount = 0, bool Shared = false);
+public sealed record AlbumInfo(string Id, string AlbumName, string? AlbumThumbnailAssetId = null, int AssetCount = 0, bool Shared = false,
+    string? OwnerId = null, List<System.Text.Json.JsonElement>? AlbumUsers = null)
+{
+    /// <summary>
+    /// Shared with other people: someone else is in it, or it's someone else's album. (The server's own
+    /// "shared" also counts albums that only have a public link.)
+    /// </summary>
+    public bool IsSharedWithPeople(string? myUserId) =>
+        AlbumUsers is { Count: > 0 } || (OwnerId is not null && myUserId is not null && OwnerId != myUserId);
+}
 
 /// <summary>
 /// Narrows the timeline: one album, person or partner, favorites, the archive ("archive"), the locked
@@ -116,7 +125,20 @@ public sealed record LoginOptions(bool PasswordLogin, bool OAuth, bool OAuthAuto
 public sealed record TimeBucket(string Key, int Count);
 
 /// <summary>A photo or video in the timeline.</summary>
-public sealed record TimelineAsset(string Id, bool IsImage, bool IsFavorite, double Ratio, long? DurationMs, string? FileCreatedAt);
+/// <param name="LocalPath">For a file on this PC that isn't in Immich yet: where it is.</param>
+/// <param name="LocalFailed">That file couldn't be uploaded (it will be retried).</param>
+/// <param name="FileSize">Size of the original, when the server said (search results, large files).</param>
+public sealed record TimelineAsset(string Id, bool IsImage, bool IsFavorite, double Ratio, long? DurationMs, string? FileCreatedAt,
+    string? LocalPath = null, bool LocalFailed = false, long? FileSize = null)
+{
+    public bool IsLocalOnly => LocalPath is not null;
+}
+
+/// <summary>One photo in a group of duplicates, with what's needed to pick the one to keep.</summary>
+public sealed record DuplicateAsset(TimelineAsset Asset, string FileName, int Width, int Height, long FileSize);
+
+/// <summary>Photos the server thinks are the same picture (Utilities → Review duplicates).</summary>
+public sealed record DuplicateGroup(string Id, IReadOnlyList<DuplicateAsset> Assets);
 
 /// <summary>Image sizes the server can render for an asset.</summary>
 public enum AssetImageSize
@@ -181,5 +203,8 @@ internal sealed record SharedLinkFullDto(string Id, string Key, string? Type, st
     List<SharedLinkAssetDto>? Assets, DateTimeOffset? CreatedAt, DateTimeOffset? ExpiresAt, bool AllowDownload);
 internal sealed record PartnerDto(string Id, string? Name, string? Email);
 internal sealed record AuthStatusDto(bool PinCode, bool IsElevated);
+internal sealed record DuplicateGroupDto(string DuplicateId, List<AssetDto> Assets);
+internal sealed record ClearDuplicateDto(IReadOnlyList<string> Ids,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)] string? DuplicateId);
 internal sealed record SessionUnlockDto(string PinCode);
 internal sealed record WellKnownApiDto(string? Endpoint);

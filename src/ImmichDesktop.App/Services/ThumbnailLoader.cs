@@ -12,7 +12,11 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
 {
     const long CacheBudgetBytes = 48L * 1024 * 1024;
 
+    /// <summary>Bigger local files (huge panoramas, RAW-sized TIFFs) get a placeholder instead.</summary>
+    const long MaxLocalDecodeBytes = 80L * 1024 * 1024;
+
     readonly SemaphoreSlim _downloads = new(8, 8);
+    readonly SemaphoreSlim _local = new(3, 3);
     readonly Lock _gate = new();
     readonly Dictionary<string, LinkedListNode<(string Key, byte[] Data)>> _index = [];
     readonly LinkedList<(string Key, byte[] Data)> _lru = new();
@@ -38,6 +42,43 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
         var data = await FetchAsync($"{assetId}:{size}", t => client.GetAssetImageAsync(assetId, size, t), cache: false, ct);
         return await Task.Run(() => Images.DecodeForDisplay(data, Math.Max(64, maxSize)), ct);
     }
+
+    /// <summary>
+    /// A thumbnail for a file on this PC that isn't in Immich yet, the right way up. Null for videos and
+    /// formats we can't decode here (e.g. HEIC); those show a placeholder.
+    /// </summary>
+    public async Task<Bitmap?> LoadLocalAsync(string path, bool isImage, int decodeWidth, CancellationToken ct)
+    {
+        if (!isImage)
+            return null;
+        await _local.WaitAsync(ct);
+        try
+        {
+            return await Task.Run(() =>
+            {
+                var info = new FileInfo(path);
+                if (!info.Exists || info.Length > MaxLocalDecodeBytes)
+                    return null;
+                try
+                {
+                    using var bitmap = Images.DecodeUpright(File.ReadAllBytes(path), Math.Max(64, decodeWidth * 2)); // long side; tiles crop to a square
+                    return Images.ToAvalonia(bitmap);
+                }
+                catch (InvalidDataException)
+                {
+                    return null;
+                }
+            }, ct);
+        }
+        finally
+        {
+            _local.Release();
+        }
+    }
+
+    /// <summary>A file on this PC for the full-window viewer.</summary>
+    public static Task<Bitmap> LoadLocalForViewerAsync(string path, int maxSize, CancellationToken ct) =>
+        Task.Run(() => Images.DecodeForDisplay(File.ReadAllBytes(path), Math.Max(64, maxSize)), ct);
 
     /// <summary>A person's face thumbnail.</summary>
     public async Task<Bitmap?> LoadPersonAsync(string personId, int decodeWidth, CancellationToken ct)

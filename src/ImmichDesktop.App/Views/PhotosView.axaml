@@ -39,6 +39,47 @@
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Background" Value="{DynamicResource AppNeutralSoftBrush}" />
       <Setter Property="ClipToBounds" Value="True" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Button.playVideo">
+      <Setter Property="Background" Value="#88000000" />
+      <Setter Property="CornerRadius" Value="40" />
+      <Setter Property="Padding" Value="18" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.playVideo:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#CC000000" />
+    </Style>
+    <Style Selector="Button.playVideo:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#88000000" />
+    </Style>
+    <Style Selector="Button.utility">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="14,12" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Button.utility:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppNeutralSoftBrush}" />
+    </Style>
+    <Style Selector="mi|MaterialIcon.utilityIcon">
+      <Setter Property="Width" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource AppPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.dupe.trashed Image">
+      <Setter Property="Opacity" Value="0.55" />
+    </Style>
+    <Style Selector="Border.syncBadge">
+      <Setter Property="Background" Value="#66000000" />
+    </Style>
+    <Style Selector="Border.syncBadge.warn">
+      <Setter Property="Background" Value="#E0B45309" />
     </Style>
     <Style Selector="Button.tile:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource AppNeutralSoftBrush}" />
@@ -278,6 +319,12 @@
                               Command="{Binding OpenCommand}" IsVisible="{Binding !IsMissing}" IsEnabled="{Binding CanOpen}">
                         <Panel>
                           <Image Classes="thumb" Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                          <!-- A file on this PC we can't preview here (video, HEIC…) -->
+                          <StackPanel IsVisible="{Binding ShowLocalPlaceholder}" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      IsHitTestVisible="False">
+                            <mi:MaterialIcon Kind="{Binding IsVideo, Converter={x:Static vm:Converters.LocalFileIcon}}" Width="30" Height="30"
+                                             Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                          </StackPanel>
                           <!-- Hover shade so the check stays visible on bright photos -->
                           <Border Classes="shade" IsHitTestVisible="False" Height="56" VerticalAlignment="Top">
                             <Border.Background>
@@ -297,6 +344,17 @@
                           </Border>
                           <mi:MaterialIcon IsVisible="{Binding IsFavorite}" Kind="Heart" Width="16" Height="16" Foreground="White"
                                            HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6" />
+                          <!-- File size (Large files) -->
+                          <Border IsVisible="{Binding HasSizeText}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5"
+                                  Padding="6,2" CornerRadius="6" Background="#99000000">
+                            <TextBlock Text="{Binding SizeText}" Foreground="White" FontSize="11.5" FontWeight="Medium" />
+                          </Border>
+                          <!-- In Immich, on this PC, or both -->
+                          <Border Classes="syncBadge" Classes.warn="{Binding SyncFailed}" IsVisible="{Binding HasSyncIcon}"
+                                  HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5"
+                                  Padding="3" CornerRadius="8" ToolTip.Tip="{Binding SyncText}">
+                            <mi:MaterialIcon Kind="{Binding SyncIcon}" Width="15" Height="15" Foreground="White" />
+                          </Border>
                           <!-- Select -->
                           <Button Classes="check" Classes.visible="{Binding IsSelected}" Classes.on="{Binding IsSelected}"
                                   Command="{Binding ToggleSelectCommand}" IsVisible="{Binding CanSelect}" l:Tr.Tip="Select">
@@ -517,6 +575,151 @@
           </StackPanel>
         </ScrollViewer>
 
+        <!-- Utilities, laid out like the Immich web app's -->
+        <ScrollViewer IsVisible="{Binding ShowUtilities}" HorizontalScrollBarVisibility="Disabled" Padding="28,4,10,24">
+          <StackPanel Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
+            <Border Classes="card" Padding="8,14,8,8" CornerRadius="20">
+              <StackPanel Spacing="2">
+                <TextBlock Classes="caption" l:Tr.Text="Organize your library" Margin="14,0,0,6" />
+                <Button Classes="utility" Command="{Binding OpenDuplicatesCommand}">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <mi:MaterialIcon Kind="ContentDuplicate" Classes="utilityIcon" />
+                    <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center">
+                      <TextBlock l:Tr.Text="Review duplicates" FontWeight="Medium" />
+                      <TextBlock Classes="caption" Text="{Binding DuplicatesText}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <mi:MaterialIcon Grid.Column="2" Kind="ChevronRight" Width="20" Height="20" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                  </Grid>
+                </Button>
+                <Button Classes="utility" Command="{Binding OpenLargeFilesCommand}">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <mi:MaterialIcon Kind="ImageSizeSelectLarge" Classes="utilityIcon" />
+                    <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center">
+                      <TextBlock l:Tr.Text="Review large files" FontWeight="Medium" />
+                      <TextBlock Classes="caption" l:Tr.Text="Your biggest photos and videos, to free up space." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <mi:MaterialIcon Grid.Column="2" Kind="ChevronRight" Width="20" Height="20" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                  </Grid>
+                </Button>
+              </StackPanel>
+            </Border>
+            <Border Classes="card" Padding="8,14,8,8" CornerRadius="20">
+              <StackPanel Spacing="2">
+                <TextBlock Classes="caption" l:Tr.Text="This PC" Margin="14,0,0,6" />
+                <Button Classes="utility" Command="{Binding OpenNotBackedUpCommand}">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <mi:MaterialIcon Kind="CloudUploadOutline" Classes="utilityIcon" />
+                    <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center">
+                      <TextBlock l:Tr.Text="Not backed up yet" FontWeight="Medium" />
+                      <TextBlock Classes="caption" Text="{Binding NotBackedUpText}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <mi:MaterialIcon Grid.Column="2" Kind="ChevronRight" Width="20" Height="20" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                  </Grid>
+                </Button>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Review duplicates -->
+        <Panel IsVisible="{Binding ShowDuplicates}">
+          <ContentControl Content="{Binding Duplicates}">
+            <ContentControl.DataTemplates>
+              <DataTemplate DataType="vm:DuplicatesViewModel">
+                <Panel>
+                  <DockPanel IsVisible="{Binding HasGroups}">
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="28,0,24,12">
+                      <TextBlock Classes="secondary" Text="{Binding Summary}" VerticalAlignment="Center" />
+                      <Button Grid.Column="1" Classes="secondary" Command="{Binding KeepAllSuggestedCommand}" IsEnabled="{Binding !IsBusy}"
+                              l:Tr.Tip="Keeps the suggested photo of every group; the others go to the trash">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <mi:MaterialIcon Kind="AutoFix" Width="16" Height="16" />
+                          <TextBlock l:Tr.Text="Keep the best of each" />
+                        </StackPanel>
+                      </Button>
+                    </Grid>
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="28,0,12,24">
+                      <ItemsControl ItemsSource="{Binding Groups}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:DuplicateGroupViewModel">
+                            <Border Classes="card" Padding="16" Margin="0,0,0,14" CornerRadius="18">
+                              <StackPanel Spacing="12">
+                                <ItemsControl ItemsSource="{Binding Items}">
+                                  <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DuplicateItemViewModel">
+                                      <StackPanel Width="190" Margin="0,0,12,4" Spacing="6">
+                                        <Button Classes="tile dupe" Classes.trashed="{Binding IsTrashed}" Width="190" Height="190" Command="{Binding ToggleKeepCommand}"
+                                                l:Tr.Tip="Click to keep or trash">
+                                          <Panel>
+                                            <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="8,3" CornerRadius="8"
+                                                    Background="{DynamicResource AppPrimaryBrush}" IsVisible="{Binding IsKept}">
+                                              <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <mi:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="White" />
+                                                <TextBlock l:Tr.Text="Keep" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                              </StackPanel>
+                                            </Border>
+                                            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="8,3" CornerRadius="8"
+                                                    Background="#D0B42318" IsVisible="{Binding IsTrashed}">
+                                              <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <mi:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14" Foreground="White" />
+                                                <TextBlock l:Tr.Text="Trash" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                              </StackPanel>
+                                            </Border>
+                                            <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" Padding="6,2" CornerRadius="6"
+                                                    Background="#99000000" IsVisible="{Binding IsSuggested}">
+                                              <TextBlock l:Tr.Text="Suggested" Foreground="White" FontSize="11" />
+                                            </Border>
+                                            <Button Classes="ghost icon" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
+                                                    Command="{Binding OpenCommand}" l:Tr.Tip="View" Background="#66000000">
+                                              <mi:MaterialIcon Kind="ArrowExpand" Width="16" Height="16" Foreground="White" />
+                                            </Button>
+                                          </Panel>
+                                        </Button>
+                                        <StackPanel Spacing="1" Margin="2,0">
+                                          <TextBlock Text="{Binding FileName}" FontSize="12.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                                          <TextBlock Classes="caption" Text="{Binding Details}" />
+                                          <TextBlock Classes="caption tertiary" Text="{Binding DateText}" />
+                                        </StackPanel>
+                                      </StackPanel>
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                  <Button Classes="ghost" l:Tr.Content="Not duplicates" Command="{Binding NotDuplicatesCommand}" />
+                                  <Button Classes="primary" Content="{Binding TrashText}" Command="{Binding ResolveCommand}" />
+                                </StackPanel>
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                  </DockPanel>
+                  <StackPanel Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsLoading}">
+                    <mi:MaterialIcon Kind="Loading" Classes="spin" Width="28" Height="28" Foreground="{DynamicResource AppPrimaryBrush}" />
+                    <TextBlock Classes="secondary" l:Tr.Text="Looking for duplicates…" />
+                  </StackPanel>
+                  <StackPanel Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowEmpty}" MaxWidth="420">
+                    <mi:MaterialIcon Kind="CheckCircleOutline" Width="36" Height="36" Foreground="{DynamicResource AppPrimaryBrush}" />
+                    <TextBlock Classes="h3" l:Tr.Text="No duplicates" HorizontalAlignment="Center" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
+                               l:Tr.Text="Immich finds look-alike photos with machine learning on your server. Nothing to review right now." />
+                  </StackPanel>
+                  <Border Classes="card" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center"
+                          IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <StackPanel Spacing="12">
+                      <TextBlock Text="{Binding Error}" TextWrapping="Wrap" TextAlignment="Center" />
+                      <Button Classes="primary" HorizontalAlignment="Center" l:Tr.Content="Try again" Command="{Binding RefreshCommand}" />
+                    </StackPanel>
+                  </Border>
+                </Panel>
+              </DataTemplate>
+            </ContentControl.DataTemplates>
+          </ContentControl>
+        </Panel>
+
         <!-- Locked folder: PIN prompt -->
         <Border Classes="card" Width="400" Padding="28,26" HorizontalAlignment="Center" VerticalAlignment="Center"
                 IsVisible="{Binding ShowLockedPrompt}">
@@ -635,10 +838,18 @@
           </Panel>
           <mi:MaterialIcon Kind="Loading" Classes="spin" Width="28" Height="28" Foreground="White" IsVisible="{Binding IsLoading}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
-          <Border IsVisible="{Binding IsVideo}" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#88000000" CornerRadius="40" Padding="18"
-                  IsHitTestVisible="False">
-            <mi:MaterialIcon Kind="Play" Width="40" Height="40" Foreground="White" />
-          </Border>
+          <StackPanel IsVisible="{Binding IsVideo}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+            <Button Classes="playVideo" Command="{Binding PlayCommand}" IsEnabled="{Binding !IsFetchingVideo}" HorizontalAlignment="Center"
+                    l:Tr.Tip="Play (Space)">
+              <Panel>
+                <mi:MaterialIcon Kind="Play" Width="40" Height="40" Foreground="White" IsVisible="{Binding !IsFetchingVideo}" />
+                <mi:MaterialIcon Kind="Loading" Classes="spin" Width="34" Height="34" Foreground="White" IsVisible="{Binding IsFetchingVideo}" />
+              </Panel>
+            </Button>
+            <Border Padding="10,4" CornerRadius="8" Background="#99000000" IsVisible="{Binding IsFetchingVideo}">
+              <TextBlock Text="{Binding VideoProgress}" Foreground="White" FontSize="12.5" />
+            </Border>
+          </StackPanel>
 
           <!-- Top bar -->
           <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Top" Margin="14,12">
@@ -654,6 +865,9 @@
                   <mi:MaterialIcon Kind="HeartOutline" IsVisible="{Binding !IsFavorite}" />
                 </Panel>
               </Button>
+              <Button Classes="viewerNav" Command="{Binding ShowInFolderCommand}" IsVisible="{Binding IsOnDevice}" l:Tr.Tip="Show in folder">
+                <mi:MaterialIcon Kind="FolderOpenOutline" />
+              </Button>
               <Button Classes="viewerNav" Command="{Binding CopyImageCommand}" IsVisible="{Binding !IsVideo}" l:Tr.Tip="Copy picture (Ctrl+C)">
                 <mi:MaterialIcon Kind="ContentCopy" />
               </Button>
@@ -666,23 +880,32 @@
               <Button Classes="viewerNav" Command="{Binding DownloadCommand}" IsVisible="{Binding CanEdit}" l:Tr.Tip="Download">
                 <mi:MaterialIcon Kind="TrayArrowDown" />
               </Button>
-              <Button Classes="viewerNav" Command="{Binding ToggleInfoCommand}" l:Tr.Tip="Info (I)">
+              <Button Classes="viewerNav" Command="{Binding ToggleInfoCommand}" IsVisible="{Binding IsInImmich}" l:Tr.Tip="Info (I)">
                 <mi:MaterialIcon Kind="InformationOutline" />
               </Button>
               <Button Classes="viewerNav" Command="{Binding TrashCommand}" IsVisible="{Binding CanEdit}" l:Tr.Tip="Move to trash (Delete)">
                 <mi:MaterialIcon Kind="TrashCanOutline" />
               </Button>
-              <Button Classes="viewerNav" Command="{Binding OpenInImmichCommand}"
+              <Button Classes="viewerNav" Command="{Binding OpenInImmichCommand}" IsVisible="{Binding IsInImmich}"
                       ToolTip.Tip="{Binding IsVideo, Converter={x:Static vm:Converters.VideoOpenText}}">
+                <mi:MaterialIcon Kind="OpenInNew" />
+              </Button>
+              <Button Classes="viewerNav" Command="{Binding OpenFileCommand}" IsVisible="{Binding IsLocalOnly}" l:Tr.Tip="Open file">
                 <mi:MaterialIcon Kind="OpenInNew" />
               </Button>
             </StackPanel>
           </Grid>
 
-          <!-- Date, under the photo -->
+          <!-- Date (and for files only on this PC, their backup status), under the photo -->
           <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,10" Padding="12,5" CornerRadius="10" Background="#99000000"
                   IsHitTestVisible="False" IsVisible="{Binding DateText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-            <TextBlock Text="{Binding DateText}" Foreground="White" FontWeight="Medium" FontSize="13" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <TextBlock Text="{Binding DateText}" Foreground="White" FontWeight="Medium" FontSize="13" />
+              <StackPanel Orientation="Horizontal" Spacing="5" IsVisible="{Binding IsLocalOnly}">
+                <mi:MaterialIcon Kind="CloudUploadOutline" Width="15" Height="15" Foreground="#FFD9A0" />
+                <TextBlock Text="{Binding LocalStatus}" Foreground="#FFD9A0" FontSize="12.5" VerticalAlignment="Center" />
+              </StackPanel>
+            </StackPanel>
           </Border>
 
           <Button Classes="viewerNav" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0"

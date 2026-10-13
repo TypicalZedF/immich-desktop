@@ -388,6 +388,28 @@ public sealed class ImmichClient : IDisposable
     public Task TrashAssetsAsync(IReadOnlyList<string> assetIds, CancellationToken ct) =>
         SendAsync(HttpMethod.Delete, "assets", new DeleteAssetsRequestDto(assetIds, Force: false), ct);
 
+    /// <summary>
+    /// Saves a video in a format any player can play (the server's encoded version, which is the
+    /// original when no re-encoding was needed). Reports progress from 0 to 1 when the size is known.
+    /// </summary>
+    public async Task DownloadVideoAsync(string assetId, Stream destination, Action<double>? progress, CancellationToken ct)
+    {
+        using var response = await _http.GetAsync($"assets/{Uri.EscapeDataString(assetId)}/video/playback", HttpCompletionOption.ResponseHeadersRead, ct);
+        await EnsureSuccessAsync(response, ct);
+        var total = response.Content.Headers.ContentLength;
+        await using var source = await response.Content.ReadAsStreamAsync(ct);
+        var buffer = new byte[81920];
+        long done = 0;
+        int read;
+        while ((read = await source.ReadAsync(buffer, ct)) > 0)
+        {
+            await destination.WriteAsync(buffer.AsMemory(0, read), ct);
+            done += read;
+            if (total is > 0)
+                progress?.Invoke(Math.Min(1, done / (double)total.Value));
+        }
+    }
+
     /// <summary>Saves the original file of an asset to <paramref name="destination"/>.</summary>
     public async Task DownloadOriginalAsync(string assetId, Stream destination, CancellationToken ct)
     {
@@ -467,7 +489,42 @@ public sealed class ImmichClient : IDisposable
     {
         var ratio = a.ExifInfo is { ExifImageWidth: > 0, ExifImageHeight: > 0 } e ? e.ExifImageWidth!.Value / (double)e.ExifImageHeight!.Value : 1;
         long? duration = TimeSpan.TryParse(a.Duration, CultureInfo.InvariantCulture, out var span) && span > TimeSpan.Zero ? (long)span.TotalMilliseconds : null;
-        return new TimelineAsset(a.Id, !string.Equals(a.Type, "VIDEO", StringComparison.OrdinalIgnoreCase), a.IsFavorite, ratio, duration, a.FileCreatedAt);
+        return new TimelineAsset(a.Id, !string.Equals(a.Type, "VIDEO", StringComparison.OrdinalIgnoreCase), a.IsFavorite, ratio, duration, a.FileCreatedAt,
+            FileSize: a.ExifInfo?.FileSizeInByte);
+    }
+
+    // ---- Utilities ---------------------------------------------------------------------------
+
+    /// <summary>Groups of photos the server found to be duplicates (needs machine learning on the server).</summary>
+    public async Task<List<DuplicateGroup>> GetDuplicatesAsync(CancellationToken ct)
+    {
+        var groups = await SendAsync<List<DuplicateGroupDto>>(HttpMethod.Get, "duplicates", null, ct, TimeSpan.FromSeconds(120));
+        return groups
+            .Where(g => g.Assets.Count > 1)
+            .Select(g => new DuplicateGroup(g.DuplicateId, g.Assets.Select(a => new DuplicateAsset(
+                ToTimelineAsset(a), a.OriginalFileName ?? "", a.ExifInfo?.ExifImageWidth ?? 0, a.ExifInfo?.ExifImageHeight ?? 0,
+                a.ExifInfo?.FileSizeInByte ?? 0)).ToList()))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Settles a group of duplicates: <paramref name="trash"/> go to the trash and the rest stop being
+    /// flagged (also how "these aren't duplicates" works, with nothing to trash).
+    /// </summary>
+    public async Task ResolveDuplicatesAsync(IReadOnlyList<string> keep, IReadOnlyList<string> trash, CancellationToken ct)
+    {
+        if (trash.Count > 0)
+            await SendAsync(HttpMethod.Delete, "assets", new DeleteAssetsRequestDto(trash, Force: false), ct);
+        if (keep.Count > 0)
+            await SendAsync(HttpMethod.Put, "assets", new ClearDuplicateDto(keep, null), ct);
+    }
+
+    /// <summary>Your biggest photos and videos, largest first (Immich 1.124 and newer).</summary>
+    public async Task<List<TimelineAsset>> GetLargeFilesAsync(long minBytes, int max, CancellationToken ct)
+    {
+        var assets = await SendAsync<List<AssetDto>>(HttpMethod.Post,
+            FormattableString.Invariant($"search/large-assets?minFileSize={minBytes}&size={max}"), null, ct, TimeSpan.FromSeconds(90));
+        return assets.Select(ToTimelineAsset).OrderByDescending(a => a.FileSize ?? 0).ToList();
     }
 
     // ---- Archive, locked folder, trash -------------------------------------------------------

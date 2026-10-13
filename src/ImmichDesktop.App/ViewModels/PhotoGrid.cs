@@ -112,8 +112,17 @@ public sealed class AssetRowViewModel : ViewModelBase
 
     public BucketState Bucket { get; }
     public int Start { get; }
-    public double TileSize { get; }
+    public double TileSize { get; private set; }
     public double RowHeight => TileSize + PhotosViewModel.Gap;
+
+    internal void Resize(double tile)
+    {
+        TileSize = tile;
+        foreach (var cell in Cells)
+            cell.TileSize = tile;
+        OnPropertyChanged(nameof(TileSize));
+        OnPropertyChanged(nameof(RowHeight));
+    }
     public ObservableCollection<AssetCellViewModel> Cells { get; } = [];
 
     public async void Realize()
@@ -153,13 +162,16 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
 {
     public BucketState Bucket { get; } = bucket;
     public int Index { get; } = index;
-    public double TileSize { get; } = tile;
+    [ObservableProperty]
+    public partial double TileSize { get; set; } = tile;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsVideo), nameof(IsFavorite), nameof(DurationText), nameof(IsMissing), nameof(CanOpen))]
+    [NotifyPropertyChangedFor(nameof(IsVideo), nameof(IsFavorite), nameof(DurationText), nameof(IsMissing), nameof(CanOpen),
+        nameof(CanSelect), nameof(SyncIcon), nameof(SyncText), nameof(HasSyncIcon), nameof(SyncFailed), nameof(IsLocalOnly), nameof(SizeText), nameof(HasSizeText), nameof(ShowLocalPlaceholder))]
     public partial TimelineAsset? Asset { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowLocalPlaceholder))]
     public partial Bitmap? Thumbnail { get; set; }
 
     [ObservableProperty]
@@ -175,8 +187,55 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
     /// <summary>Videos can't be picked as a profile picture.</summary>
     public bool CanOpen => !(owner.IsPicker && IsVideo);
 
-    /// <summary>Selecting (the check in the corner) is for the library, not for picking a profile picture.</summary>
-    public bool CanSelect => !owner.IsPicker;
+    /// <summary>
+    /// Selecting (the check in the corner) is for the library, not for picking a profile picture, and
+    /// not for files that are only on this PC (there's nothing in Immich to act on yet).
+    /// </summary>
+    public bool CanSelect => !owner.IsPicker && Asset is not { IsLocalOnly: true };
+
+    public bool IsLocalOnly => Asset is { IsLocalOnly: true };
+
+    public string SizeText => owner.ShowFileSizes && Asset?.FileSize is long size and > 0 ? Format.Bytes(size) : "";
+    public bool HasSizeText => SizeText.Length > 0;
+
+    /// <summary>A file on this PC we can't draw a preview of (a video, or a format like HEIC).</summary>
+    public bool ShowLocalPlaceholder => IsLocalOnly && Thumbnail is null && _thumbnailTried;
+
+    bool _thumbnailTried;
+
+    // ---- Where it is: in Immich, on this PC, or both (like the mobile app's timeline badges) ----
+
+    enum Sync { None, CloudOnly, Both, Waiting, Failed }
+
+    Sync SyncState => Asset switch
+    {
+        null => Sync.None,
+        _ when !owner.ShowSyncStatus => Sync.None,
+        { IsLocalOnly: true, LocalFailed: true } => Sync.Failed,
+        { IsLocalOnly: true } => Sync.Waiting,
+        var a when owner.DevicePathFor(a.Id) is not null => Sync.Both,
+        _ => Sync.CloudOnly,
+    };
+
+    public bool HasSyncIcon => SyncState != Sync.None;
+    public bool SyncFailed => SyncState == Sync.Failed;
+
+    public Material.Icons.MaterialIconKind SyncIcon => SyncState switch
+    {
+        Sync.Both => Material.Icons.MaterialIconKind.CloudCheckOutline,
+        Sync.Waiting => Material.Icons.MaterialIconKind.CloudUploadOutline,
+        Sync.Failed => Material.Icons.MaterialIconKind.CloudAlertOutline,
+        _ => Material.Icons.MaterialIconKind.CloudOutline,
+    };
+
+    public string SyncText => SyncState switch
+    {
+        Sync.Both => Tr.T("Backed up · also on this PC"),
+        Sync.Waiting => Tr.T("On this PC · waiting to back up"),
+        Sync.Failed => Tr.T("On this PC · couldn't back up yet (will retry)"),
+        Sync.CloudOnly => Tr.T("In Immich only"),
+        _ => "",
+    };
 
     internal void Bind(TimelineAsset? asset)
     {
@@ -187,11 +246,13 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
 
     internal async Task LoadThumbnailAsync(CancellationToken ct)
     {
-        if (Asset is null || Thumbnail is not null || owner.Thumbnails is not { } loader)
+        if (Asset is not { } asset || Thumbnail is not null || owner.Thumbnails is not { } loader)
             return;
         try
         {
-            var bitmap = await loader.LoadAsync(Asset.Id, AssetImageSize.Thumbnail, owner.DecodeWidth, ct);
+            var bitmap = asset.LocalPath is { } path
+                ? await loader.LoadLocalAsync(path, asset.IsImage, owner.DecodeWidth, ct)
+                : await loader.LoadAsync(asset.Id, AssetImageSize.Thumbnail, owner.DecodeWidth, ct);
             if (ct.IsCancellationRequested)
                 bitmap?.Dispose();
             else
@@ -202,13 +263,22 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
         }
         catch (Exception ex)
         {
-            Log.Info($"Thumbnail failed for {Asset.Id}: {ex.Message}");
+            Log.Info($"Thumbnail failed for {asset.Id}: {ex.Message}");
+        }
+        finally
+        {
+            if (!ct.IsCancellationRequested)
+            {
+                _thumbnailTried = true;
+                OnPropertyChanged(nameof(ShowLocalPlaceholder));
+            }
         }
     }
 
     internal void Release()
     {
         var bitmap = Thumbnail;
+        _thumbnailTried = false;
         Thumbnail = null;
         bitmap?.Dispose();
     }
@@ -217,7 +287,7 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
     [RelayCommand]
     void Open()
     {
-        if (owner.IsSelecting && Asset is not null)
+        if (owner.IsSelecting && CanSelect && Asset is not null)
             owner.ToggleSelection(this);
         else
             owner.OpenViewer(this);
@@ -226,7 +296,7 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
     [RelayCommand]
     void ToggleSelect()
     {
-        if (Asset is not null)
+        if (CanSelect && Asset is not null)
             owner.ToggleSelection(this);
     }
 

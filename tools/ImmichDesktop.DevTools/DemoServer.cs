@@ -171,7 +171,11 @@ sealed class DemoServer : HttpMessageHandler
             return Task.FromResult(Bytes(path.Contains("dark", StringComparison.Ordinal) ? _tileDark! : _tileLight!));
         HttpResponseMessage response = path switch
         {
-            "/api/albums" => Json(Albums.Select((a, i) => new { id = a.Id, albumName = a.Name, albumThumbnailAssetId = $"202609-{i * 5 + 1}", assetCount = a.Count, shared = a.Shared })),
+            "/api/albums" => Json(Albums.Select((a, i) => new
+            {
+                id = a.Id, albumName = a.Name, albumThumbnailAssetId = $"202609-{i * 5 + 1}", assetCount = a.Count, shared = true, ownerId = "u1",
+                albumUsers = a.Shared ? new object[] { new { role = "editor", user = new { id = "u2", name = "Sam" } } } : Array.Empty<object>(),
+            })),
             "/api/people" => Json(new { people = People.Select((p, i) => new { id = $"p{i}", name = p.Name, isHidden = false }), hasNextPage = false }),
             _ when path.StartsWith("/api/people/", StringComparison.Ordinal) => Bytes(_faces[int.Parse(path.Split('/')[3][1..]) % _faces.Count]),
             "/api/search/cities" => Json(Cities.Select((c, i) => new { id = $"202608-{i * 2}", exifInfo = new { city = c.City, state = c.State, country = c.Country } })),
@@ -193,6 +197,28 @@ sealed class DemoServer : HttpMessageHandler
                       assets = new[] { new { id = "202609-4" }, new { id = "202609-5" }, new { id = "202609-6" } }, createdAt = DateTimeOffset.Now.AddDays(-20),
                       expiresAt = (DateTimeOffset?)DateTimeOffset.Now.AddDays(10), allowDownload = false },
             }),
+            "/api/duplicates" => Json(Enumerable.Range(0, 3).Select(g => new
+            {
+                duplicateId = $"d{g}",
+                assets = Enumerable.Range(0, 2 + g % 2).Select(k => new
+                {
+                    id = $"202609-{g * 5 + k}",
+                    type = "IMAGE",
+                    originalFileName = k == 0 ? $"IMG_{4410 + g}.HEIC" : $"IMG_{4410 + g} ({k}).jpg",
+                    fileCreatedAt = new DateTime(2026, 9, 20 - g, 15, 0, 0, DateTimeKind.Utc).ToString("o"),
+                    isFavorite = false,
+                    exifInfo = new { exifImageWidth = k == 0 ? 4080 : 1920, exifImageHeight = k == 0 ? 3072 : 1440, fileSizeInByte = k == 0 ? 3_800_000L : 640_000L / k },
+                }),
+            })),
+            "/api/search/large-assets" => Json(Enumerable.Range(0, 14).Select(i => new
+            {
+                id = $"202608-{i}",
+                type = i % 3 == 0 ? "VIDEO" : "IMAGE",
+                isFavorite = false,
+                fileCreatedAt = new DateTime(2026, 8, 20, 12, 0, 0, DateTimeKind.Utc).AddDays(-i).ToString("o"),
+                duration = i % 3 == 0 ? "0:01:12.000" : "0:00:00.00000",
+                exifInfo = new { fileSizeInByte = 1_900_000_000L / (i + 1) },
+            })),
             "/api/partners" => Json(new[] { new { id = "pt1", name = "Sam Morgan", email = "sam@example.com" } }),
             "/api/auth/status" => Json(new { pinCode = true, isElevated = false, password = true }),
             "/api/server/config" => Json(new { externalDomain = "" }),
