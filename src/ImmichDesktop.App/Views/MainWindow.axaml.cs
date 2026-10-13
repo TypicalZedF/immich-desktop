@@ -48,6 +48,8 @@ public partial class MainWindow : Window
         {
             vm.PickFolder = PickFolderAsync;
             vm.PickImage = PickImageAsync;
+            vm.PickSaveFile = PickSaveFileAsync;
+            vm.CopyText = text => Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
             vm.GetWindowHandle = () => TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
         }
     }
@@ -76,6 +78,18 @@ public partial class MainWindow : Window
             FileTypeFilter = [new FilePickerFileType("Images") { Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.bmp"] }],
         });
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+    }
+
+    async Task<string?> PickSaveFileAsync(string title, string suggestedName)
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = title,
+            SuggestedFileName = suggestedName,
+            DefaultExtension = Path.GetExtension(suggestedName).TrimStart('.'),
+            ShowOverwritePrompt = true,
+        });
+        return file?.TryGetLocalPath();
     }
 
     async Task<string?> PickFolderAsync(string title)

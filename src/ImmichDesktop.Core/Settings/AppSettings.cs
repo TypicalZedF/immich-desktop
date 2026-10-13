@@ -16,6 +16,14 @@ public enum UpdateChannel
     Beta,
 }
 
+/// <summary>Where desktop backgrounds come from.</summary>
+public enum WallpaperSource
+{
+    Favorites,
+    Album,
+    Library,
+}
+
 public enum AppLockMode
 {
     Off,
@@ -88,6 +96,13 @@ public sealed class AppSettings
 
     public bool AutoInstallUpdates { get; set; } = true;
     public UpdateChannel UpdateChannel { get; set; } = UpdateChannel.Stable;
+
+    // Desktop background: a photo from Immich, changed every so often (like a digital picture frame).
+    public bool WallpaperEnabled { get; set; }
+    public WallpaperSource WallpaperSource { get; set; } = WallpaperSource.Favorites;
+    public string? WallpaperAlbumId { get; set; }
+    public string? WallpaperAlbumName { get; set; }
+    public int WallpaperIntervalMinutes { get; set; } = 60;
 
     public bool IsConfigured => !string.IsNullOrEmpty(ServerUrl) && !string.IsNullOrEmpty(UserId);
 }

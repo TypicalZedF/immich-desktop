@@ -39,13 +39,19 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         CheckForUpdates = s.CheckForUpdates;
         AutoInstallUpdates = s.AutoInstallUpdates;
         _channel = s.UpdateChannel;
+        WallpaperEnabled = s.WallpaperEnabled;
+        SelectedWallpaperSource = WallpaperSources.FirstOrDefault(o => o.Value == s.WallpaperSource) ?? WallpaperSources[0];
+        SelectedWallpaperInterval = WallpaperIntervals.FirstOrDefault(o => o.Value == s.WallpaperIntervalMinutes) ?? WallpaperIntervals[2];
         _lockMode = s.AppLock;
         _loading = false;
 
         ThemeService.Changed += OnThemeChanged;
         AppServices.Updates.Changed += OnUpdatesChanged;
         AppServices.Profile.Changed += OnProfileChanged;
+        AppServices.Wallpaper.Changed += OnWallpaperChanged;
         _ = DetectHelloAsync();
+        if (WallpaperSupported)
+            _ = LoadWallpaperAlbumsAsync();
     }
 
     public void Dispose()
@@ -53,7 +59,104 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         ThemeService.Changed -= OnThemeChanged;
         AppServices.Updates.Changed -= OnUpdatesChanged;
         AppServices.Profile.Changed -= OnProfileChanged;
+        AppServices.Wallpaper.Changed -= OnWallpaperChanged;
     }
+
+    // ---- Desktop background ----
+
+    public bool WallpaperSupported => WallpaperService.IsSupported;
+
+    [ObservableProperty]
+    public partial bool WallpaperEnabled { get; set; }
+
+    partial void OnWallpaperEnabledChanged(bool value)
+    {
+        if (_loading) return;
+        AppServices.Settings.Update(s => s.WallpaperEnabled = value);
+    }
+
+    public IReadOnlyList<Option<WallpaperSource>> WallpaperSources { get; } =
+    [
+        new("Favorites", WallpaperSource.Favorites),
+        new("An album", WallpaperSource.Album),
+        new("All photos", WallpaperSource.Library),
+    ];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAlbumWallpaper))]
+    public partial Option<WallpaperSource> SelectedWallpaperSource { get; set; }
+
+    public bool IsAlbumWallpaper => SelectedWallpaperSource?.Value == WallpaperSource.Album;
+
+    partial void OnSelectedWallpaperSourceChanged(Option<WallpaperSource> value)
+    {
+        if (_loading || value is null) return;
+        AppServices.Settings.Update(s => s.WallpaperSource = value.Value);
+    }
+
+    public System.Collections.ObjectModel.ObservableCollection<AlbumInfo> WallpaperAlbums { get; } = [];
+
+    [ObservableProperty]
+    public partial AlbumInfo? SelectedWallpaperAlbum { get; set; }
+
+    partial void OnSelectedWallpaperAlbumChanged(AlbumInfo? value)
+    {
+        if (value is null) return;
+        AppServices.Settings.Update(s =>
+        {
+            s.WallpaperAlbumId = value.Id;
+            s.WallpaperAlbumName = value.AlbumName;
+        });
+    }
+
+    async Task LoadWallpaperAlbumsAsync()
+    {
+        if (AppServices.Account.Client is not { } client)
+            return;
+        try
+        {
+            var albums = await client.GetAlbumsAsync(CancellationToken.None);
+            foreach (var album in albums.Where(a => a.AssetCount > 0).OrderBy(a => a.AlbumName, StringComparer.CurrentCultureIgnoreCase))
+                WallpaperAlbums.Add(album);
+            var chosen = AppServices.Settings.Current.WallpaperAlbumId;
+            SelectedWallpaperAlbum = WallpaperAlbums.FirstOrDefault(a => a.Id == chosen);
+        }
+        catch (Exception ex)
+        {
+            Log.Info($"Albums for the desktop background unavailable: {ex.Message}");
+        }
+    }
+
+    public IReadOnlyList<Option<int>> WallpaperIntervals { get; } =
+    [
+        new("Every 15 minutes", 15),
+        new("Every 30 minutes", 30),
+        new("Every hour", 60),
+        new("Every 3 hours", 180),
+        new("Every 6 hours", 360),
+        new("Once a day", 1440),
+    ];
+
+    [ObservableProperty]
+    public partial Option<int> SelectedWallpaperInterval { get; set; }
+
+    partial void OnSelectedWallpaperIntervalChanged(Option<int> value)
+    {
+        if (_loading || value is null) return;
+        AppServices.Settings.Update(s => s.WallpaperIntervalMinutes = value.Value);
+    }
+
+    public string WallpaperStatus => AppServices.Wallpaper.StatusText;
+    public bool IsChangingWallpaper => AppServices.Wallpaper.IsChanging;
+
+    void OnWallpaperChanged() => Dispatcher.UIThread.Post(() =>
+    {
+        OnPropertyChanged(nameof(WallpaperStatus));
+        OnPropertyChanged(nameof(IsChangingWallpaper));
+    });
+
+    [RelayCommand]
+    static Task ChangeWallpaperNowAsync() => AppServices.Wallpaper.ChangeNowAsync();
 
     // ---- Profile picture (also changes it in Immich) ----
 

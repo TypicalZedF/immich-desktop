@@ -23,6 +23,24 @@ sealed class DemoServer : HttpMessageHandler
 
     readonly Dictionary<string, byte[]> _images = [];
     byte[]? _avatar;
+    readonly List<byte[]> _faces = [];
+    byte[]? _tileLight, _tileDark;
+
+    static readonly (string Name, string Color)[] People =
+    [
+        ("Alex", "#F59E0B"), ("Sam", "#10B981"), ("Jordan", "#6366F1"), ("Riley", "#EC4899"), ("Casey", "#0EA5E9"), ("", "#94A3B8"),
+    ];
+
+    static readonly (string Id, string Name, int Count, bool Shared)[] Albums =
+    [
+        ("a1", "Summer in Lisbon", 48, false), ("a2", "Family", 212, true), ("a3", "Hiking", 37, false), ("a4", "Garden", 15, false),
+    ];
+
+    static readonly (string City, string State, string Country, double Lat, double Lon, int Count)[] Cities =
+    [
+        ("Lisbon", "Lisbon", "Portugal", 38.72, -9.14, 40), ("Porto", "Porto", "Portugal", 41.15, -8.61, 12), ("Madrid", "Madrid", "Spain", 40.42, -3.70, 18),
+        ("Paris", "Île-de-France", "France", 48.86, 2.35, 25), ("Amsterdam", "North Holland", "Netherlands", 52.37, 4.90, 9), ("Barcelona", "Catalonia", "Spain", 41.39, 2.17, 22),
+    ];
 
     /// <summary>Must be called on the UI thread (renders the demo images).</summary>
     public void Prepare()
@@ -32,6 +50,26 @@ sealed class DemoServer : HttpMessageHandler
             _images[$"t{i}"] = Render.ToPng(Scene(i, 250, 250), 250, 250);
             _images[$"p{i}"] = Render.ToPng(Scene(i, 1200, 800), 1200, 800);
         }
+        foreach (var (name, color) in People)
+        {
+            _faces.Add(Render.ToPng(new Border
+            {
+                Width = 160,
+                Height = 160,
+                Background = new SolidColorBrush(Color.Parse(color)),
+                Child = new TextBlock
+                {
+                    Text = name.Length > 0 ? name[..1] : "?",
+                    FontSize = 72,
+                    FontWeight = FontWeight.SemiBold,
+                    Foreground = Brushes.White,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                },
+            }, 160, 160));
+        }
+        _tileLight = Render.ToPng(Tile("#ECEEF1", "#DDE3EA", "#FFFFFF"), 512, 512);
+        _tileDark = Render.ToPng(Tile("#1B1F24", "#232A33", "#2D333B"), 512, 512);
         _avatar = Render.ToPng(new Border
         {
             Width = 160,
@@ -45,6 +83,41 @@ sealed class DemoServer : HttpMessageHandler
             Child = new Ellipse { Width = 70, Height = 70, Fill = new SolidColorBrush(Color.Parse("#FDE68A")), Margin = new Thickness(0, 0, 0, 30) },
         }, 160, 160);
     }
+
+    /// <summary>A plain map tile: land, a pond and a few streets (real tiles come from the internet).</summary>
+    static Control Tile(string land, string water, string road) => new Canvas
+    {
+        Width = 512,
+        Height = 512,
+        Background = new SolidColorBrush(Color.Parse(land)),
+        Children =
+        {
+            new Ellipse { Width = 220, Height = 150, Fill = new SolidColorBrush(Color.Parse(water)), [Canvas.LeftProperty] = 250.0, [Canvas.TopProperty] = 300.0 },
+            new Line { StartPoint = new Point(0, 120), EndPoint = new Point(512, 180), Stroke = new SolidColorBrush(Color.Parse(road)), StrokeThickness = 10 },
+            new Line { StartPoint = new Point(160, 0), EndPoint = new Point(120, 512), Stroke = new SolidColorBrush(Color.Parse(road)), StrokeThickness = 6 },
+            new Line { StartPoint = new Point(0, 420), EndPoint = new Point(512, 380), Stroke = new SolidColorBrush(Color.Parse(road)), StrokeThickness = 4 },
+        },
+    };
+
+    static object AssetJson(string id, int i, string? city = null) => new
+    {
+        id,
+        type = i % 7 == 3 ? "VIDEO" : "IMAGE",
+        originalFileName = $"IMG_{4400 + i}.HEIC",
+        fileCreatedAt = new DateTime(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc).AddDays(-i * 3).ToString("o"),
+        isFavorite = i % 9 == 2,
+        duration = i % 7 == 3 ? "0:00:21.000" : "0:00:00.00000",
+        exifInfo = new
+        {
+            make = "Google", model = "Pixel 9", lensModel = "Main camera", fNumber = 1.7, exposureTime = "1/320", iso = 50.0, focalLength = 6.9,
+            city = city ?? "Lisbon", state = "Lisbon", country = "Portugal", exifImageWidth = 4080, exifImageHeight = 3072, fileSizeInByte = 2_480_000L,
+            description = (string?)null,
+        },
+        people = new[] { new { name = "Alex" }, new { name = "Sam" } },
+    };
+
+    static HttpResponseMessage Search(int count) =>
+        Json(new { assets = new { total = count, count, items = Enumerable.Range(0, count).Select(i => AssetJson($"202609-{i % 41}", i)), nextPage = (string?)null } });
 
     /// <summary>A simple landscape: sky gradient, sun and hills, with a different palette per index.</summary>
     static Control Scene(int i, int w, int h)
@@ -80,8 +153,26 @@ sealed class DemoServer : HttpMessageHandler
     {
         var path = request.RequestUri!.AbsolutePath;
         var query = request.RequestUri.Query;
+        if (request.RequestUri.Host.EndsWith("cartocdn.com", StringComparison.Ordinal))
+            return Task.FromResult(Bytes(path.Contains("dark", StringComparison.Ordinal) ? _tileDark! : _tileLight!));
         HttpResponseMessage response = path switch
         {
+            "/api/albums" => Json(Albums.Select((a, i) => new { id = a.Id, albumName = a.Name, albumThumbnailAssetId = $"202609-{i * 5 + 1}", assetCount = a.Count, shared = a.Shared })),
+            "/api/people" => Json(new { people = People.Select((p, i) => new { id = $"p{i}", name = p.Name, isHidden = false }), hasNextPage = false }),
+            _ when path.StartsWith("/api/people/", StringComparison.Ordinal) => Bytes(_faces[int.Parse(path.Split('/')[3][1..]) % _faces.Count]),
+            "/api/search/cities" => Json(Cities.Select((c, i) => new { id = $"202608-{i * 2}", exifInfo = new { city = c.City, state = c.State, country = c.Country } })),
+            "/api/map/markers" => Json(Cities.SelectMany((c, ci) => Enumerable.Range(0, c.Count).Select(i => new
+            {
+                id = $"202609-{(ci * 7 + i) % 41}",
+                lat = c.Lat + Math.Sin(i * 1.7) * 0.05 * (1 + i % 3),
+                lon = c.Lon + Math.Cos(i * 2.3) * 0.07 * (1 + i % 3),
+                city = c.City,
+                country = c.Country,
+            }))),
+            "/api/search/smart" or "/api/search/metadata" => Search(17),
+            "/api/shared-links" => Json(new { id = "l1", key = "Xq7cT2pLm9vR4sWz" }),
+            "/api/server/config" => Json(new { externalDomain = "" }),
+            _ when path.StartsWith("/api/assets/", StringComparison.Ordinal) && path.Count(c => c == '/') == 3 => Json(AssetJson(path.Split('/')[3], 4)),
             "/api/server/ping" => Json(new { res = "pong" }),
             "/api/server/version" => Json(new { major = 3, minor = 3, patch = 1 }),
             "/api/users/me" => Json(new { id = "u1", name = "Alex Morgan", email = "alex@example.com", profileImagePath = "upload/profile/u1.jpg", avatarColor = "pink", quotaSizeInBytes = (long?)null, quotaUsageInBytes = (long?)null }),

@@ -104,6 +104,7 @@ static class Screens
         // Talk to a pretend server so the library, avatar and storage show real-looking content.
         var demo = new DemoServer();
         demo.Prepare();
+        MapTiles.Handler = demo;
         AppServices.Account.UseClient(new ImmichClient(new Uri("https://photos.example.com/api/"), new AuthCredential(AuthKind.ApiKey, "demo"), demo));
         Pump(TimeSpan.FromSeconds(1));
 
@@ -149,7 +150,32 @@ static class Screens
             var cell = photos.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).First(c => c.Asset is not null && c.Index == 4);
             photos.OpenViewer(cell);
             Shot(main, outDir, $"16-viewer-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            photos.Viewer?.ToggleInfoCommand.Execute(null);
+            Shot(main, outDir, $"16b-viewer-info-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1));
+            photos.Viewer?.ToggleInfoCommand.Execute(null);
             photos.Viewer?.CloseCommand.Execute(null);
+
+            // Select a few photos, then share them.
+            foreach (var c in photos.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).Where(c => c.Asset is not null).Take(3))
+                c.ToggleSelectCommand.Execute(null);
+            Shot(main, outDir, $"17-photos-selected-{suffix}", height: 860, settle: TimeSpan.FromSeconds(1));
+            photos.ShareSelectionCommand.Execute(null);
+            Shot(main, outDir, $"18-share-{suffix}", height: 760);
+            photos.Panel = null;
+            photos.ClearSelectionCommand.Execute(null);
+
+            photos.IsAlbumsTab = true;
+            Shot(main, outDir, $"19a-albums-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            photos.IsPeopleTab = true;
+            Shot(main, outDir, $"19b-people-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            photos.IsPlacesTab = true;
+            Shot(main, outDir, $"19c-places-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            photos.IsMapTab = true;
+            Shot(main, outDir, $"19d-map-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            photos.SearchText = "beach";
+            photos.SearchCommand.Execute(null);
+            Shot(main, outDir, $"19e-search-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            photos.IsPhotosTab = true;
 
             shell.Navigate(ShellPage.Folders);
             ((FoldersViewModel)Page(shell, ShellPage.Folders)).Folders[1].IsExpanded = true;
@@ -158,8 +184,10 @@ static class Screens
             shell.Navigate(ShellPage.Activity);
             Shot(main, outDir, $"30-activity-{suffix}", height: 860);
 
+            AppServices.Settings.Update(s => s.WallpaperEnabled = true);
             shell.Navigate(ShellPage.Settings);
-            Shot(main, outDir, $"40-settings-{suffix}", height: 1440);
+            Shot(main, outDir, $"40-settings-{suffix}", height: 1700, settle: TimeSpan.FromSeconds(1));
+            AppServices.Settings.Update(s => s.WallpaperEnabled = false);
 
             // Profile picture: choose from the library, then crop.
             var photo = new ProfilePhotoViewModel(main);

@@ -16,6 +16,7 @@ public static class AppServices
     public static SyncEngine Engine { get; private set; } = null!;
     public static UpdateService Updates { get; private set; } = null!;
     public static ProfileService Profile { get; private set; } = null!;
+    public static WallpaperService Wallpaper { get; private set; } = null!;
 
     public static void Initialize()
     {
@@ -27,6 +28,7 @@ public static class AppServices
         Engine = new SyncEngine(Settings, Database, Account, Activity);
         Updates = new UpdateService();
         Profile = new ProfileService();
+        Wallpaper = new WallpaperService();
         Account.SessionChanged += () =>
         {
             if (Account.IsSignedIn)
@@ -41,6 +43,7 @@ public static class AppServices
     public static async Task ShutdownAsync()
     {
         Updates?.Dispose();
+        Wallpaper?.Dispose();
         if (Engine is not null)
             await Engine.DisposeAsync();
         Account?.Dispose();

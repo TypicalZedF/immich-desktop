@@ -6,13 +6,13 @@ using AvaloniaBitmap = Avalonia.Media.Imaging.Bitmap;
 namespace ImmichDesktop.App.Services;
 
 /// <summary>
-/// Image work for profile pictures: decoding the right way up, rotating, and cropping to the JPEG
-/// that is uploaded to Immich.
+/// Image work done on this PC: decoding the right way up at a sensible size, rotating, and cropping
+/// profile pictures to the JPEG that is uploaded to Immich.
 /// </summary>
-public static class ProfileImage
+public static class Images
 {
-    /// <summary>Side of the square picture uploaded to Immich, in pixels.</summary>
-    public const int UploadSize = 512;
+    /// <summary>Side of the square profile picture uploaded to Immich, in pixels.</summary>
+    public const int ProfileSize = 512;
 
     /// <summary>
     /// Decodes an image the right way up, no larger than <paramref name="maxSize"/> on its long side.
@@ -54,7 +54,7 @@ public static class ProfileImage
     public static SKBitmap RotateClockwise(SKBitmap source) => Reorient(source, SKEncodedOrigin.RightTop);
 
     /// <summary>Renders the <paramref name="crop"/> area (in source pixels) to a square JPEG for uploading.</summary>
-    public static byte[] RenderCrop(SKBitmap source, SKRect crop, int size = UploadSize)
+    public static byte[] RenderCrop(SKBitmap source, SKRect crop, int size = ProfileSize)
     {
         using var output = new SKBitmap(new SKImageInfo(size, size, SKColorType.Bgra8888, SKAlphaType.Premul));
         using (var canvas = new SKCanvas(output))
@@ -66,6 +66,21 @@ public static class ProfileImage
         }
         using var encoded = SKImage.FromBitmap(output).Encode(SKEncodedImageFormat.Jpeg, 92);
         return encoded.ToArray();
+    }
+
+    /// <summary>Encodes a picture as JPEG.</summary>
+    public static byte[] ToJpeg(SKBitmap bitmap, int quality = 90)
+    {
+        using var image = SKImage.FromBitmap(bitmap);
+        using var encoded = image.Encode(SKEncodedImageFormat.Jpeg, quality);
+        return encoded.ToArray();
+    }
+
+    /// <summary>Decodes for display: upright, no larger than <paramref name="maxSize"/> on its long side.</summary>
+    public static AvaloniaBitmap DecodeForDisplay(byte[] data, int maxSize)
+    {
+        using var bitmap = DecodeUpright(data, maxSize);
+        return ToAvalonia(bitmap);
     }
 
     /// <summary>Copies a decoded picture into an Avalonia bitmap for display.</summary>

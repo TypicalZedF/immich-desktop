@@ -279,17 +279,21 @@ public sealed class ImmichClient : IDisposable
     // ---- Library (timeline) ----------------------------------------------------------------
 
     /// <summary>The user's timeline, newest first, as buckets with counts (no assets yet).</summary>
-    internal Task<List<TimeBucketDto>> GetTimeBucketsRawAsync(CancellationToken ct) =>
-        SendAsync<List<TimeBucketDto>>(HttpMethod.Get, "timeline/buckets?visibility=timeline&order=desc", null, ct);
+    internal Task<List<TimeBucketDto>> GetTimeBucketsRawAsync(TimelineFilter filter, CancellationToken ct) =>
+        SendAsync<List<TimeBucketDto>>(HttpMethod.Get, "timeline/buckets?" + TimelineQuery(filter), null, ct);
 
-    public async Task<List<TimeBucket>> GetTimeBucketsAsync(CancellationToken ct) =>
-        (await GetTimeBucketsRawAsync(ct)).Select(b => new TimeBucket(b.TimeBucket, b.Count)).ToList();
+    public Task<List<TimeBucket>> GetTimeBucketsAsync(CancellationToken ct) => GetTimeBucketsAsync(TimelineFilter.All, ct);
+
+    public async Task<List<TimeBucket>> GetTimeBucketsAsync(TimelineFilter filter, CancellationToken ct) =>
+        (await GetTimeBucketsRawAsync(filter, ct)).Select(b => new TimeBucket(b.TimeBucket, b.Count)).ToList();
+
+    public Task<List<TimelineAsset>> GetTimeBucketAsync(string bucket, CancellationToken ct) => GetTimeBucketAsync(bucket, TimelineFilter.All, ct);
 
     /// <summary>The assets in one bucket, newest first.</summary>
-    public async Task<List<TimelineAsset>> GetTimeBucketAsync(string bucket, CancellationToken ct)
+    public async Task<List<TimelineAsset>> GetTimeBucketAsync(string bucket, TimelineFilter filter, CancellationToken ct)
     {
         var dto = await SendAsync<TimeBucketAssetsDto>(HttpMethod.Get,
-            $"timeline/bucket?visibility=timeline&order=desc&timeBucket={Uri.EscapeDataString(bucket)}", null, ct, TimeSpan.FromSeconds(60));
+            $"timeline/bucket?{TimelineQuery(filter)}&timeBucket={Uri.EscapeDataString(bucket)}", null, ct, TimeSpan.FromSeconds(60));
         var assets = new List<TimelineAsset>(dto.Id.Count);
         for (var i = 0; i < dto.Id.Count; i++)
         {
@@ -304,12 +308,30 @@ public sealed class ImmichClient : IDisposable
         return assets;
     }
 
+    static string TimelineQuery(TimelineFilter filter)
+    {
+        // Albums show everything in them, archived photos included, like the web app.
+        var query = filter.AlbumId is { } album
+            ? $"order=desc&albumId={Uri.EscapeDataString(album)}"
+            : "visibility=timeline&order=desc";
+        if (filter.PersonId is { } person)
+            query += $"&personId={Uri.EscapeDataString(person)}";
+        if (filter.Favorites)
+            query += "&isFavorite=true";
+        return query;
+    }
+
     /// <summary>Thumbnail (~250px) or preview (~1440px) image bytes for an asset.</summary>
     public async Task<byte[]> GetAssetImageAsync(string assetId, AssetImageSize size, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(60));
-        var sizeName = size == AssetImageSize.Preview ? "preview" : "thumbnail";
+        var sizeName = size switch
+        {
+            AssetImageSize.Preview => "preview",
+            AssetImageSize.Fullsize => "fullsize",
+            _ => "thumbnail",
+        };
         try
         {
             using var response = await _http.GetAsync($"assets/{Uri.EscapeDataString(assetId)}/thumbnail?size={sizeName}", HttpCompletionOption.ResponseHeadersRead, cts.Token);
@@ -329,6 +351,137 @@ public sealed class ImmichClient : IDisposable
         JsonValueKind.String when TimeSpan.TryParse(value.GetString(), CultureInfo.InvariantCulture, out var span) => (long)span.TotalMilliseconds,
         _ => null,
     };
+
+    /// <summary>Full details of one asset (for the viewer's info panel).</summary>
+    public async Task<AssetDetails> GetAssetAsync(string assetId, CancellationToken ct)
+    {
+        var a = await SendAsync<AssetDto>(HttpMethod.Get, $"assets/{Uri.EscapeDataString(assetId)}", null, ct);
+        var e = a.ExifInfo;
+        string? camera = e is null ? null : string.Join(" ", new[] { e.Make, e.Model }.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct());
+        var exposure = new List<string>();
+        if (e?.FNumber is > 0) exposure.Add($"ƒ/{e.FNumber.Value.ToString("0.#", CultureInfo.InvariantCulture)}");
+        if (!string.IsNullOrWhiteSpace(e?.ExposureTime)) exposure.Add($"{e.ExposureTime} s");
+        if (e?.FocalLength is > 0) exposure.Add($"{e.FocalLength.Value.ToString("0.#", CultureInfo.InvariantCulture)} mm");
+        if (e?.Iso is > 0) exposure.Add($"ISO {e.Iso.Value.ToString("0", CultureInfo.InvariantCulture)}");
+        var place = e is null ? null : string.Join(", ", new[] { e.City, e.State, e.Country }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        return new AssetDetails(a.Id, a.OriginalFileName, a.FileCreatedAt, a.IsFavorite, !string.Equals(a.Type, "VIDEO", StringComparison.OrdinalIgnoreCase),
+            e?.FileSizeInByte, e?.ExifImageWidth, e?.ExifImageHeight,
+            string.IsNullOrWhiteSpace(camera) ? null : camera, e?.LensModel,
+            exposure.Count > 0 ? string.Join("  ·  ", exposure) : null,
+            string.IsNullOrWhiteSpace(place) ? null : place, string.IsNullOrWhiteSpace(e?.Description) ? null : e.Description,
+            a.People?.Select(p => p.Name).Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n!).ToList() ?? []);
+    }
+
+    /// <summary>Marks assets as favorites (or not).</summary>
+    public Task SetFavoriteAsync(IReadOnlyList<string> assetIds, bool favorite, CancellationToken ct) =>
+        SendAsync(HttpMethod.Put, "assets", new FavoriteRequestDto(assetIds, favorite), ct);
+
+    /// <summary>Moves assets to the trash (they can be restored in Immich for a while).</summary>
+    public Task TrashAssetsAsync(IReadOnlyList<string> assetIds, CancellationToken ct) =>
+        SendAsync(HttpMethod.Delete, "assets", new DeleteAssetsRequestDto(assetIds, Force: false), ct);
+
+    /// <summary>Saves the original file of an asset to <paramref name="destination"/>.</summary>
+    public async Task DownloadOriginalAsync(string assetId, Stream destination, CancellationToken ct)
+    {
+        using var response = await _http.GetAsync($"assets/{Uri.EscapeDataString(assetId)}/original", HttpCompletionOption.ResponseHeadersRead, ct);
+        await EnsureSuccessAsync(response, ct);
+        await using var source = await response.Content.ReadAsStreamAsync(ct);
+        await source.CopyToAsync(destination, ct);
+    }
+
+    // ---- Search & explore ------------------------------------------------------------------
+
+    /// <summary>Smart search ("beach at sunset"), best matches first. Needs machine learning on the server.</summary>
+    public async Task<List<TimelineAsset>> SmartSearchAsync(string query, int size, CancellationToken ct)
+    {
+        var response = await SendAsync<SearchResponseDto>(HttpMethod.Post, "search/smart", new SmartSearchRequestDto(query, 1, size), ct, TimeSpan.FromSeconds(60));
+        return response.Assets.Items.Select(ToTimelineAsset).ToList();
+    }
+
+    /// <summary>Photos by file name or city, newest first, up to <paramref name="max"/>.</summary>
+    public async Task<List<TimelineAsset>> SearchAsync(string? fileName, string? city, int max, CancellationToken ct)
+    {
+        var results = new List<TimelineAsset>();
+        for (var page = 1; results.Count < max; page++)
+        {
+            var response = await SendAsync<SearchResponseDto>(HttpMethod.Post, "search/metadata",
+                new MetadataSearchRequestDto(city, fileName, page, Math.Min(250, max)), ct, TimeSpan.FromSeconds(60));
+            results.AddRange(response.Assets.Items.Select(ToTimelineAsset));
+            if (string.IsNullOrEmpty(response.Assets.NextPage) || response.Assets.Items.Count == 0)
+                break;
+        }
+        return results;
+    }
+
+    public async Task<List<PersonInfo>> GetPeopleAsync(CancellationToken ct)
+    {
+        var people = new List<PersonInfo>();
+        for (var page = 1; page <= 20; page++)
+        {
+            var response = await SendAsync<PeopleResponseDto>(HttpMethod.Get, $"people?withHidden=false&page={page}&size=500", null, ct);
+            people.AddRange((response.People ?? []).Where(p => !p.IsHidden).Select(p => new PersonInfo(p.Id, p.Name ?? "", p.IsHidden)));
+            if (response.HasNextPage != true)
+                break;
+        }
+        return people;
+    }
+
+    public async Task<byte[]> GetPersonThumbnailAsync(string personId, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(60));
+        using var response = await _http.GetAsync($"people/{Uri.EscapeDataString(personId)}/thumbnail", cts.Token);
+        await EnsureSuccessAsync(response, cts.Token);
+        return await response.Content.ReadAsByteArrayAsync(cts.Token);
+    }
+
+    /// <summary>Cities with photos, like the web app's Explore → Places.</summary>
+    public async Task<List<PlaceInfo>> GetPlacesAsync(CancellationToken ct)
+    {
+        var assets = await SendAsync<List<AssetDto>>(HttpMethod.Get, "search/cities", null, ct, TimeSpan.FromSeconds(60));
+        return assets.Where(a => !string.IsNullOrWhiteSpace(a.ExifInfo?.City))
+            .Select(a => new PlaceInfo(a.ExifInfo!.City!, a.ExifInfo.State, a.ExifInfo.Country, a.Id))
+            .OrderBy(p => p.City, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>Every photo with a location, for the map.</summary>
+    public async Task<List<MapMarker>> GetMapMarkersAsync(CancellationToken ct)
+    {
+        var markers = await SendAsync<List<MapMarkerDto>>(HttpMethod.Get, "map/markers?isArchived=false", null, ct, TimeSpan.FromSeconds(90));
+        return markers.Select(m => new MapMarker(m.Id, m.Lat, m.Lon, m.City, m.Country)).ToList();
+    }
+
+    static TimelineAsset ToTimelineAsset(AssetDto a)
+    {
+        var ratio = a.ExifInfo is { ExifImageWidth: > 0, ExifImageHeight: > 0 } e ? e.ExifImageWidth!.Value / (double)e.ExifImageHeight!.Value : 1;
+        long? duration = TimeSpan.TryParse(a.Duration, CultureInfo.InvariantCulture, out var span) && span > TimeSpan.Zero ? (long)span.TotalMilliseconds : null;
+        return new TimelineAsset(a.Id, !string.Equals(a.Type, "VIDEO", StringComparison.OrdinalIgnoreCase), a.IsFavorite, ratio, duration, a.FileCreatedAt);
+    }
+
+    // ---- Sharing -----------------------------------------------------------------------------
+
+    /// <summary>Creates a public link to some photos, or to an album.</summary>
+    public Task<SharedLinkInfo> CreateSharedLinkAsync(IReadOnlyList<string>? assetIds, string? albumId, bool allowDownload, DateTimeOffset? expiresAt, CancellationToken ct) =>
+        SendAsync<SharedLinkInfo>(HttpMethod.Post, "shared-links",
+            new SharedLinkRequestDto(albumId is null ? "INDIVIDUAL" : "ALBUM", albumId is null ? assetIds : null, albumId,
+                allowDownload, ShowMetadata: true, expiresAt is { } e ? IsoDate(e.UtcDateTime) : null), ct);
+
+    /// <summary>The public address for shared links: the server's "external domain" if set, else <paramref name="webUrl"/>.</summary>
+    public async Task<string> GetShareBaseUrlAsync(string webUrl, CancellationToken ct)
+    {
+        try
+        {
+            var config = await SendAsync<ServerExternalDomainDto>(HttpMethod.Get, "server/config", null, ct);
+            if (!string.IsNullOrWhiteSpace(config.ExternalDomain))
+                return config.ExternalDomain.TrimEnd('/');
+        }
+        catch (ImmichApiException)
+        {
+            // Older servers: the address we know is fine.
+        }
+        return webUrl.TrimEnd('/');
+    }
 
     // ---- Albums ------------------------------------------------------------------------------
 

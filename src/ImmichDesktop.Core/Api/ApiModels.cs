@@ -44,7 +44,42 @@ public sealed record UploadResult(string Id, string Status)
     public bool IsDuplicate => Status == "duplicate";
 }
 
-public sealed record AlbumInfo(string Id, string AlbumName);
+public sealed record AlbumInfo(string Id, string AlbumName, string? AlbumThumbnailAssetId = null, int AssetCount = 0, bool Shared = false);
+
+/// <summary>Narrows the timeline to one album, one person or favorites (empty = the whole library).</summary>
+public sealed record TimelineFilter(string? AlbumId = null, string? PersonId = null, bool Favorites = false)
+{
+    public static TimelineFilter All { get; } = new();
+}
+
+/// <summary>A recognized face, as on the web app's People page.</summary>
+public sealed record PersonInfo(string Id, string Name, bool IsHidden);
+
+/// <summary>A city with photos (and one of them, for a cover).</summary>
+public sealed record PlaceInfo(string City, string? State, string? Country, string CoverAssetId);
+
+/// <summary>Where a photo was taken.</summary>
+public sealed record MapMarker(string Id, double Lat, double Lon, string? City, string? Country);
+
+/// <summary>Details shown in the photo viewer's info panel.</summary>
+public sealed record AssetDetails(
+    string Id,
+    string? OriginalFileName,
+    string? FileCreatedAt,
+    bool IsFavorite,
+    bool IsImage,
+    long? FileSize,
+    int? Width,
+    int? Height,
+    string? Camera,
+    string? Lens,
+    string? Exposure,
+    string? Place,
+    string? Description,
+    IReadOnlyList<string> People);
+
+/// <summary>A public link to photos or an album.</summary>
+public sealed record SharedLinkInfo(string Id, string Key);
 
 public sealed record MediaTypesInfo(string[]? Image, string[]? Video);
 
@@ -71,6 +106,9 @@ public enum AssetImageSize
 {
     Thumbnail,
     Preview,
+
+    /// <summary>Full resolution in a format any app can show (the original for JPEGs). Newer servers only.</summary>
+    Fullsize,
 }
 
 // Wire DTOs
@@ -99,4 +137,23 @@ internal sealed record TimeBucketAssetsDto(
     List<System.Text.Json.JsonElement>? Duration,
     List<string>? FileCreatedAt);
 internal sealed record WellKnownDto(WellKnownApiDto? Api);
+internal sealed record PeopleResponseDto(List<PersonDto>? People, bool? HasNextPage);
+internal sealed record PersonDto(string Id, string? Name, bool IsHidden);
+internal sealed record ExifDto(
+    string? Make, string? Model, string? LensModel, double? FNumber, string? ExposureTime, double? Iso, double? FocalLength,
+    string? City, string? State, string? Country, int? ExifImageWidth, int? ExifImageHeight, long? FileSizeInByte, string? Description);
+internal sealed record AssetPersonDto(string? Name);
+internal sealed record AssetDto(
+    string Id, string? Type, string? OriginalFileName, string? FileCreatedAt, bool IsFavorite, string? Duration,
+    ExifDto? ExifInfo, List<AssetPersonDto>? People);
+internal sealed record SearchAssetsDto(List<AssetDto> Items, string? NextPage);
+internal sealed record SearchResponseDto(SearchAssetsDto Assets);
+internal sealed record SmartSearchRequestDto(string Query, int Page, int Size);
+internal sealed record MetadataSearchRequestDto(string? City, string? OriginalFileName, int Page, int Size, string? Order = "desc");
+internal sealed record MapMarkerDto(string Id, double Lat, double Lon, string? City, string? Country);
+internal sealed record FavoriteRequestDto(IReadOnlyList<string> Ids, bool IsFavorite);
+internal sealed record DeleteAssetsRequestDto(IReadOnlyList<string> Ids, bool Force);
+internal sealed record SharedLinkRequestDto(string Type, IReadOnlyList<string>? AssetIds, string? AlbumId, bool AllowDownload, bool ShowMetadata, string? ExpiresAt);
+internal sealed record SharedLinkDto(string Id, string Key);
+internal sealed record ServerExternalDomainDto(string? ExternalDomain);
 internal sealed record WellKnownApiDto(string? Endpoint);

@@ -52,6 +52,17 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public Task<string?> PickImageAsync(string title) => PickImage?.Invoke(title) ?? Task.FromResult<string?>(null);
 
+    /// <summary>Provided by the window: a native "Save as" dialog (title, suggested file name).</summary>
+    public Func<string, string, Task<string?>>? PickSaveFile { get; set; }
+
+    public Task<string?> PickSaveFileAsync(string title, string suggestedName) =>
+        PickSaveFile?.Invoke(title, suggestedName) ?? Task.FromResult<string?>(null);
+
+    /// <summary>Provided by the window: puts text on the clipboard.</summary>
+    public Func<string, Task>? CopyText { get; set; }
+
+    public Task CopyTextAsync(string text) => CopyText?.Invoke(text) ?? Task.CompletedTask;
+
     /// <summary>Provided by the window: its native handle (for the Windows Hello prompt).</summary>
     public Func<IntPtr>? GetWindowHandle { get; set; }
 

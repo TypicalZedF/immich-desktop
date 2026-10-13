@@ -60,6 +60,7 @@ public partial class App : Application
             AppServices.Updates.Start(_checkForUpdates);
             _autoUpdateTimer = new DispatcherTimer(TimeSpan.FromMinutes(10), DispatcherPriority.Background, (_, _) => TryAutoInstallUpdate());
             _autoUpdateTimer.Start();
+            ApplyWallpaper(settings);
 
             if (Program.StartupLink is { } link)
                 OAuthCallbacks.Deliver(link);
@@ -90,8 +91,21 @@ public partial class App : Application
         }
     }
 
+    (bool, WallpaperSource, string?, int) _wallpaperConfig;
+
+    /// <summary>Restarts the desktop background timer when its settings change.</summary>
+    void ApplyWallpaper(AppSettings settings)
+    {
+        var config = (settings.WallpaperEnabled, settings.WallpaperSource, settings.WallpaperAlbumId, settings.WallpaperIntervalMinutes);
+        if (config == _wallpaperConfig)
+            return;
+        _wallpaperConfig = config;
+        AppServices.Wallpaper.Apply(settings);
+    }
+
     void OnSettingsChanged(AppSettings settings) => Dispatcher.UIThread.Post(() =>
     {
+        ApplyWallpaper(settings);
         if (settings.CheckForUpdates != _checkForUpdates)
         {
             _checkForUpdates = settings.CheckForUpdates;

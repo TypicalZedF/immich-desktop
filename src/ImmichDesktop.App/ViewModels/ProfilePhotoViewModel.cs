@@ -73,7 +73,7 @@ public sealed partial class ProfilePhotoViewModel : ViewModelBase, IDisposable
         try
         {
             var bytes = await load(cts.Token);
-            var bitmap = await Task.Run(() => ProfileImage.DecodeUpright(bytes, PhotoCropViewModel.MaxSourceSize), cts.Token);
+            var bitmap = await Task.Run(() => Images.DecodeUpright(bytes, PhotoCropViewModel.MaxSourceSize), cts.Token);
             if (cts.IsCancellationRequested)
             {
                 bitmap.Dispose();
@@ -165,7 +165,7 @@ public sealed partial class PhotoCropViewModel : ViewModelBase, IDisposable
     public PhotoCropViewModel(SKBitmap source)
     {
         _source = source;
-        Image = ProfileImage.ToAvalonia(source);
+        Image = Images.ToAvalonia(source);
     }
 
     [ObservableProperty]
@@ -232,11 +232,11 @@ public sealed partial class PhotoCropViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     void Rotate()
     {
-        var rotated = ProfileImage.RotateClockwise(_source);
+        var rotated = Images.RotateClockwise(_source);
         _source.Dispose();
         _source = rotated;
         var old = Image;
-        Image = ProfileImage.ToAvalonia(rotated);
+        Image = Images.ToAvalonia(rotated);
         old.Dispose();
         _offsetX = _offsetY = 0;
         if (Zoom == MinZoom)
@@ -268,7 +268,7 @@ public sealed partial class PhotoCropViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>The picture to upload. Safe to call off the UI thread.</summary>
-    public byte[] Render() => ProfileImage.RenderCrop(_source, CropRect);
+    public byte[] Render() => Images.RenderCrop(_source, CropRect);
 
     void ClampAndUpdate()
     {

@@ -45,8 +45,8 @@ public sealed class ProfileService
                 picture = await Task.Run(() =>
                 {
                     // Upright: pictures uploaded straight from a phone can carry an EXIF rotation.
-                    using var upright = ProfileImage.DecodeUpright(bytes, 160);
-                    return ProfileImage.ToAvalonia(upright);
+                    using var upright = Images.DecodeUpright(bytes, 160);
+                    return Images.ToAvalonia(upright);
                 });
             }
 
@@ -65,7 +65,7 @@ public sealed class ProfileService
         }
     }
 
-    /// <summary>Uploads an already cropped JPEG (see <see cref="ProfileImage.RenderCrop"/>).</summary>
+    /// <summary>Uploads an already cropped JPEG (see <see cref="Images.RenderCrop"/>).</summary>
     public async Task SetPictureAsync(byte[] jpeg)
     {
         if (AppServices.Account.Client is not { } client)
