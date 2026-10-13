@@ -39,7 +39,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsVideo), nameof(DurationText), nameof(IsLocalOnly), nameof(IsInImmich), nameof(CanEdit),
+    [NotifyPropertyChangedFor(nameof(IsVideo), nameof(ShowBigPlay), nameof(DurationText), nameof(IsLocalOnly), nameof(IsInImmich), nameof(CanEdit),
         nameof(DevicePath), nameof(IsOnDevice), nameof(CanCopy), nameof(LocalStatus), nameof(FileName))]
     public partial TimelineAsset Asset { get; set; }
 
@@ -116,6 +116,8 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         Error = null;
         Details = null;
         VideoProgress = null;
+        VideoError = null;
+        StopVideo();
         Generation++;
 
         // Show the (already loaded) thumbnail instantly, then swap in sharper images.
@@ -126,6 +128,10 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
         _ = LoadAsync(asset, _cts.Token);
+        // Videos start playing when opened, like the Immich apps (not on a metered connection,
+        // unless the video is on this PC).
+        if (!asset.IsImage && (!AppServices.Network.IsMetered || asset.IsLocalOnly))
+            StartVideo();
         if (ShowInfo && !asset.IsLocalOnly)
             _ = LoadDetailsAsync(asset, _cts.Token);
     }
@@ -274,9 +280,50 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         }
     }
 
-    // ---- Videos ----
+    // ---- Videos: played right here in the viewer ----
 
-    /// <summary>While a video is being fetched for playing: how far along ("Getting video… 40%").</summary>
+    VideoPlayer? _video;
+    bool _updatingPosition;
+
+    /// <summary>The playing video's picture (null until the first frame, while the photo preview shows).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasVideoFrame))]
+    public partial Avalonia.Media.Imaging.WriteableBitmap? VideoFrame { get; set; }
+
+    public bool HasVideoFrame => VideoFrame is not null;
+
+    /// <summary>Raised when the video's picture changed (the view repaints it).</summary>
+    public event Action? VideoFrameUpdated;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowBigPlay))]
+    public partial bool IsVideoPlaying { get; set; }
+
+    /// <summary>A player is open for this video (controls show).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowBigPlay))]
+    public partial bool IsVideoStarted { get; set; }
+
+    public bool ShowBigPlay => IsVideo && !IsVideoPlaying;
+
+    /// <summary>Where the video is, from 0 to 1 (the seek bar; dragging it seeks).</summary>
+    [ObservableProperty]
+    public partial double VideoPosition { get; set; }
+
+    [ObservableProperty]
+    public partial string VideoTimeText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool IsMuted { get; set; }
+
+    /// <summary>Why the video can't play here; "Open in video player" is offered instead.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanPlayHere))]
+    public partial string? VideoError { get; set; }
+
+    public bool CanPlayHere => VideoError is null;
+
+    /// <summary>While a video is being fetched for the external player: how far along.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFetchingVideo))]
     public partial string? VideoProgress { get; set; }
@@ -285,12 +332,111 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
 
     static string VideoCacheDir => Path.Combine(Path.GetTempPath(), "ImmichDesktop", "videos");
 
+    partial void OnVideoPositionChanged(double value)
+    {
+        if (!_updatingPosition)
+            _video?.Seek(value);
+    }
+
+    partial void OnIsMutedChanged(bool value)
+    {
+        if (_video is not null)
+            _video.IsMuted = value;
+    }
+
+    /// <summary>Plays or pauses (starting the player the first time).</summary>
+    [RelayCommand]
+    void PlayPause()
+    {
+        if (Asset.IsImage)
+            return;
+        if (_video is null)
+            StartVideo();
+        else
+            _video.TogglePlay();
+    }
+
+    /// <summary>Kept for compatibility with the Play keyboard shortcut and old bindings.</summary>
+    [RelayCommand]
+    void Play() => PlayPause();
+
+    [RelayCommand]
+    void ToggleMute() => IsMuted = !IsMuted;
+
+    [RelayCommand]
+    void SkipBack() => _video?.SeekBy(TimeSpan.FromSeconds(-10));
+
+    [RelayCommand]
+    void SkipForward() => _video?.SeekBy(TimeSpan.FromSeconds(10));
+
+    void StartVideo()
+    {
+        StopVideo();
+        if (Asset.IsImage)
+            return;
+        VideoError = null;
+        VideoPlayer? player;
+        if (DevicePath is { } local && File.Exists(local))
+            player = VideoPlayer.ForFile(local);
+        else if (AppServices.Account.Client is { } client)
+            player = VideoPlayer.ForStream(new RemoteVideoStream(client, Asset.Id));
+        else
+            return;
+        if (player is null)
+        {
+            VideoError = VideoPlayer.Unavailable;
+            return;
+        }
+        var asset = Asset;
+        _video = player;
+        player.IsMuted = IsMuted;
+        player.FrameChanged += () => { if (ReferenceEquals(_video, player)) VideoFrame = player.Frame; };
+        player.FrameReady += () => { if (ReferenceEquals(_video, player)) VideoFrameUpdated?.Invoke(); };
+        player.StateChanged += () => { if (ReferenceEquals(_video, player)) IsVideoPlaying = player.IsPlaying; };
+        player.TimeChanged += () => { if (ReferenceEquals(_video, player)) UpdateVideoTime(player); };
+        player.Failed += () =>
+        {
+            if (!ReferenceEquals(_video, player))
+                return;
+            Log.Warn($"Video {asset.Id} couldn't be played in the app");
+            StopVideo();
+            VideoError = Tr.T("This video couldn't be played here.");
+        };
+        IsVideoStarted = true;
+        player.Play();
+    }
+
+    void UpdateVideoTime(VideoPlayer player)
+    {
+        var length = player.Length;
+        _updatingPosition = true;
+        VideoPosition = length > TimeSpan.Zero ? player.Time / length : 0;
+        _updatingPosition = false;
+        VideoTimeText = length > TimeSpan.Zero
+            ? $"{AssetCellViewModel.FormatDuration((long)player.Time.TotalMilliseconds)} / {AssetCellViewModel.FormatDuration((long)length.TotalMilliseconds)}"
+            : AssetCellViewModel.FormatDuration((long)player.Time.TotalMilliseconds);
+    }
+
+    void StopVideo()
+    {
+        var video = _video;
+        _video = null;
+        video?.Dispose();
+        VideoFrame = null;
+        IsVideoPlaying = false;
+        IsVideoStarted = false;
+        _updatingPosition = true;
+        VideoPosition = 0;
+        _updatingPosition = false;
+        VideoTimeText = "";
+    }
+
     /// <summary>
-    /// Plays the video in the PC's video player. Videos in Immich are fetched first (the server's
-    /// playable version) into a temporary folder that's cleaned up after a day.
+    /// The fallback when the app can't play a video: open it in the PC's video player (Immich videos
+    /// are fetched first into a temporary folder that's cleaned up after a day).
     /// </summary>
     [RelayCommand]
-    async Task PlayAsync()
+    async Task OpenInVideoPlayerAsync()
     {
         if (Asset.IsImage || IsFetchingVideo)
             return;
@@ -403,6 +549,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     [RelayCommand]
     void Close()
     {
+        StopVideo();
         _cts?.Cancel();
         _owner.CloseViewer();
         Image = null;

@@ -206,6 +206,32 @@ static class Screens
             Shot(main, outDir, $"16b-viewer-info-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1));
             photos.Viewer?.ToggleInfoCommand.Execute(null);
             photos.Viewer?.CloseCommand.Execute(null);
+            // A video plays right in the viewer (streamed from the server in pieces).
+            if (Environment.GetEnvironmentVariable("IMMICH_DEMO_VIDEO") is not null && suffix == "dark")
+            {
+                var videoCell = photos.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).First(c => c.Asset is { IsImage: false, IsLocalOnly: false });
+                photos.OpenViewer(videoCell);
+                Shot(main, outDir, $"16d-viewer-video-{suffix}", height: 760, settle: TimeSpan.FromSeconds(3));
+                var viewer = photos.Viewer!;
+                var frames = 0;
+                viewer.VideoFrameUpdated += () => frames++;
+                Pump(TimeSpan.FromSeconds(1));
+                if (viewer.VideoFrame is { } vf)
+                    unsafe
+                    {
+                        using var fb = vf.Lock();
+                        var px = (uint*)((byte*)fb.Address + fb.RowBytes * (fb.Size.Height / 2)) + fb.Size.Width / 3;
+                        Console.WriteLine($"Video frame: {frames} repaints in 1s; a pixel = {*px:X8}");
+                    }
+                Console.WriteLine($"Video: started={viewer.IsVideoStarted} playing={viewer.IsVideoPlaying} frame={viewer.VideoFrame?.PixelSize} time={viewer.VideoTimeText} error={viewer.VideoError} requests={demo.VideoRequests}");
+                viewer.VideoPosition = 0.75; // seek
+                Pump(TimeSpan.FromSeconds(1.5));
+                Console.WriteLine($"Video after seek: time={viewer.VideoTimeText} position={viewer.VideoPosition:0.00}");
+                viewer.PlayPauseCommand.Execute(null);
+                Shot(main, outDir, $"16e-viewer-video-paused-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1));
+                Console.WriteLine($"Video paused: playing={viewer.IsVideoPlaying}");
+                viewer.CloseCommand.Execute(null);
+            }
             // A photo on this PC that isn't backed up yet.
             var local = photos.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).First(c => c.Asset is { IsLocalOnly: true, IsImage: true });
             photos.OpenViewer(local);
@@ -235,6 +261,23 @@ static class Screens
 
             shell.Navigate(ShellPage.Albums);
             Shot(main, outDir, $"19a-albums-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            if (suffix == "light")
+            {
+                // Deleting an album that a backed-up folder fills: warns, then stops the folder's album too.
+                var albumsPage = (PhotosViewModel)Page(shell, ShellPage.Albums);
+                var phone = albumsPage.Albums.First(a => a.Title == "Phone");
+                phone.DeleteCommand.Execute(null);
+                Pump(TimeSpan.FromMilliseconds(300));
+                Shot(main, outDir, "19a2-delete-album-warning", height: 760);
+                main.Dialog?.ConfirmCommand.Execute(null);
+                Pump(TimeSpan.FromSeconds(1));
+                var folderAlbum = AppServices.Settings.Current.Folders.First(f => f.Id == "camera").AlbumName;
+                Console.WriteLine($"Album delete: server saw [{string.Join(", ", demo.DeletedAlbums)}]; folder album now '{folderAlbum}'; albums shown {albumsPage.Albums.Count}");
+                if (demo.DeletedAlbums is not ["a5"] || folderAlbum is not null || albumsPage.Albums.Any(a => a.Title == "Phone"))
+                    throw new InvalidOperationException("Deleting an album didn't work");
+                var sharingNames = ((PhotosViewModel)Page(shell, ShellPage.Sharing)).SharedAlbums.Select(a => a.Title).ToList();
+                Console.WriteLine($"Shared albums (v3 format): {string.Join(", ", sharingNames)}");
+            }
             shell.Navigate(ShellPage.Explore);
             Shot(main, outDir, $"19b-explore-{suffix}", height: 860, settle: TimeSpan.FromSeconds(2));
             shell.Navigate(ShellPage.Sharing);
@@ -314,6 +357,38 @@ static class Screens
             Shot(main, outDir, $"41-dialog-{suffix}");
             main.Dispose();
         }
+        // Settings opens on the first click (it isn't in the sidebar, which used to "unselect" it),
+        // and switching the language rebuilds the window on the Settings page. Checked in a live window.
+        {
+            var liveMain = new MainWindowViewModel();
+            liveMain.ShowShell();
+            var live = new MainWindow { DataContext = liveMain, Width = 1060, Height = 760 };
+            live.Show();
+            Pump(TimeSpan.FromSeconds(1));
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                var liveShell = (ShellViewModel)liveMain.Content;
+                liveShell.Navigate(ShellPage.Photos);
+                Pump(TimeSpan.FromMilliseconds(300));
+                liveShell.OpenSettingsCommand.Execute(null);
+                Pump(TimeSpan.FromMilliseconds(500));
+                if (liveShell.CurrentPage is not SettingsViewModel)
+                    throw new InvalidOperationException($"Settings didn't open (attempt {attempt + 1}); showing {liveShell.CurrentPage?.GetType().Name ?? "nothing"}");
+            }
+            Tr.SetLanguage("de");
+            liveMain.ShowShell(ShellPage.Settings); // what App.ApplyLanguage does
+            Pump(TimeSpan.FromSeconds(1));
+            var rebuilt = (ShellViewModel)liveMain.Content;
+            Console.WriteLine($"Settings opens: ok; after switching language the page is {rebuilt.CurrentPage?.GetType().Name ?? "nothing"}");
+            if (rebuilt.CurrentPage is not SettingsViewModel)
+                throw new InvalidOperationException("Settings went blank after switching the language");
+            live.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "93-language-switched.png"));
+            Tr.SetLanguage("en");
+            live.DataContext = null;
+            live.Close();
+            liveMain.Dispose();
+        }
+
         // A translated pass (German has the longest words) to check layouts.
         Application.Current!.RequestedThemeVariant = ThemeVariant.Light;
         Tr.SetLanguage("de");

@@ -55,6 +55,24 @@
     <Style Selector="Button.playVideo:disabled /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="#88000000" />
     </Style>
+    <Style Selector="Button.videoControl">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="7" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.videoControl mi|MaterialIcon">
+      <Setter Property="Width" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.videoControl:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#33FFFFFF" />
+    </Style>
+    <Style Selector="Slider.videoSeek">
+      <Setter Property="Foreground" Value="White" />
+    </Style>
     <Style Selector="Button.utility">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
@@ -242,6 +260,9 @@
           <Button Classes="ghost icon" Command="{Binding ShareAlbumCommand}" IsVisible="{Binding CanShareAlbum}" l:Tr.Tip="Share album">
             <mi:MaterialIcon Kind="ShareVariantOutline" Width="20" Height="20" />
           </Button>
+          <Button Classes="ghost icon" Command="{Binding DeleteOpenAlbumCommand}" IsVisible="{Binding CanDeleteAlbum}" l:Tr.Tip="Delete album">
+            <mi:MaterialIcon Kind="TrashCanOutline" Width="20" Height="20" />
+          </Button>
           <Button Classes="ghost icon" Command="{Binding RefreshCommand}" l:Tr.Tip="Refresh">
             <mi:MaterialIcon Kind="Refresh" Width="20" Height="20" />
           </Button>
@@ -401,6 +422,12 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:AlbumCardViewModel">
                 <Button Classes="cover" Width="196" Command="{Binding OpenCommand}">
+                  <Button.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem l:Tr.Header="Open" Command="{Binding OpenCommand}" />
+                      <MenuItem l:Tr.Header="Delete album" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" />
+                    </ContextMenu>
+                  </Button.ContextMenu>
                   <StackPanel Spacing="8">
                     <Border Classes="coverImage" Width="196" Height="196" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
                       <Panel>
@@ -835,21 +862,65 @@
           <!-- The photo: scroll to zoom, drag to move when zoomed, double-click to zoom in/out -->
           <Panel Name="ViewerStage" Margin="64,64,64,20" ClipToBounds="True" Background="Transparent">
             <Image Name="ViewerImage" Source="{Binding Image}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
+            <!-- The playing video, drawn over its preview once the first frame arrives -->
+            <Panel Background="Black" IsVisible="{Binding HasVideoFrame}">
+              <Image Name="VideoSurface" Source="{Binding VideoFrame}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="MediumQuality" />
+            </Panel>
           </Panel>
           <mi:MaterialIcon Kind="Loading" Classes="spin" Width="28" Height="28" Foreground="White" IsVisible="{Binding IsLoading}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
-          <StackPanel IsVisible="{Binding IsVideo}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-            <Button Classes="playVideo" Command="{Binding PlayCommand}" IsEnabled="{Binding !IsFetchingVideo}" HorizontalAlignment="Center"
-                    l:Tr.Tip="Play (Space)">
-              <Panel>
-                <mi:MaterialIcon Kind="Play" Width="40" Height="40" Foreground="White" IsVisible="{Binding !IsFetchingVideo}" />
-                <mi:MaterialIcon Kind="Loading" Classes="spin" Width="34" Height="34" Foreground="White" IsVisible="{Binding IsFetchingVideo}" />
-              </Panel>
-            </Button>
-            <Border Padding="10,4" CornerRadius="8" Background="#99000000" IsVisible="{Binding IsFetchingVideo}">
-              <TextBlock Text="{Binding VideoProgress}" Foreground="White" FontSize="12.5" />
-            </Border>
-          </StackPanel>
+          <!-- Video: big play button (paused or not started) -->
+          <Button Classes="playVideo" Command="{Binding PlayPauseCommand}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                  l:Tr.Tip="Play (Space)">
+            <Button.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="ShowBigPlay" />
+                <Binding Path="CanPlayHere" />
+              </MultiBinding>
+            </Button.IsVisible>
+            <mi:MaterialIcon Kind="Play" Width="40" Height="40" Foreground="White" />
+          </Button>
+          <!-- Video: can't play here, offer the PC's player -->
+          <Border HorizontalAlignment="Center" VerticalAlignment="Center" Padding="18,14" CornerRadius="14" Background="#CC000000" MaxWidth="420"
+                  IsVisible="{Binding !CanPlayHere}">
+            <StackPanel Spacing="10">
+              <TextBlock Text="{Binding VideoError}" Foreground="White" TextWrapping="Wrap" TextAlignment="Center" />
+              <Button Classes="primary" HorizontalAlignment="Center" Command="{Binding OpenInVideoPlayerCommand}" IsEnabled="{Binding !IsFetchingVideo}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="Loading" Classes="spin" Width="16" Height="16" IsVisible="{Binding IsFetchingVideo}" />
+                  <TextBlock Text="{Binding VideoProgress}" IsVisible="{Binding IsFetchingVideo}" />
+                  <TextBlock l:Tr.Text="Open in video player" IsVisible="{Binding !IsFetchingVideo}" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </Border>
+          <!-- Video: controls -->
+          <Border HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="80,0,80,48" Padding="10,6" CornerRadius="14" Background="#B3000000"
+                  MaxWidth="900" IsVisible="{Binding IsVideoStarted}">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" VerticalAlignment="Center">
+              <Button Classes="videoControl" Command="{Binding PlayPauseCommand}" l:Tr.Tip="Play or pause (Space)">
+                <Panel>
+                  <mi:MaterialIcon Kind="Pause" IsVisible="{Binding IsVideoPlaying}" />
+                  <mi:MaterialIcon Kind="Play" IsVisible="{Binding !IsVideoPlaying}" />
+                </Panel>
+              </Button>
+              <Button Grid.Column="1" Classes="videoControl" Command="{Binding SkipBackCommand}" l:Tr.Tip="Back 10 seconds">
+                <mi:MaterialIcon Kind="Rewind10" />
+              </Button>
+              <Button Grid.Column="2" Classes="videoControl" Command="{Binding SkipForwardCommand}" l:Tr.Tip="Forward 10 seconds">
+                <mi:MaterialIcon Kind="FastForward10" />
+              </Button>
+              <Slider Grid.Column="3" Classes="videoSeek" Minimum="0" Maximum="1" Value="{Binding VideoPosition}" Margin="10,0" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="4" Text="{Binding VideoTimeText}" Foreground="White" FontSize="12.5" VerticalAlignment="Center" Margin="4,0,8,0"
+                         FontFeatures="tnum" />
+              <Button Grid.Column="5" Classes="videoControl" Command="{Binding ToggleMuteCommand}" l:Tr.Tip="Mute (M)">
+                <Panel>
+                  <mi:MaterialIcon Kind="VolumeOff" IsVisible="{Binding IsMuted}" />
+                  <mi:MaterialIcon Kind="VolumeHigh" IsVisible="{Binding !IsMuted}" />
+                </Panel>
+              </Button>
+            </Grid>
+          </Border>
 
           <!-- Top bar -->
           <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Top" Margin="14,12">

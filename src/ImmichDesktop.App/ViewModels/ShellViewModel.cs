@@ -107,8 +107,27 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial ViewModelBase? CurrentPage { get; set; }
 
+    /// <summary>
+    /// What the sidebar highlights. Settings isn't in the sidebar, so while it's open nothing is
+    /// highlighted; the sidebar letting go of its selection must not close the page you're on.
+    /// </summary>
+    public object? SidebarSelection
+    {
+        get => NavEntries.Contains(SelectedNav) ? SelectedNav : null;
+        set
+        {
+            if (value is NavItem item && !ReferenceEquals(item, SelectedNav))
+                SelectedNav = item;
+            else
+                OnPropertyChanged(); // headers can't be selected; keep the highlight where it was
+        }
+    }
+
     partial void OnSelectedNavChanged(NavItem oldValue, NavItem newValue)
     {
+        OnPropertyChanged(nameof(SidebarSelection));
+        if (newValue is null)
+            return;
         // Leaving the locked folder locks it again, like the Immich apps.
         if (oldValue is { IsCreated: true, ViewModel: PhotosViewModel { IsLockedFolder: true } locked })
             _ = locked.LockAsync();

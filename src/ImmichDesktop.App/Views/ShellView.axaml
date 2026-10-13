@@ -94,7 +94,7 @@
         </Button>
 
         <!-- Navigation: library sections, the Library group, this PC's backup, settings -->
-        <ListBox Name="Nav" Classes="nav" ItemsSource="{Binding NavEntries}" SelectedItem="{Binding SelectedNav}">
+        <ListBox Name="Nav" Classes="nav" ItemsSource="{Binding NavEntries}" SelectedItem="{Binding SidebarSelection}">
           <ListBox.DataTemplates>
             <DataTemplate DataType="vm:NavHeader">
               <Panel>

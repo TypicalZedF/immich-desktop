@@ -64,6 +64,11 @@ public sealed class AlbumCardViewModel(PhotosViewModel owner, AlbumInfo album) :
         Album.AlbumThumbnailAssetId is { } cover ? loader.LoadAsync(cover, AssetImageSize.Thumbnail, decodeWidth, ct) : Task.FromResult<Bitmap?>(null);
 
     protected override void Open() => Owner.OpenAlbum(Album);
+
+    public bool CanDelete => Album.IsOwnedBy(AppServices.Settings.Current.UserId);
+
+    public IRelayCommand DeleteCommand => _delete ??= new AsyncRelayCommand(() => Owner.DeleteAlbumAsync(Album));
+    IRelayCommand? _delete;
 }
 
 public sealed class PersonCardViewModel(PhotosViewModel owner, PersonInfo person) : LibraryCardViewModel(owner)

@@ -51,6 +51,19 @@ public sealed record AlbumInfo(string Id, string AlbumName, string? AlbumThumbna
     /// Shared with other people: anyone besides you is in it (or it's someone else's album). The
     /// server's own "shared" also counts albums that only have a public link.
     /// </summary>
+    /// <summary>
+    /// Whose album it is: ownerId on older servers, the first member on newer ones (null if unknown).
+    /// </summary>
+    public string? OwnerUserId =>
+        OwnerId
+        ?? (Owner is { ValueKind: System.Text.Json.JsonValueKind.Object } o && o.TryGetProperty("id", out var id) ? id.GetString() : null)
+        ?? (AlbumUsers is [{ ValueKind: System.Text.Json.JsonValueKind.Object } first, ..]
+            && first.TryGetProperty("user", out var user) && user.ValueKind == System.Text.Json.JsonValueKind.Object
+            && user.TryGetProperty("id", out var uid) ? uid.GetString() : null);
+
+    /// <summary>Only the owner can delete an album (when unknown, let the server decide).</summary>
+    public bool IsOwnedBy(string? myUserId) => OwnerUserId is not { } owner || myUserId is null || owner == myUserId;
+
     public bool IsSharedWithPeople(string? myUserId)
     {
         // Everyone in the album: the owner and its members (newer servers list the owner first among
@@ -158,6 +171,12 @@ public sealed record DuplicateAsset(TimelineAsset Asset, string FileName, int Wi
 
 /// <summary>Photos the server thinks are the same picture (Utilities → Review duplicates).</summary>
 public sealed record DuplicateGroup(string Id, IReadOnlyList<DuplicateAsset> Assets);
+
+/// <summary>
+/// Bytes of a video starting at <paramref name="Offset"/>, and its total size when known.
+/// <paramref name="Partial"/> is false when the server ignored the range and sent the whole video.
+/// </summary>
+public sealed record VideoChunk(byte[] Data, long? Total, long Offset, bool Partial = true);
 
 /// <summary>Image sizes the server can render for an asset.</summary>
 public enum AssetImageSize

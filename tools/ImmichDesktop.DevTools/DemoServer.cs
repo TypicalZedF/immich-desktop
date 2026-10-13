@@ -45,6 +45,7 @@ sealed class DemoServer : HttpMessageHandler
     static readonly (string Id, string Name, int Count, bool Shared)[] Albums =
     [
         ("a1", "Summer in Lisbon", 48, false), ("a2", "Family", 212, true), ("a3", "Hiking", 37, false), ("a4", "Garden", 15, false),
+        ("a5", "Phone", 1203, false),
     ];
 
     static readonly (string City, string State, string Country, double Lat, double Lon, int Count)[] Cities =
@@ -171,10 +172,14 @@ sealed class DemoServer : HttpMessageHandler
             return Task.FromResult(Bytes(path.Contains("dark", StringComparison.Ordinal) ? _tileDark! : _tileLight!));
         HttpResponseMessage response = path switch
         {
-            "/api/albums" => Json(Albums.Select((a, i) => new
+            _ when path.StartsWith("/api/albums/", StringComparison.Ordinal) && request.Method == HttpMethod.Delete => DeleteAlbum(path),
+            // Like Immich v3: no ownerId, the owner is the first member, and "shared" also counts link-only albums.
+            "/api/albums" => Json(Albums.Where(a => !DeletedAlbums.Contains(a.Id)).Select((a, i) => new
             {
-                id = a.Id, albumName = a.Name, albumThumbnailAssetId = $"202609-{i * 5 + 1}", assetCount = a.Count, shared = true, ownerId = "u1",
-                albumUsers = a.Shared ? new object[] { new { role = "editor", user = new { id = "u2", name = "Sam" } } } : Array.Empty<object>(),
+                id = a.Id, albumName = a.Name, albumThumbnailAssetId = $"202609-{i * 5 + 1}", assetCount = a.Count, shared = true, hasSharedLink = !a.Shared,
+                albumUsers = a.Shared
+                    ? new object[] { new { role = "editor", user = new { id = "u1", name = "Alex" } }, new { role = "editor", user = new { id = "u2", name = "Sam" } } }
+                    : new object[] { new { role = "editor", user = new { id = "u1", name = "Alex" } } },
             })),
             "/api/people" => Json(new { people = People.Select((p, i) => new { id = $"p{i}", name = p.Name, isHidden = false }), hasNextPage = false }),
             _ when path.StartsWith("/api/people/", StringComparison.Ordinal) => Bytes(_faces[int.Parse(path.Split('/')[3][1..]) % _faces.Count]),
@@ -232,9 +237,36 @@ sealed class DemoServer : HttpMessageHandler
             "/api/timeline/buckets" => Json(Buckets.Select(b => new { timeBucket = b.Bucket, count = b.Count })),
             "/api/timeline/bucket" => BucketResponse(Uri.UnescapeDataString(query.Split("timeBucket=")[1].Split('&')[0])),
             _ when path.EndsWith("/thumbnail", StringComparison.Ordinal) => Thumbnail(path, query),
+            _ when path.EndsWith("/video/playback", StringComparison.Ordinal) => Video(request),
             _ => new HttpResponseMessage(HttpStatusCode.NotFound),
         };
         return Task.FromResult(response);
+    }
+
+    /// <summary>A test video for the player (set IMMICH_DEMO_VIDEO to an .mp4), served in ranges like Immich.</summary>
+    static readonly byte[]? DemoVideo = Environment.GetEnvironmentVariable("IMMICH_DEMO_VIDEO") is { } file && File.Exists(file) ? File.ReadAllBytes(file) : null;
+
+    public int VideoRequests;
+
+    HttpResponseMessage Video(HttpRequestMessage request)
+    {
+        Interlocked.Increment(ref VideoRequests);
+        if (DemoVideo is not { } video)
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        if (request.Headers.Range?.Ranges.FirstOrDefault() is not { From: { } from } range)
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(video) };
+        var to = Math.Min(range.To ?? video.Length - 1, video.Length - 1);
+        var content = new ByteArrayContent(video, (int)from, (int)(to - from + 1));
+        content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(from, to, video.Length);
+        return new HttpResponseMessage(HttpStatusCode.PartialContent) { Content = content };
+    }
+
+    public List<string> DeletedAlbums { get; } = [];
+
+    HttpResponseMessage DeleteAlbum(string path)
+    {
+        DeletedAlbums.Add(path.Split('/')[3]);
+        return new HttpResponseMessage(HttpStatusCode.NoContent);
     }
 
     /// <summary>Shared links deleted through the app (for checking the delete flow).</summary>

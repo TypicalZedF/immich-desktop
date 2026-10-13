@@ -96,6 +96,8 @@ public static class Tr
         AvaloniaProperty.RegisterAttached<Control, string?>("Placeholder", typeof(Tr));
     public static readonly AttachedProperty<string?> TitleProperty =
         AvaloniaProperty.RegisterAttached<Control, string?>("Title", typeof(Tr));
+    public static readonly AttachedProperty<string?> HeaderProperty =
+        AvaloniaProperty.RegisterAttached<Control, string?>("Header", typeof(Tr));
 
     static Tr()
     {
@@ -122,6 +124,10 @@ public static class Tr
         {
             if (c is Window window) window.Title = Translate(e.NewValue);
         });
+        HeaderProperty.Changed.AddClassHandler<Control>((c, e) =>
+        {
+            if (c is MenuItem item) item.Header = Translate(e.NewValue);
+        });
     }
 
     static string? Translate(object? value) => value is string s ? T(s) : null;
@@ -138,4 +144,6 @@ public static class Tr
     public static void SetPlaceholder(Control c, string? v) => c.SetValue(PlaceholderProperty, v);
     public static string? GetTitle(Control c) => c.GetValue(TitleProperty);
     public static void SetTitle(Control c, string? v) => c.SetValue(TitleProperty, v);
+    public static string? GetHeader(Control c) => c.GetValue(HeaderProperty);
+    public static void SetHeader(Control c, string? v) => c.SetValue(HeaderProperty, v);
 }

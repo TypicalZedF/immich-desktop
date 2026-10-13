@@ -411,6 +411,24 @@ public sealed class ImmichClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Part of a video's playable version, for streaming it into the player: bytes from
+    /// <paramref name="offset"/>, and the video's total size. Servers that ignore the range send it all.
+    /// </summary>
+    public async Task<VideoChunk> GetVideoChunkAsync(string assetId, long offset, int count, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"assets/{Uri.EscapeDataString(assetId)}/video/playback");
+        request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, offset + count - 1);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(60));
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        await EnsureSuccessAsync(response, cts.Token);
+        var data = await response.Content.ReadAsByteArrayAsync(cts.Token);
+        if (response.StatusCode == HttpStatusCode.PartialContent)
+            return new VideoChunk(data, response.Content.Headers.ContentRange?.Length, response.Content.Headers.ContentRange?.From ?? offset);
+        return new VideoChunk(data, data.Length, 0, Partial: false);
+    }
+
     /// <summary>Saves the original file of an asset to <paramref name="destination"/>.</summary>
     public async Task DownloadOriginalAsync(string assetId, Stream destination, CancellationToken ct)
     {
@@ -619,6 +637,10 @@ public sealed class ImmichClient : IDisposable
 
     public Task<AlbumInfo> CreateAlbumAsync(string name, IReadOnlyList<string>? assetIds, CancellationToken ct) =>
         SendAsync<AlbumInfo>(HttpMethod.Post, "albums", new CreateAlbumRequestDto(name, assetIds), ct);
+
+    /// <summary>Deletes an album. Its photos stay in the library.</summary>
+    public Task DeleteAlbumAsync(string albumId, CancellationToken ct) =>
+        SendAsync(HttpMethod.Delete, $"albums/{Uri.EscapeDataString(albumId)}", null, ct);
 
     public Task AddAssetsToAlbumAsync(string albumId, IReadOnlyList<string> assetIds, CancellationToken ct) =>
         SendAsync(HttpMethod.Put, $"albums/{Uri.EscapeDataString(albumId)}/assets", new BulkIdsRequestDto(assetIds), ct);

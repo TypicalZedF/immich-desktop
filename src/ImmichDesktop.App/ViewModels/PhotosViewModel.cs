@@ -108,7 +108,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     /// <summary>An album, person, place, search or map area opened from the page; Back returns to the page.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowGrid), nameof(ShowAlbums), nameof(ShowExplore), nameof(ShowMap), nameof(ShowSharing),
-        nameof(ShowLockedPrompt), nameof(IsDrilledIn), nameof(Heading), nameof(CanShareAlbum), nameof(ShowHeading),
+        nameof(ShowLockedPrompt), nameof(IsDrilledIn), nameof(Heading), nameof(CanShareAlbum), nameof(CanDeleteAlbum), nameof(ShowHeading),
         nameof(IsTrash), nameof(IsArchive), nameof(ShowTrashActions), nameof(ShowLockAction), nameof(ShowUtilities))]
     public partial GridQuery? Drill { get; set; }
 
@@ -127,6 +127,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     public bool ShowTrashActions => IsTrash && !IsEmpty && !IsLoading;
     public bool ShowLockAction => Page == LibraryPage.Locked && IsUnlocked && Drill is null;
     public bool CanShareAlbum => Drill?.Album is not null && !IsPicker;
+    public bool CanDeleteAlbum => Drill?.Album is { } album && !IsPicker && album.IsOwnedBy(AppServices.Settings.Current.UserId);
 
     public string Heading => Drill?.Title ?? (Duplicates is not null ? Tr.T("Review duplicates") : null) ?? Page switch
     {
@@ -1136,6 +1137,58 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     {
         if (Drill?.Album is { } album)
             Panel = new SharePanelViewModel(this, Tr.T("the album “{0}”", album.AlbumName), null, album.Id);
+    }
+
+    [RelayCommand]
+    Task DeleteOpenAlbumAsync() => Drill?.Album is { } album ? DeleteAlbumAsync(album) : Task.CompletedTask;
+
+    /// <summary>
+    /// Deletes an album (its photos stay). If a backed-up folder adds its photos to this album, the
+    /// next backup would just create it again, so deleting it also stops that folder's album.
+    /// </summary>
+    internal async Task DeleteAlbumAsync(AlbumInfo album)
+    {
+        if (Client is not { } client || _main is null)
+            return;
+        // Same matching as the backup uses to find a folder's album.
+        var folders = AppServices.Settings.Current.Folders
+            .Where(f => !string.IsNullOrWhiteSpace(f.AlbumName) && f.AlbumName.Trim() == album.AlbumName)
+            .ToList();
+        var message = Tr.T("The photos and videos in it stay in your library. This can't be undone.");
+        var action = Tr.T("Delete album");
+        if (folders.Count > 0)
+        {
+            var names = string.Join(", ", folders.Select(f => $"“{Path.GetFileName(f.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))}”"));
+            message = Tr.T("This album is filled by backing up {0}. Deleting it also stops that folder from adding photos to an album; otherwise the next backup would just create it again. You can turn the album back on in Folders.", names)
+                + "\n\n" + message;
+            action = Tr.T("Delete album and stop the folder's album");
+        }
+        if (!await _main.ConfirmAsync(Tr.T("Delete “{0}”?", album.AlbumName), message, action, danger: true))
+            return;
+        try
+        {
+            if (folders.Count > 0)
+            {
+                var ids = folders.Select(f => f.Id).ToHashSet();
+                AppServices.Settings.Update(s =>
+                {
+                    foreach (var f in s.Folders.Where(f => ids.Contains(f.Id)))
+                        f.AlbumName = null;
+                });
+            }
+            await client.DeleteAlbumAsync(album.Id, CancellationToken.None);
+            ShowNotice(Tr.T("Deleted the album “{0}”", album.AlbumName));
+            if (Drill?.Album?.Id == album.Id)
+                Back();
+            if (Page == LibraryPage.Albums)
+                _ = LoadAlbumsAsync();
+            else if (Page == LibraryPage.Sharing)
+                _ = LoadSharingAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(Tr.T("Couldn't delete the album. {0}", NetworkErrors.Describe(ex)));
+        }
     }
 
     internal void ShowAlbumPicker(IReadOnlyList<string> assetIds) => Panel = new AlbumPickerViewModel(this, assetIds);

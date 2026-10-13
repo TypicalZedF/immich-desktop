@@ -17,6 +17,7 @@ public partial class PhotosView : UserControl
     readonly MapView _map;
     readonly Panel _stage;
     readonly Image _viewerImage;
+    readonly Image _videoSurface;
     ScrollViewer? _scroll;
     PhotosViewModel? _vm;
     PhotoViewerViewModel? _viewer;
@@ -35,6 +36,7 @@ public partial class PhotosView : UserControl
         _map = this.FindControl<MapView>("Map")!;
         _stage = this.FindControl<Panel>("ViewerStage")!;
         _viewerImage = this.FindControl<Image>("ViewerImage")!;
+        _videoSurface = this.FindControl<Image>("VideoSurface")!;
 
         // Rows load their month and thumbnails only while on screen, and let go when scrolled away.
         _grid.ContainerPrepared += (_, e) => (e.Container.DataContext as AssetRowViewModel)?.Realize();
@@ -170,8 +172,12 @@ public partial class PhotosView : UserControl
             _vm.PropertyChanged -= OnViewModelChanged;
         _vm = DataContext as PhotosViewModel;
         if (_vm is null)
+        {
+            SetViewer(null);
             return;
+        }
         _vm.PropertyChanged += OnViewModelChanged;
+        SetViewer(_vm.Viewer); // a viewer may already be open (this view can be recreated)
         UpdateScrollBar(force: true);
         if (_grid.Bounds.Width > 0)
             UpdateLayout(_grid.Bounds.Width);
@@ -199,15 +205,22 @@ public partial class PhotosView : UserControl
     void SetViewer(PhotoViewerViewModel? viewer)
     {
         if (_viewer is not null)
+        {
             _viewer.PropertyChanged -= OnViewerChanged;
+            _viewer.VideoFrameUpdated -= OnVideoFrame;
+        }
         _viewer = viewer;
         ResetZoom();
         if (viewer is null)
             return;
         viewer.PropertyChanged += OnViewerChanged;
+        viewer.VideoFrameUpdated += OnVideoFrame;
         UpdateViewerPixels();
         this.FindControl<Panel>("ViewerLayer")?.Focus();
     }
+
+    /// <summary>The video bitmap is redrawn in place; tell the image to repaint.</summary>
+    void OnVideoFrame() => _videoSurface.InvalidateVisual();
 
     void OnViewerChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -319,7 +332,10 @@ public partial class PhotosView : UserControl
                     viewer.ToggleInfoCommand.Execute(null);
                     break;
                 case Key.Space or Key.Enter when viewer.IsVideo:
-                    viewer.PlayCommand.Execute(null);
+                    viewer.PlayPauseCommand.Execute(null);
+                    break;
+                case Key.M when viewer.IsVideo:
+                    viewer.ToggleMuteCommand.Execute(null);
                     break;
                 case Key.C when e.KeyModifiers.HasFlag(KeyModifiers.Control) && !viewer.IsVideo:
                     viewer.CopyImageCommand.Execute(null);
