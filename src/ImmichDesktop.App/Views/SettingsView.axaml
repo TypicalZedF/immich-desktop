@@ -1,0 +1,181 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ImmichDesktop.App.ViewModels"
+             xmlns:c="using:ImmichDesktop.App.Controls"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichDesktop.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  <UserControl.Styles>
+    <Style Selector="Grid.row">
+      <Setter Property="MinHeight" Value="58" />
+    </Style>
+    <Style Selector="Grid.row > StackPanel">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Spacing" Value="2" />
+      <Setter Property="Margin" Value="0,0,20,0" />
+    </Style>
+    <Style Selector="Grid.row TextBlock.title">
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="36,30,36,36" Spacing="18" MaxWidth="820" HorizontalAlignment="Stretch">
+      <TextBlock Classes="h1" Text="Settings" />
+
+      <!-- Account -->
+      <Border Classes="card">
+        <StackPanel Spacing="16">
+          <TextBlock Classes="section" Text="ACCOUNT" />
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <Border Width="48" Height="48" CornerRadius="24" Background="{DynamicResource AppPrimaryBrush}">
+              <TextBlock Text="{Binding UserInitial}" FontSize="20" FontWeight="Bold"
+                         Foreground="{DynamicResource AppOnPrimaryBrush}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="2">
+              <TextBlock Classes="h3" Text="{Binding UserName}" />
+              <TextBlock Classes="caption" Text="{Binding UserEmail}" />
+            </StackPanel>
+            <Button Grid.Column="2" Classes="secondary" VerticalAlignment="Center" Command="{Binding SignOutCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="Logout" />
+                <TextBlock Text="Sign out" />
+              </StackPanel>
+            </Button>
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Server" />
+              <TextBlock Classes="caption" Text="{Binding ServerUrl}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="0" VerticalAlignment="Center">
+              <Border Classes="chip" VerticalAlignment="Center">
+                <TextBlock Classes="caption" Text="{Binding ServerVersion}" />
+              </Border>
+              <Button Classes="ghost" Command="{Binding OpenServerCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="OpenInNew" />
+                  <TextBlock Text="Open" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- General -->
+      <Border Classes="card" Padding="22,16">
+        <StackPanel>
+          <TextBlock Classes="section" Text="GENERAL" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto" IsVisible="{Binding AutostartSupported}">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Start automatically" />
+              <TextBlock Classes="caption" Text="{Binding AutostartDescription}" TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding LaunchAtStartup}" />
+          </Grid>
+          <Border Classes="divider" IsVisible="{Binding AutostartSupported}" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Appearance" />
+              <TextBlock Classes="caption" Text="Light, dark, or follow your system." />
+            </StackPanel>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Backup -->
+      <Border Classes="card" Padding="22,16">
+        <StackPanel>
+          <TextBlock Classes="section" Text="BACKUP" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Upload speed limit" />
+              <TextBlock Classes="caption" Text="Leave bandwidth for everything else on your network." TextWrapping="Wrap" />
+            </StackPanel>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding SpeedLimits}" SelectedItem="{Binding SelectedSpeedLimit}" VerticalAlignment="Center" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Simultaneous uploads" />
+              <TextBlock Classes="caption" Text="More is faster on a good connection; fewer is gentler on your server." TextWrapping="Wrap" />
+            </StackPanel>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding Concurrency}" SelectedItem="{Binding SelectedConcurrency}" VerticalAlignment="Center" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Pause on battery" />
+              <TextBlock Classes="caption" Text="Wait until your laptop is plugged in before uploading." TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding PauseOnBattery}" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Full folder check" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="New files are noticed instantly. A full check also runs periodically to catch anything missed." />
+            </StackPanel>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding RescanIntervals}" SelectedItem="{Binding SelectedRescan}" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Troubleshooting -->
+      <Border Classes="card" Padding="22,16">
+        <StackPanel>
+          <TextBlock Classes="section" Text="TROUBLESHOOTING" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Re-check all files" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="Compare everything with your Immich library again. Nothing is uploaded twice." />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="secondary" Content="Re-check" Command="{Binding RecheckAllCommand}" VerticalAlignment="Center" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" Text="Logs and app data" />
+              <TextBlock Classes="caption" Text="Helpful when reporting a problem." />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0" VerticalAlignment="Center">
+              <Button Classes="secondary" Content="Open logs" Command="{Binding OpenLogsCommand}" />
+              <Button Classes="ghost" Content="Data folder" Command="{Binding OpenDataFolderCommand}" />
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- About -->
+      <Border Classes="card">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <c:AppLogo Width="48" Height="48" />
+          <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="2">
+            <TextBlock Classes="h3" Text="Immich Desktop" />
+            <TextBlock Classes="caption" Text="{Binding Version}" />
+            <TextBlock Classes="caption" Text="{Binding UpdateStatus}"
+                       IsVisible="{Binding UpdateStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding UpdatesSupported}">
+            <Button Classes="secondary" Command="{Binding CheckForUpdatesCommand}" IsVisible="{Binding !UpdateReady}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="Refresh" Classes.spin="{Binding IsCheckingUpdates}" />
+                <TextBlock Text="Check for updates" />
+              </StackPanel>
+            </Button>
+            <Button Classes="primary" Content="Restart to update" Command="{Binding InstallUpdateCommand}" IsVisible="{Binding UpdateReady}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <TextBlock Classes="caption tertiary" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,4,0,0"
+                 Text="An unofficial desktop companion for Immich. Immich is a project by FUTO." />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

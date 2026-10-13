@@ -1,0 +1,75 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ImmichDesktop.App.ViewModels"
+             xmlns:c="using:ImmichDesktop.App.Controls"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichDesktop.App.Views.ShellView"
+             x:DataType="vm:ShellViewModel">
+  <Grid ColumnDefinitions="252,*">
+
+    <!-- ===== Sidebar ===== -->
+    <Border Background="{DynamicResource AppSidebarBrush}">
+      <DockPanel Margin="16,22,16,16">
+
+        <!-- Brand -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="8,0,0,28">
+          <c:AppLogo Width="38" Height="38" />
+          <StackPanel VerticalAlignment="Center" Spacing="0">
+            <TextBlock Text="Immich" FontSize="18" FontWeight="Bold" LetterSpacing="-0.3" />
+            <TextBlock Classes="caption" Text="Desktop" Margin="0,-2,0,0" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Account card -->
+        <Border DockPanel.Dock="Bottom" Classes="card" Padding="12" CornerRadius="16" Margin="0,10,0,0">
+          <Grid ColumnDefinitions="Auto,*">
+            <Border Width="36" Height="36" CornerRadius="18" Background="{DynamicResource AppPrimaryBrush}">
+              <TextBlock Text="{Binding UserInitial}" Foreground="{DynamicResource AppOnPrimaryBrush}"
+                         FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Spacing="1">
+              <TextBlock Text="{Binding UserName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              <TextBlock Classes="caption" Text="{Binding ServerHost}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Live status pill -->
+        <Border DockPanel.Dock="Bottom" CornerRadius="14" Padding="12,10" Background="{DynamicResource AppCardBrush}"
+                BorderBrush="{DynamicResource AppCardBorderBrush}" BorderThickness="1"
+                ToolTip.Tip="{Binding Status.Detail}">
+          <Grid ColumnDefinitions="Auto,*">
+            <Border Classes="tone" Width="30" Height="30" CornerRadius="15"
+                    Classes.busy="{Binding Status.IsBusy}" Classes.paused="{Binding Status.IsPaused}"
+                    Classes.warning="{Binding Status.IsWarning}" Classes.error="{Binding Status.IsError}">
+              <mi:MaterialIcon Kind="{Binding Status.Icon}" Width="17" Height="17" Classes.spin="{Binding Status.Spin}" />
+            </Border>
+            <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" FontWeight="Medium"
+                       Text="{Binding Status.Title}" TextTrimming="CharacterEllipsis" />
+          </Grid>
+        </Border>
+
+        <!-- Navigation -->
+        <ListBox Classes="nav" ItemsSource="{Binding NavItems}" SelectedItem="{Binding SelectedNav}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:NavItem">
+              <StackPanel Orientation="Horizontal" Spacing="14">
+                <mi:MaterialIcon Kind="{Binding Icon}" Width="20" Height="20" />
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <!-- ===== Page ===== -->
+    <Border Grid.Column="1" Background="{DynamicResource AppPageBrush}">
+      <TransitioningContentControl Content="{Binding CurrentPage}">
+        <TransitioningContentControl.PageTransition>
+          <CrossFade Duration="0:0:0.12" />
+        </TransitioningContentControl.PageTransition>
+      </TransitioningContentControl>
+    </Border>
+  </Grid>
+</UserControl>

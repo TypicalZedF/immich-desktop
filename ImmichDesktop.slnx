@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ImmichDesktop.App/ImmichDesktop.App.csproj" />
+    <Project Path="src/ImmichDesktop.Core/ImmichDesktop.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ImmichDesktop.Core.Tests/ImmichDesktop.Core.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/ImmichDesktop.DevTools/ImmichDesktop.DevTools.csproj" />
+  </Folder>
+</Solution>

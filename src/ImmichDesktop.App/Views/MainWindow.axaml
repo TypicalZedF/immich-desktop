@@ -1,0 +1,30 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ImmichDesktop.App.ViewModels"
+        x:Class="ImmichDesktop.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Immich Desktop"
+        Width="1060" Height="720" MinWidth="880" MinHeight="600"
+        WindowStartupLocation="CenterScreen">
+  <Panel>
+    <ContentControl Content="{Binding Content}" />
+
+    <!-- In-window confirmation dialog -->
+    <Panel IsVisible="{Binding Dialog, Converter={x:Static ObjectConverters.IsNotNull}}"
+           Background="{DynamicResource AppOverlayBrush}">
+      <Border Classes="card" Width="440" Padding="28,26" CornerRadius="22"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              BoxShadow="0 18 50 0 #40000000">
+        <StackPanel Spacing="10" DataContext="{Binding Dialog}" x:DataType="vm:DialogViewModel">
+          <TextBlock Classes="h2" Text="{Binding Title}" TextWrapping="Wrap" />
+          <TextBlock Classes="secondary" Text="{Binding Message}" TextWrapping="Wrap" LineHeight="21" />
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,14,0,0">
+            <Button Classes="secondary" Content="{Binding CancelText}" Command="{Binding CancelCommand}" />
+            <Button Classes="primary" Classes.danger="{Binding IsDanger}"
+                    Content="{Binding ConfirmText}" Command="{Binding ConfirmCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Panel>
+  </Panel>
+</Window>
