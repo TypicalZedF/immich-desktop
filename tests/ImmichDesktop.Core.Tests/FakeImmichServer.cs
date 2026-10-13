@@ -22,6 +22,12 @@ sealed class FakeImmichServer : HttpMessageHandler
     public ConcurrentDictionary<string, (string Name, HashSet<string> Assets)> Albums { get; } = new();
     public bool RejectAuth { get; set; }
 
+    /// <summary>Order of uploads and album additions, to check albums fill during a long upload.</summary>
+    public ConcurrentQueue<string> Events { get; } = new();
+
+    /// <summary>Called after each upload with the running count (lets a test change settings mid-run).</summary>
+    public Action<int>? AfterUpload { get; set; }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
         var path = request.RequestUri!.AbsolutePath;
@@ -71,6 +77,8 @@ sealed class FakeImmichServer : HttpMessageHandler
                 var id = Guid.NewGuid().ToString();
                 AssetsByChecksum[checksum] = id;
                 UploadedFileNames.Enqueue(fileName!);
+                Events.Enqueue("upload");
+                AfterUpload?.Invoke(UploadedFileNames.Count);
                 return Json(HttpStatusCode.Created, new { id, status = "created" });
             }
             case ("GET", "/api/albums"):
@@ -89,6 +97,7 @@ sealed class FakeImmichServer : HttpMessageHandler
                 using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
                 foreach (var id in doc.RootElement.GetProperty("ids").EnumerateArray())
                     Albums[albumId].Assets.Add(id.GetString()!);
+                Events.Enqueue("album");
                 return Json(HttpStatusCode.OK, Array.Empty<object>());
             }
             default:

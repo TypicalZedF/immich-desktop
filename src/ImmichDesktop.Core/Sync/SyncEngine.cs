@@ -372,7 +372,7 @@ public sealed class SyncEngine : IAsyncDisposable
 
             await ScanAsync(settings, ct);
             await UploadAsync(client, settings, ct);
-            await SyncAlbumsAsync(client, settings, ct);
+            await SyncAlbumsAsync(client, ct);
 
             _lastSync = DateTimeOffset.Now;
             RefreshCounts(settings);
@@ -716,6 +716,7 @@ public sealed class SyncEngine : IAsyncDisposable
                             Interlocked.Increment(ref uploaded);
                     });
 
+                await SyncAlbumsDuringUploadAsync(client, ct);
                 RefreshCounts(settings);
             }
         }
@@ -876,9 +877,14 @@ public sealed class SyncEngine : IAsyncDisposable
 
     // ---- Albums -----------------------------------------------------------------------------------
 
-    async Task SyncAlbumsAsync(ImmichClient client, AppSettings settings, CancellationToken ct)
+    /// <summary>
+    /// Adds uploaded (or already-on-server) files to their folder's album. Runs after every upload batch,
+    /// not just at the end, so albums fill up while a big backup is still running, and always uses the
+    /// folder settings as they are right now (an album set mid-upload applies immediately).
+    /// </summary>
+    async Task SyncAlbumsAsync(ImmichClient client, CancellationToken ct)
     {
-        foreach (var folder in settings.Folders.Where(f => f.Enabled && !string.IsNullOrWhiteSpace(f.AlbumName)))
+        foreach (var folder in _folderSnapshot.Where(f => f.Enabled && !string.IsNullOrWhiteSpace(f.AlbumName)))
         {
             var name = folder.AlbumName!.Trim();
             while (true)
@@ -908,6 +914,19 @@ public sealed class SyncEngine : IAsyncDisposable
                     break;
                 }
             }
+        }
+    }
+
+    /// <summary>Album step between upload batches: a hiccup here must never stop the backup itself.</summary>
+    async Task SyncAlbumsDuringUploadAsync(ImmichClient client, CancellationToken ct)
+    {
+        try
+        {
+            await SyncAlbumsAsync(client, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && !NetworkErrors.IsConnectivity(ex) && ex is not ImmichApiException { IsUnauthorized: true })
+        {
+            Log.Warn("Album update during upload failed; will retry after the batch", ex);
         }
     }
 

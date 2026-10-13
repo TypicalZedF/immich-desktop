@@ -130,6 +130,33 @@ public class SyncEngineTests
     }
 
     [Fact]
+    public async Task Album_set_during_a_big_upload_fills_while_uploading_not_only_at_the_end()
+    {
+        await using var h = new Harness();
+        for (var i = 0; i < 120; i++)
+            h.Temp.File($"Photos/IMG_{i:000}.jpg");
+
+        // The user types an album name a few photos into a long backup.
+        h.Server.AfterUpload = count =>
+        {
+            if (count != 5)
+                return;
+            h.Settings.Update(s => s.Folders[0].AlbumName = "Trip");
+            h.Engine.OnSettingsChanged(h.Settings.Current);
+        };
+
+        await h.RunAsync();
+
+        var events = h.Server.Events.ToList();
+        var firstAlbum = events.IndexOf("album");
+        var lastUpload = events.LastIndexOf("upload");
+        Assert.True(firstAlbum >= 0, "album was never filled");
+        Assert.True(firstAlbum < lastUpload, "album only filled after every upload finished");
+        Assert.Equal(120, Assert.Single(h.Server.Albums.Values).Assets.Count);
+        Assert.Equal(120, h.Server.UploadedFileNames.Count);
+    }
+
+    [Fact]
     public async Task Exclusions_and_disabled_folders_are_respected()
     {
         await using var h = new Harness(f => f.ExcludePatterns = ["Screenshots"]);
