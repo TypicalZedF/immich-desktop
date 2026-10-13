@@ -104,7 +104,7 @@ public sealed class PrivacyScanService : IDisposable
 
     async Task RunAsync(bool useGpu, CancellationToken ct)
     {
-        Report(new PrivacyScanStatus(PrivacyScanState.Starting, 0, 0, Suggestions, false));
+        ReportRun(new PrivacyScanStatus(PrivacyScanState.Starting, 0, 0, Suggestions, false), ct);
         NsfwClassifier? classifier = null;
         PhotoTextReader? reader = null;
         try
@@ -142,13 +142,14 @@ public sealed class PrivacyScanService : IDisposable
                         _db.SavePrivacyScan(todo[i], ChecksVersion, 0, 0); // no picture to check (e.g. a format we can't open)
                     }
                     checkedCount++;
+                    ct.ThrowIfCancellationRequested();
                     if (DateTime.UtcNow - lastReport > TimeSpan.FromSeconds(0.5) || i == todo.Count - 1)
                     {
                         lastReport = DateTime.UtcNow;
-                        Report(new PrivacyScanStatus(PrivacyScanState.Scanning, checkedCount, library.Count, Suggestions, onGpu));
+                        ReportRun(new PrivacyScanStatus(PrivacyScanState.Scanning, checkedCount, library.Count, Suggestions, onGpu), ct);
                     }
                 }
-                Report(new PrivacyScanStatus(PrivacyScanState.Done, library.Count, library.Count, Suggestions, onGpu));
+                ReportRun(new PrivacyScanStatus(PrivacyScanState.Done, library.Count, library.Count, Suggestions, onGpu), ct);
                 await Task.Delay(RecheckLibraryEvery, ct); // then look for new photos
             }
         }
@@ -158,7 +159,7 @@ public sealed class PrivacyScanService : IDisposable
         catch (Exception ex)
         {
             Log.Warn("The privacy check stopped", ex);
-            Report(new PrivacyScanStatus(PrivacyScanState.Error, Status.Checked, Status.Total, Suggestions, false, NetworkErrors.Describe(ex)));
+            ReportRun(new PrivacyScanStatus(PrivacyScanState.Error, Status.Checked, Status.Total, Suggestions, false, NetworkErrors.Describe(ex)), ct);
             // Try again in a while (e.g. the server was unreachable).
             _ = RetryLaterAsync(ct);
         }
@@ -244,7 +245,7 @@ public sealed class PrivacyScanService : IDisposable
             if (reason is null)
                 return;
             if (Status.State != PrivacyScanState.Paused || Status.Detail != reason)
-                Report(new PrivacyScanStatus(PrivacyScanState.Paused, checkedCount, total, Suggestions, onGpu, reason));
+                ReportRun(new PrivacyScanStatus(PrivacyScanState.Paused, checkedCount, total, Suggestions, onGpu, reason), ct);
             await Task.Delay(TimeSpan.FromSeconds(15), ct);
         }
     }
@@ -277,6 +278,19 @@ public sealed class PrivacyScanService : IDisposable
 
     /// <summary>The suggestions were acted on (moved or dismissed): refresh the count.</summary>
     public void Refresh() => Report(Status with { Suggestions = Suggestions });
+
+    /// <summary>
+    /// A status from a run. Dropped once that run was stopped: a photo finishing after you turned
+    /// the check off must not put "Checking…" back on the page.
+    /// </summary>
+    void ReportRun(PrivacyScanStatus status, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            if (!ct.IsCancellationRequested)
+                Report(status);
+        }
+    }
 
     void Report(PrivacyScanStatus status)
     {

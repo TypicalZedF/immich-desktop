@@ -253,6 +253,17 @@ static class Screens
                 // ...and runs at home.
                 ImmichDesktop.Core.Platform.NetworkStatus.Override = new ImmichDesktop.Core.Platform.NetworkSnapshot("Home", false, IsPrivate: true);
                 Task.Run(() => AppServices.Network.CheckAsync()).GetAwaiter().GetResult(); // off the UI thread: it awaits
+                // Turning it off mid-check says "Off" and stays that way (a photo finishing must not flip it back).
+                var waitStart = DateTime.UtcNow;
+                while (AppServices.PrivacyScan.Status.State != ImmichDesktop.Core.Privacy.PrivacyScanState.Scanning && DateTime.UtcNow - waitStart < TimeSpan.FromSeconds(40))
+                    Pump(TimeSpan.FromMilliseconds(500));
+                Pump(TimeSpan.FromSeconds(2));
+                AppServices.Settings.Update(s => s.PrivacyScanEnabled = false);
+                Pump(TimeSpan.FromSeconds(4));
+                Console.WriteLine($"Privacy check turned off mid-scan: {AppServices.PrivacyScan.Status.State} after {AppServices.PrivacyScan.Status.Checked} checked");
+                if (AppServices.PrivacyScan.Status.State != ImmichDesktop.Core.Privacy.PrivacyScanState.Off)
+                    throw new InvalidOperationException("Turning the privacy check off didn't show it as off");
+                AppServices.Settings.Update(s => s.PrivacyScanEnabled = true);
                 var started = DateTime.UtcNow;
                 while (AppServices.PrivacyScan.Status.State is not (ImmichDesktop.Core.Privacy.PrivacyScanState.Done or ImmichDesktop.Core.Privacy.PrivacyScanState.Error)
                        && DateTime.UtcNow - started < TimeSpan.FromMinutes(6))

@@ -692,7 +692,8 @@
                           <Button Classes="ghost" Command="{Binding ToggleDetailsCommand}" Padding="8,4" Margin="-8,0,0,0" HorizontalAlignment="Left">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                               <mi:MaterialIcon Kind="InformationOutline" Width="16" Height="16" />
-                              <TextBlock l:Tr.Text="How this works, and what it can see" FontWeight="Medium" />
+                              <TextBlock l:Tr.Text="How this works, and what it can see" FontWeight="Medium" IsVisible="{Binding !ShowDetails}" />
+                              <TextBlock l:Tr.Text="Hide how this works" FontWeight="Medium" IsVisible="{Binding ShowDetails}" />
                               <mi:MaterialIcon Kind="ChevronDown" Width="16" Height="16" IsVisible="{Binding !ShowDetails}" />
                               <mi:MaterialIcon Kind="ChevronUp" Width="16" Height="16" IsVisible="{Binding ShowDetails}" />
                             </StackPanel>
@@ -724,6 +725,12 @@
                       <!-- Transparency: where it runs, what leaves the PC, what's kept, the models and the rules -->
                       <Border Classes="card" Padding="20,18" CornerRadius="16" IsVisible="{Binding ShowDetails}" Margin="0,0,12,0">
                         <StackPanel Spacing="16">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="h2" l:Tr.Text="How this works" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="ghost icon" Command="{Binding ToggleDetailsCommand}" l:Tr.Tip="Hide">
+                              <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
+                            </Button>
+                          </Grid>
                           <StackPanel Spacing="4">
                             <TextBlock Classes="h3" l:Tr.Text="Exactly what it does, step by step" />
                             <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="1. Asks your Immich server for the list of your photos and videos (the timeline and the archive; never the locked folder or the trash)." />
@@ -795,13 +802,20 @@
                           <StackPanel Spacing="4">
                             <TextBlock Classes="h3" l:Tr.Text="Check it yourself" />
                             <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="Immich Desktop is open source. This is the code that does the check:" />
-                            <Button Classes="ghost" HorizontalAlignment="Left" Padding="8,4" Margin="-8,0,0,0" Command="{Binding OpenSourceCommand}">
-                              <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Button Classes="secondary" HorizontalAlignment="Left" Command="{Binding OpenSourceCommand}" ToolTip.Tip="{Binding SourceUrl}">
+                              <StackPanel Orientation="Horizontal" Spacing="8">
                                 <mi:MaterialIcon Kind="CodeBraces" Width="16" Height="16" />
-                                <TextBlock Text="{Binding SourceUrl}" TextWrapping="Wrap" />
+                                <TextBlock l:Tr.Text="See the code on GitHub" />
                               </StackPanel>
                             </Button>
+                            <SelectableTextBlock Classes="caption tertiary" Text="{Binding SourceUrl}" TextWrapping="Wrap" />
                           </StackPanel>
+                          <Button Classes="secondary" HorizontalAlignment="Center" Command="{Binding ToggleDetailsCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <mi:MaterialIcon Kind="ChevronUp" Width="16" Height="16" />
+                              <TextBlock l:Tr.Text="Hide how this works" />
+                            </StackPanel>
+                          </Button>
                         </StackPanel>
                       </Border>
                       <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding HasItems}">
