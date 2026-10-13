@@ -109,6 +109,27 @@ public class SyncEngineTests
     }
 
     [Fact]
+    public async Task Setting_an_album_later_adds_already_uploaded_files_without_reuploading()
+    {
+        await using var h = new Harness();
+        h.Temp.File("Photos/a.jpg");
+        h.Temp.File("Photos/b.jpg");
+        await h.RunAsync();
+        Assert.Equal(2, h.Server.UploadedFileNames.Count);
+        Assert.Empty(h.Server.Albums);
+
+        // Oops, forgot the album: set it afterwards.
+        h.Settings.Update(s => s.Folders[0].AlbumName = "Trip");
+        h.Engine.OnSettingsChanged(h.Settings.Current);
+        await h.RunAsync();
+
+        var album = Assert.Single(h.Server.Albums.Values);
+        Assert.Equal("Trip", album.Name);
+        Assert.Equal(2, album.Assets.Count);
+        Assert.Equal(2, h.Server.UploadedFileNames.Count); // nothing uploaded twice
+    }
+
+    [Fact]
     public async Task Exclusions_and_disabled_folders_are_respected()
     {
         await using var h = new Harness(f => f.ExcludePatterns = ["Screenshots"]);
