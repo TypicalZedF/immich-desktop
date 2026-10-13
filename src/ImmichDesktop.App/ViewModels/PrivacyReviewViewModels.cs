@@ -128,23 +128,20 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
 
     public string MinConfidenceText => MinConfidence <= 0 ? Tr.T("Any") : Tr.T("{0}% or more", ((int)MinConfidence).ToString(System.Globalization.CultureInfo.CurrentCulture));
 
-    // Dragging the slider changes the value many times a second; the tiles follow at most every
-    // 80 ms (always ending on the final value) instead of on every step.
-    DispatcherTimer? _filterTimer;
+    // Dragging the slider changes the value many times a second; the tiles catch up once input and
+    // drawing have (one update for however many steps went by), always ending on the final value.
+    bool _filterQueued;
 
     partial void OnMinConfidenceChanged(double value)
     {
-        if (_filterTimer is null)
+        if (_filterQueued)
+            return;
+        _filterQueued = true;
+        Dispatcher.UIThread.Post(() =>
         {
-            _filterTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
-            _filterTimer.Tick += (_, _) =>
-            {
-                _filterTimer.Stop();
-                ApplyFilter();
-            };
-        }
-        if (!_filterTimer.IsEnabled)
-            _filterTimer.Start();
+            _filterQueued = false;
+            ApplyFilter();
+        }, DispatcherPriority.Background);
     }
 
     [ObservableProperty]
@@ -461,7 +458,6 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _lifetime.Cancel();
-        _filterTimer?.Stop();
         AppServices.PrivacyScan.StatusChanged -= OnStatus;
         foreach (var item in _all)
             item.Dispose();
