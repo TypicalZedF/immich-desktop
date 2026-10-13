@@ -7,6 +7,77 @@
              xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="ImmichDesktop.App.Views.PhotosView"
              x:DataType="vm:PhotosViewModel">
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="vm:MonthHeaderViewModel">
+      <StackPanel Orientation="Horizontal" Spacing="10" Height="54" VerticalAlignment="Bottom" Margin="2,0,0,0">
+        <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="Medium" VerticalAlignment="Bottom" Margin="0,0,0,12" />
+        <TextBlock Classes="caption tertiary" Text="{Binding Count}" VerticalAlignment="Bottom" Margin="0,0,0,14" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:AssetRowViewModel">
+      <ItemsControl ItemsSource="{Binding Cells}" Height="{Binding RowHeight}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:AssetCellViewModel">
+            <Button Classes="tile" Classes.selected="{Binding IsSelected}" Width="{Binding TileSize}" Height="{Binding TileSize}" VerticalAlignment="Top"
+                    Command="{Binding OpenCommand}" IsVisible="{Binding !IsMissing}" IsEnabled="{Binding CanOpen}">
+              <Panel>
+                <Image Classes="thumb" Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                <!-- A file on this PC we can't preview here (video, HEIC…) -->
+                <StackPanel IsVisible="{Binding ShowLocalPlaceholder}" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            IsHitTestVisible="False">
+                  <mi:MaterialIcon Kind="{Binding IsVideo, Converter={x:Static vm:Converters.LocalFileIcon}}" Width="30" Height="30"
+                                   Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                </StackPanel>
+                <!-- Hover shade so the check stays visible on bright photos -->
+                <Border Classes="shade" IsHitTestVisible="False" Height="56" VerticalAlignment="Top">
+                  <Border.Background>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                      <GradientStop Color="#66000000" Offset="0" />
+                      <GradientStop Color="#00000000" Offset="1" />
+                    </LinearGradientBrush>
+                  </Border.Background>
+                </Border>
+                <!-- Video badge -->
+                <Border IsVisible="{Binding IsVideo}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="6" Padding="6,2" CornerRadius="6" Background="#99000000">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="{Binding DurationText}" Foreground="White" FontSize="11.5" FontWeight="Medium" />
+                    <mi:MaterialIcon Kind="PlayCircleOutline" Width="14" Height="14" Foreground="White" />
+                  </StackPanel>
+                </Border>
+                <mi:MaterialIcon IsVisible="{Binding IsFavorite}" Kind="Heart" Width="16" Height="16" Foreground="White"
+                                 HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6" />
+                <!-- File size (Large files) -->
+                <Border IsVisible="{Binding HasSizeText}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5"
+                        Padding="6,2" CornerRadius="6" Background="#99000000">
+                  <TextBlock Text="{Binding SizeText}" Foreground="White" FontSize="11.5" FontWeight="Medium" />
+                </Border>
+                <!-- In Immich, on this PC, or both -->
+                <Border Classes="syncBadge" Classes.warn="{Binding SyncFailed}" IsVisible="{Binding HasSyncIcon}"
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5"
+                        Padding="3" CornerRadius="8" ToolTip.Tip="{Binding SyncText}">
+                  <mi:MaterialIcon Kind="{Binding SyncIcon}" Width="15" Height="15" Foreground="White" />
+                </Border>
+                <!-- Select -->
+                <Button Classes="check" Classes.visible="{Binding IsSelected}" Classes.on="{Binding IsSelected}"
+                        Command="{Binding ToggleSelectCommand}" IsVisible="{Binding CanSelect}" l:Tr.Tip="Select">
+                  <Panel>
+                    <Ellipse Width="22" Height="22" Fill="White" IsVisible="{Binding IsSelected}" />
+                    <mi:MaterialIcon Kind="CheckCircle" Width="26" Height="26" IsVisible="{Binding IsSelected}" />
+                    <mi:MaterialIcon Kind="CheckboxBlankCircleOutline" Width="24" Height="24" IsVisible="{Binding !IsSelected}" />
+                  </Panel>
+                </Button>
+              </Panel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
   <UserControl.Styles>
     <!-- The grid is a plain virtualized list: no selection or hover chrome on rows -->
     <Style Selector="ListBox.grid">
@@ -72,6 +143,19 @@
     </Style>
     <Style Selector="Slider.videoSeek">
       <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.privacyTile Image.sharp">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Button.privacyTile.reveal Image.sharp, Button.privacyTile:pointerover Image.sharp">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Button.privacyTile.reveal :is(Control).blurred, Button.privacyTile:pointerover :is(Control).blurred">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="ToggleButton.filterChip">
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="12,5" />
     </Style>
     <Style Selector="Button.utility">
       <Setter Property="Background" Value="Transparent" />
@@ -248,11 +332,21 @@
           </TextBox.KeyBindings>
         </TextBox>
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" Margin="8,0,0,0" VerticalAlignment="Center">
+          <!-- Thumbnail size (also Ctrl + scroll over the photos) -->
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,8,0" IsVisible="{Binding ShowGrid}"
+                      l:Tr.Tip="Thumbnail size (Ctrl + scroll)">
+            <mi:MaterialIcon Kind="ViewGridCompact" Width="16" Height="16" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+            <Slider Width="120" Minimum="80" Maximum="360" Value="{Binding ThumbnailSize}" VerticalAlignment="Center" />
+            <mi:MaterialIcon Kind="ViewGrid" Width="18" Height="18" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+          </StackPanel>
           <Button Classes="secondary" Command="{Binding RestoreAllCommand}" IsVisible="{Binding ShowTrashActions}">
             <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="Restore" /><TextBlock l:Tr.Text="Restore all" /></StackPanel>
           </Button>
           <Button Classes="secondary danger" Command="{Binding EmptyTrashCommand}" IsVisible="{Binding ShowTrashActions}">
             <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="DeleteForeverOutline" /><TextBlock l:Tr.Text="Empty trash" /></StackPanel>
+          </Button>
+          <Button Classes="primary" Command="{Binding ArchiveAllCommand}" IsVisible="{Binding ShowArchiveAll}">
+            <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="ArchiveArrowDownOutline" /><TextBlock l:Tr.Text="Archive all" /></StackPanel>
           </Button>
           <Button Classes="secondary" Command="{Binding LockCommand}" IsVisible="{Binding ShowLockAction}">
             <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="LockOutline" /><TextBlock l:Tr.Text="Lock" /></StackPanel>
@@ -322,76 +416,6 @@
         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding ShowGrid}">
           <ListBox Name="Grid" Classes="grid" ItemsSource="{Binding Rows}" Margin="28,0,0,0" Padding="0,0,12,24"
                    ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-            <ListBox.DataTemplates>
-              <DataTemplate DataType="vm:MonthHeaderViewModel">
-                <StackPanel Orientation="Horizontal" Spacing="10" Height="54" VerticalAlignment="Bottom" Margin="2,0,0,0">
-                  <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="Medium" VerticalAlignment="Bottom" Margin="0,0,0,12" />
-                  <TextBlock Classes="caption tertiary" Text="{Binding Count}" VerticalAlignment="Bottom" Margin="0,0,0,14" />
-                </StackPanel>
-              </DataTemplate>
-              <DataTemplate DataType="vm:AssetRowViewModel">
-                <ItemsControl ItemsSource="{Binding Cells}" Height="{Binding RowHeight}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:AssetCellViewModel">
-                      <Button Classes="tile" Classes.selected="{Binding IsSelected}" Width="{Binding TileSize}" Height="{Binding TileSize}" VerticalAlignment="Top"
-                              Command="{Binding OpenCommand}" IsVisible="{Binding !IsMissing}" IsEnabled="{Binding CanOpen}">
-                        <Panel>
-                          <Image Classes="thumb" Source="{Binding Thumbnail}" Stretch="UniformToFill" />
-                          <!-- A file on this PC we can't preview here (video, HEIC…) -->
-                          <StackPanel IsVisible="{Binding ShowLocalPlaceholder}" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                      IsHitTestVisible="False">
-                            <mi:MaterialIcon Kind="{Binding IsVideo, Converter={x:Static vm:Converters.LocalFileIcon}}" Width="30" Height="30"
-                                             Foreground="{DynamicResource AppTextTertiaryBrush}" />
-                          </StackPanel>
-                          <!-- Hover shade so the check stays visible on bright photos -->
-                          <Border Classes="shade" IsHitTestVisible="False" Height="56" VerticalAlignment="Top">
-                            <Border.Background>
-                              <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
-                                <GradientStop Color="#66000000" Offset="0" />
-                                <GradientStop Color="#00000000" Offset="1" />
-                              </LinearGradientBrush>
-                            </Border.Background>
-                          </Border>
-                          <!-- Video badge -->
-                          <Border IsVisible="{Binding IsVideo}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                  Margin="6" Padding="6,2" CornerRadius="6" Background="#99000000">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                              <TextBlock Text="{Binding DurationText}" Foreground="White" FontSize="11.5" FontWeight="Medium" />
-                              <mi:MaterialIcon Kind="PlayCircleOutline" Width="14" Height="14" Foreground="White" />
-                            </StackPanel>
-                          </Border>
-                          <mi:MaterialIcon IsVisible="{Binding IsFavorite}" Kind="Heart" Width="16" Height="16" Foreground="White"
-                                           HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6" />
-                          <!-- File size (Large files) -->
-                          <Border IsVisible="{Binding HasSizeText}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5"
-                                  Padding="6,2" CornerRadius="6" Background="#99000000">
-                            <TextBlock Text="{Binding SizeText}" Foreground="White" FontSize="11.5" FontWeight="Medium" />
-                          </Border>
-                          <!-- In Immich, on this PC, or both -->
-                          <Border Classes="syncBadge" Classes.warn="{Binding SyncFailed}" IsVisible="{Binding HasSyncIcon}"
-                                  HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5"
-                                  Padding="3" CornerRadius="8" ToolTip.Tip="{Binding SyncText}">
-                            <mi:MaterialIcon Kind="{Binding SyncIcon}" Width="15" Height="15" Foreground="White" />
-                          </Border>
-                          <!-- Select -->
-                          <Button Classes="check" Classes.visible="{Binding IsSelected}" Classes.on="{Binding IsSelected}"
-                                  Command="{Binding ToggleSelectCommand}" IsVisible="{Binding CanSelect}" l:Tr.Tip="Select">
-                            <Panel>
-                              <Ellipse Width="22" Height="22" Fill="White" IsVisible="{Binding IsSelected}" />
-                              <mi:MaterialIcon Kind="CheckCircle" Width="26" Height="26" IsVisible="{Binding IsSelected}" />
-                              <mi:MaterialIcon Kind="CheckboxBlankCircleOutline" Width="24" Height="24" IsVisible="{Binding !IsSelected}" />
-                            </Panel>
-                          </Button>
-                        </Panel>
-                      </Button>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </DataTemplate>
-            </ListBox.DataTemplates>
           </ListBox>
           <c:TimelineScrubber Grid.Column="1" Name="Scrubber" Width="56" Sections="{Binding Sections}"
                               IsVisible="{Binding HasSections}" Margin="0,0,4,8" />
@@ -618,6 +642,16 @@
                     <mi:MaterialIcon Grid.Column="2" Kind="ChevronRight" Width="20" Height="20" Foreground="{DynamicResource AppTextTertiaryBrush}" />
                   </Grid>
                 </Button>
+                <Button Classes="utility" Command="{Binding OpenScreenCapturesCommand}">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <mi:MaterialIcon Kind="Monitor" Classes="utilityIcon" />
+                    <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center">
+                      <TextBlock l:Tr.Text="Archive screenshots and screen recordings" FontWeight="Medium" />
+                      <TextBlock Classes="caption" l:Tr.Text="Keep them out of your timeline without deleting them." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <mi:MaterialIcon Grid.Column="2" Kind="ChevronRight" Width="20" Height="20" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                  </Grid>
+                </Button>
                 <Button Classes="utility" Command="{Binding OpenLargeFilesCommand}">
                   <Grid ColumnDefinitions="Auto,*,Auto">
                     <mi:MaterialIcon Kind="ImageSizeSelectLarge" Classes="utilityIcon" />
@@ -701,6 +735,28 @@
                         </StackPanel>
                       </Grid>
                     </Border>
+                    <!-- Filters: what kind of thing, and how sure the check is -->
+                    <StackPanel Spacing="8" IsVisible="{Binding HasKindFilters}">
+                      <ItemsControl ItemsSource="{Binding KindFilters}">
+                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:PrivacyKindFilter">
+                            <ToggleButton Classes="filterChip" IsChecked="{Binding IsOn}" Content="{Binding Label}" Margin="0,0,8,6" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                    <Grid ColumnDefinitions="Auto,200,Auto,*,Auto" IsVisible="{Binding ShowConfidenceFilter}">
+                      <TextBlock Classes="secondary" l:Tr.Text="How sure" VerticalAlignment="Center" Margin="0,0,10,0"
+                                 l:Tr.Tip="For nudity, it's the detector's own score. For text, how strong the match is: a card number that passes the card checksum or a passport's machine-readable lines count as 95%, word matches as 80%." />
+                      <Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding MinConfidence}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Classes="secondary" Text="{Binding MinConfidenceText}" VerticalAlignment="Center" Margin="10,0,0,0" />
+                      <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Classes="caption" Text="{Binding FilterSummary}" VerticalAlignment="Center" />
+                        <Button Classes="ghost" Padding="8,3" l:Tr.Content="Clear filters" Command="{Binding ClearFiltersCommand}"
+                                IsVisible="{Binding FilterSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      </StackPanel>
+                    </Grid>
                     <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasItems}">
                       <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                         <TextBlock Classes="h3" Text="{Binding Count, StringFormat='{}{0:N0}'}" />
@@ -823,15 +879,14 @@
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:PrivacySuggestionViewModel">
                             <StackPanel Width="176" Margin="0,0,10,12" Spacing="5">
-                              <Button Classes="tile" Classes.selected="{Binding IsSelected}" Width="176" Height="176" Command="{Binding ToggleSelectCommand}">
+                              <Button Classes="tile privacyTile" Classes.selected="{Binding IsSelected}" Classes.reveal="{Binding Revealed}"
+                                      Width="176" Height="176" Command="{Binding ToggleSelectCommand}">
                                 <Panel>
-                                  <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"
-                                         IsVisible="{Binding $parent[ContentControl].((vm:PrivacyReviewViewModel)DataContext).ShowPictures}" />
-                                  <Image Source="{Binding Blurred}" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality"
-                                         IsVisible="{Binding !$parent[ContentControl].((vm:PrivacyReviewViewModel)DataContext).ShowPictures}" />
-                                  <mi:MaterialIcon Kind="EyeOffOutline" Width="26" Height="26" Foreground="White" Opacity="0.85"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   IsVisible="{Binding !$parent[ContentControl].((vm:PrivacyReviewViewModel)DataContext).ShowPictures}" />
+                                  <!-- Blurred unless "Show pictures" is on or the pointer is over it -->
+                                  <Image Classes="sharp" Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                  <Image Classes="blurred" Source="{Binding Blurred}" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                  <mi:MaterialIcon Classes="blurred" Kind="EyeOffOutline" Width="26" Height="26" Foreground="White" Opacity="0.85"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
                                   <Panel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6">
                                     <Ellipse Width="22" Height="22" Fill="White" IsVisible="{Binding IsSelected}" />
                                     <mi:MaterialIcon Kind="CheckCircle" Width="26" Height="26" IsVisible="{Binding IsSelected}" Foreground="{DynamicResource AppPrimaryBrush}" />
@@ -843,7 +898,10 @@
                                   </Button>
                                 </Panel>
                               </Button>
-                              <TextBlock Classes="caption" Text="{Binding Reason}" TextWrapping="Wrap" Margin="2,0" />
+                              <StackPanel Orientation="Horizontal" Spacing="6" Margin="2,0">
+                                <TextBlock Classes="caption" Text="{Binding Reason}" TextWrapping="Wrap" MaxWidth="110" />
+                                <TextBlock Classes="caption tertiary" Text="{Binding ConfidenceText}" />
+                              </StackPanel>
                             </StackPanel>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -986,32 +1044,50 @@
           </StackPanel>
         </Border>
 
-        <!-- Map -->
-        <Panel IsVisible="{Binding ShowMap}" Margin="28,4,28,24">
-          <Border CornerRadius="18" ClipToBounds="True" BorderBrush="{DynamicResource AppCardBorderBrush}" BorderThickness="1">
-            <c:MapView Name="Map" Markers="{Binding Markers}" ShowStreetDetail="{Binding ShowStreetDetail}" />
+        <!-- Map, with the photos of a clicked bubble (or the area in view) beside it -->
+        <Grid IsVisible="{Binding ShowMap}" Margin="28,4,28,24" ColumnDefinitions="*,Auto">
+          <Panel>
+            <Border CornerRadius="18" ClipToBounds="True" BorderBrush="{DynamicResource AppCardBorderBrush}" BorderThickness="1">
+              <c:MapView Name="Map" Markers="{Binding Markers}" ShowStreetDetail="{Binding ShowStreetDetail}"
+                         AllowDark="{Binding MapAllowDark}" HeatMap="{Binding MapHeat}" />
+            </Border>
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12" Spacing="6">
+              <Button Classes="secondary icon" Name="ZoomInButton" l:Tr.Tip="Zoom in"><mi:MaterialIcon Kind="Plus" Width="18" Height="18" /></Button>
+              <Button Classes="secondary icon" Name="ZoomOutButton" l:Tr.Tip="Zoom out"><mi:MaterialIcon Kind="Minus" Width="18" Height="18" /></Button>
+              <Button Classes="secondary icon" Name="FitButton" l:Tr.Tip="Show all photos"><mi:MaterialIcon Kind="FitToScreenOutline" Width="18" Height="18" /></Button>
+            </StackPanel>
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12" Spacing="6" Orientation="Horizontal">
+              <ToggleButton Padding="12,7" CornerRadius="999" IsChecked="{Binding MapHeat}" l:Tr.Tip="Show where most of your photos are">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="Fire" Width="18" Height="18" />
+                  <TextBlock l:Tr.Text="Heat map" />
+                </StackPanel>
+              </ToggleButton>
+              <Button Classes="secondary icon" Command="{Binding OpenMapSettingsCommand}" l:Tr.Tip="Map settings">
+                <mi:MaterialIcon Kind="CogOutline" Width="18" Height="18" />
+              </Button>
+            </StackPanel>
+            <Button Name="ShowAreaButton" Classes="primary" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,34">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="ImageMultipleOutline" />
+                <TextBlock Name="ShowAreaText" l:Tr.Text="Show photos in this area" />
+              </StackPanel>
+            </Button>
+          </Panel>
+          <Border Grid.Column="1" Width="392" Margin="12,0,0,0" CornerRadius="18" Classes="card" Padding="0" IsVisible="{Binding ShowMapPanel}">
+            <DockPanel>
+              <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="16,12,8,8">
+                <mi:MaterialIcon Kind="ImageMultipleOutline" Width="20" Height="20" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding MapPanelTitle}" FontWeight="SemiBold" Margin="10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <Button Grid.Column="2" Classes="ghost icon" Command="{Binding CloseMapPanelCommand}" l:Tr.Tip="Close">
+                  <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
+                </Button>
+              </Grid>
+              <ListBox Name="MapPanelGrid" Classes="grid" ItemsSource="{Binding MapPanelRows}" Margin="12,0,8,12"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+            </DockPanel>
           </Border>
-          <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12" Spacing="6">
-            <Button Classes="secondary icon" Name="ZoomInButton" l:Tr.Tip="Zoom in"><mi:MaterialIcon Kind="Plus" Width="18" Height="18" /></Button>
-            <Button Classes="secondary icon" Name="ZoomOutButton" l:Tr.Tip="Zoom out"><mi:MaterialIcon Kind="Minus" Width="18" Height="18" /></Button>
-            <Button Classes="secondary icon" Name="FitButton" l:Tr.Tip="Show all photos"><mi:MaterialIcon Kind="FitToScreenOutline" Width="18" Height="18" /></Button>
-          </StackPanel>
-          <!-- Street detail comes from an online map service; the built-in map needs nothing. -->
-          <ToggleButton HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12" Padding="12,7" CornerRadius="999"
-                        IsChecked="{Binding ShowStreetDetail}"
-                        l:Tr.Tip="Street names and roads come from an online map service (no account or key needed). Off: only the built-in map is used, and nothing about your photos' locations leaves your PC.">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <mi:MaterialIcon Kind="LayersOutline" Width="18" Height="18" />
-              <TextBlock l:Tr.Text="Street detail" />
-            </StackPanel>
-          </ToggleButton>
-          <Button Name="ShowAreaButton" Classes="primary" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,34">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <mi:MaterialIcon Kind="ImageMultipleOutline" />
-              <TextBlock Name="ShowAreaText" l:Tr.Text="Show photos in this area" />
-            </StackPanel>
-          </Button>
-        </Panel>
+        </Grid>
 
         <!-- Albums / people / places / map: loading and messages -->
         <StackPanel Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsLoadingCollection}">
@@ -1209,6 +1285,41 @@
               Background="{DynamicResource AppPageBrush}" BoxShadow="0 18 50 0 #40000000">
         <ContentControl Content="{Binding Panel}">
           <ContentControl.DataTemplates>
+            <DataTemplate DataType="vm:MapSettingsViewModel">
+              <StackPanel Spacing="4">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                  <TextBlock Classes="h2" l:Tr.Text="Map settings" VerticalAlignment="Center" />
+                  <Button Grid.Column="1" Classes="ghost icon" Command="{Binding CancelCommand}">
+                    <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
+                  </Button>
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Allow dark mode" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding AllowDark}" OnContent="" OffContent="" /></Grid>
+                <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Only favorites" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding OnlyFavorites}" OnContent="" OffContent="" /></Grid>
+                <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Include archived" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding IncludeArchived}" OnContent="" OffContent="" /></Grid>
+                <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Include shared partner photos" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding IncludePartners}" OnContent="" OffContent="" /></Grid>
+                <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Include shared albums" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding IncludeSharedAlbums}" OnContent="" OffContent="" /></Grid>
+                <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Show photo panel by default" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowPanel}" OnContent="" OffContent="" /></Grid>
+                <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Heat map" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding HeatMap}" OnContent="" OffContent="" /></Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock l:Tr.Text="Street detail" />
+                    <TextBlock Classes="caption" TextWrapping="Wrap" MaxWidth="300"
+                               l:Tr.Text="Roads and names from an online map service. Off: only the built-in map, and nothing about where your photos are leaves your PC." />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding StreetDetail}" OnContent="" OffContent="" />
+                </Grid>
+                <TextBlock l:Tr.Text="Date range" Margin="0,8,0,4" />
+                <ComboBox ItemsSource="{Binding DateRanges}" SelectedItem="{Binding SelectedDateRange}" HorizontalAlignment="Stretch" />
+                <Grid ColumnDefinitions="*,12,*" IsVisible="{Binding IsCustom}" Margin="0,8,0,0">
+                  <CalendarDatePicker SelectedDate="{Binding From}" HorizontalAlignment="Stretch" l:Tr.Watermark="From" />
+                  <CalendarDatePicker Grid.Column="2" SelectedDate="{Binding To}" HorizontalAlignment="Stretch" l:Tr.Watermark="To" />
+                </Grid>
+                <Grid ColumnDefinitions="*,12,*" Margin="0,16,0,0">
+                  <Button Classes="secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" l:Tr.Content="Cancel" Command="{Binding CancelCommand}" />
+                  <Button Grid.Column="2" Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" l:Tr.Content="Save" Command="{Binding SaveCommand}" />
+                </Grid>
+              </StackPanel>
+            </DataTemplate>
             <DataTemplate DataType="vm:SharePanelViewModel">
               <StackPanel Spacing="14">
                 <Grid ColumnDefinitions="*,Auto">

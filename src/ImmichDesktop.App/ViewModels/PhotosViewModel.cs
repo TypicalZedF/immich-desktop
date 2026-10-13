@@ -25,8 +25,9 @@ public enum LibraryPage
 
 /// <summary>What the grid is showing: a title and how to load its groups.</summary>
 /// <param name="ShowSizes">Tiles show each file's size (Large files).</param>
+/// <param name="OffersArchiveAll">An "Archive all" button in the header (screenshots utility).</param>
 public sealed record GridQuery(string Title, Func<ImmichClient, CancellationToken, Task<List<BucketState>>> Load, AlbumInfo? Album = null,
-    bool ShowSizes = false);
+    bool ShowSizes = false, bool OffersArchiveAll = false);
 
 /// <summary>
 /// One section of your Immich library (see <see cref="LibraryPage"/>): the timeline, Explore (people
@@ -41,7 +42,9 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
 
     /// <summary>Height of a month heading in the grid (fixed, so the date rail knows where months are).</summary>
     public const double HeaderHeight = 54;
-    const double TargetTile = 168;
+    public const double MinTile = 80, MaxTile = 360;
+    double _targetTile = Math.Clamp(AppServices.Settings.Current.ThumbnailSize, MinTile, MaxTile);
+    double _scaling = 1;
     const int CardDecodeWidth = 360;
 
     readonly CancellationTokenSource _lifetime = new();
@@ -109,7 +112,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowGrid), nameof(ShowAlbums), nameof(ShowExplore), nameof(ShowMap), nameof(ShowSharing),
         nameof(ShowLockedPrompt), nameof(IsDrilledIn), nameof(Heading), nameof(CanShareAlbum), nameof(CanDeleteAlbum), nameof(ShowHeading),
-        nameof(IsTrash), nameof(IsArchive), nameof(ShowTrashActions), nameof(ShowLockAction), nameof(ShowUtilities))]
+        nameof(IsTrash), nameof(IsArchive), nameof(ShowTrashActions), nameof(ShowLockAction), nameof(ShowUtilities), nameof(ShowArchiveAll))]
     public partial GridQuery? Drill { get; set; }
 
     public bool IsDrilledIn => Drill is not null || Duplicates is not null || Privacy is not null;
@@ -125,6 +128,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     public bool ShowSharing => Drill is null && Page == LibraryPage.Sharing;
     public bool ShowLockedPrompt => Drill is null && Page == LibraryPage.Locked && !IsUnlocked;
     public bool ShowTrashActions => IsTrash && !IsEmpty && !IsLoading;
+    public bool ShowArchiveAll => Drill?.OffersArchiveAll == true && !IsEmpty && !IsLoading;
     public bool ShowLockAction => Page == LibraryPage.Locked && IsUnlocked && Drill is null;
     public bool CanShareAlbum => Drill?.Album is not null && !IsPicker;
     public bool CanDeleteAlbum => Drill?.Album is { } album && !IsPicker && album.IsOwnedBy(AppServices.Settings.Current.UserId);
@@ -204,14 +208,14 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     public bool HasSections => Sections.Count > 0;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowTrashActions))]
+    [NotifyPropertyChangedFor(nameof(ShowTrashActions), nameof(ShowArchiveAll))]
     public partial bool IsLoading { get; set; } = true;
 
     [ObservableProperty]
     public partial string? Error { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowTrashActions))]
+    [NotifyPropertyChangedFor(nameof(ShowTrashActions), nameof(ShowArchiveAll))]
     public partial bool IsEmpty { get; set; }
 
     [ObservableProperty]
@@ -375,13 +379,57 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         }
     }
 
+    // ---- Thumbnail size (the slider, or Ctrl + scroll) ----
+
+    /// <summary>The photo the grid's top row starts with (asked of the view, to keep your place when resizing).</summary>
+    internal Func<(BucketState Bucket, int Index)?>? GetTopAnchor { get; set; }
+
+    /// <summary>Asks the view to scroll so this row is at the top.</summary>
+    public event Action<int>? ScrollToRowRequested;
+
+    CancellationTokenSource? _saveTileSize;
+
+    /// <summary>How big thumbnails are, in pixels (remembered).</summary>
+    public double ThumbnailSize
+    {
+        get => _targetTile;
+        set
+        {
+            value = Math.Clamp(value, MinTile, MaxTile);
+            if (Math.Abs(value - _targetTile) < 0.5)
+                return;
+            var anchor = GetTopAnchor?.Invoke();
+            _targetTile = value;
+            OnPropertyChanged();
+            var columnsBefore = _columns;
+            if (_width > 0)
+                SetLayout(_width, _scaling);
+            if (anchor is { } a && _columns != columnsBefore)
+            {
+                var index = Rows.ToList().FindIndex(r => r is AssetRowViewModel row && row.Bucket == a.Bucket && a.Index >= row.Start && a.Index < row.Start + row.Cells.Count);
+                if (index >= 0)
+                    ScrollToRowRequested?.Invoke(index);
+            }
+            // Save once the slider settles, not on every step.
+            _saveTileSize?.Cancel();
+            var cts = _saveTileSize = new CancellationTokenSource();
+            var size = (int)value;
+            _ = Task.Delay(500, cts.Token).ContinueWith(t =>
+            {
+                if (!t.IsCanceled)
+                    AppServices.Settings.Update(s => s.ThumbnailSize = size);
+            }, TaskScheduler.Default);
+        }
+    }
+
     /// <summary>Called by the view when its width or display scaling changes.</summary>
     public void SetLayout(double width, double scaling)
     {
         if (width <= 0)
             return;
         _width = width;
-        var columns = Math.Max(2, (int)((width + Gap) / (TargetTile + Gap)));
+        _scaling = scaling;
+        var columns = Math.Max(2, (int)((width + Gap) / (_targetTile + Gap)));
         var tile = TileSize(columns);
         DecodeWidth = (int)Math.Ceiling(tile * Math.Max(1, scaling));
         if (columns != _columns)
@@ -516,6 +564,10 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             }
         }));
     }
+
+    /// <summary>Photos whose file name contains the text (e.g. "IMG_4410").</summary>
+    public void SearchFileName(string text) =>
+        OpenDrill(new GridQuery(Tr.T("File names with “{0}”", text), async (client, ct) => BucketState.FromAssets(await client.SearchAsync(text, null, 2000, ct))));
 
     // ---- Albums, Explore (people and places), Sharing ----
 
@@ -902,7 +954,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         CollectionMessage = null;
         try
         {
-            Markers = await client.GetMapMarkersAsync(_lifetime.Token);
+            Markers = await client.GetMapMarkersAsync(Core.Settings.MapSettings.Filter(AppServices.Settings.Current, DateTimeOffset.Now), _lifetime.Token);
             if (Markers.Count == 0)
                 CollectionMessage = Tr.T("No photos with a location yet.");
         }
@@ -918,17 +970,6 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         {
             IsLoadingCollection = false;
         }
-    }
-
-    /// <summary>Shows the photos of a map area (or one cluster) as a grid.</summary>
-    public void ShowMapPhotos(IReadOnlyList<MapMarker> markers)
-    {
-        if (markers.Count == 0)
-            return;
-        var place = markers.Select(m => m.City).Where(c => !string.IsNullOrWhiteSpace(c)).GroupBy(c => c).OrderByDescending(g => g.Count()).FirstOrDefault()?.Key;
-        var assets = markers.Select(m => new TimelineAsset(m.Id, true, false, 1, null, null)).ToList();
-        OpenDrill(new GridQuery(place is null ? Tr.T("This area") : Tr.T("Around {0}", place),
-            (_, _) => Task.FromResult(BucketState.FromAssets(assets, Format.Plural(assets.Count, "photo")))));
     }
 
     // ---- Selection ----

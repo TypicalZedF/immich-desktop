@@ -166,6 +166,13 @@ public sealed record TimelineAsset(string Id, bool IsImage, bool IsFavorite, dou
     public bool IsLocalOnly => LocalPath is not null;
 }
 
+/// <summary>Which photos the map shows (Map settings).</summary>
+public sealed record MapFilter(bool OnlyFavorites = false, bool IncludeArchived = false, bool WithPartners = false, bool WithSharedAlbums = false,
+    DateTimeOffset? After = null, DateTimeOffset? Before = null)
+{
+    public static MapFilter Everything { get; } = new();
+}
+
 /// <summary>One photo in a group of duplicates, with what's needed to pick the one to keep.</summary>
 public sealed record DuplicateAsset(TimelineAsset Asset, string FileName, int Width, int Height, long FileSize);
 
@@ -226,6 +233,21 @@ internal sealed record AssetDto(
 internal sealed record SearchAssetsDto(List<AssetDto> Items, string? NextPage);
 internal sealed record SearchResponseDto(SearchAssetsDto Assets);
 internal sealed record SmartSearchRequestDto(string Query, int Page, int Size);
+/// <summary>A screen capture search: the file name or folder contains some text.</summary>
+internal sealed record CaptureSearchRequestDto(string? OriginalFileName, string? OriginalPath, string? Type, string Visibility, int Page, int Size);
+
+/// <summary>Files of a type with no camera make ("make": null is how the server is asked for that).</summary>
+internal sealed record NoCameraSearchRequestDto(string? OriginalFileName, string Type, string Visibility, int Page, int Size)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public string? Make => null;
+}
+
+/// <summary>What kind of screen capture a photo looks like.</summary>
+public enum CaptureKind { Screenshot, ScreenRecording, LikelyScreenshot }
+
+public sealed record ScreenCapture(TimelineAsset Asset, CaptureKind Kind);
+
 internal sealed record MetadataSearchRequestDto(string? City, string? OriginalFileName, int Page, int Size, string? Order = "desc");
 internal sealed record MapMarkerDto(string Id, double Lat, double Lon, string? City, string? Country);
 internal sealed record FavoriteRequestDto(IReadOnlyList<string> Ids, bool IsFavorite);

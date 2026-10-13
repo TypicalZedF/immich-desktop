@@ -145,12 +145,15 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     void Search()
     {
-        var text = SearchText.Trim();
-        if (text.Length == 0)
+        // Enter: the highlighted suggestion, or a smart search for the text.
+        if (SelectedSuggestion is { } highlighted)
+        {
+            Choose(highlighted);
             return;
-        Navigate(ShellPage.Photos);
-        if (SelectedNav.ViewModel is PhotosViewModel photos)
-            photos.SearchFor(text);
+        }
+        var text = SearchText.Trim();
+        if (text.Length > 0)
+            Run(new SearchHistoryEntry { Kind = SearchKind.Text, Text = text });
     }
 
     [RelayCommand]

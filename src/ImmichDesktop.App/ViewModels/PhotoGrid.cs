@@ -250,13 +250,27 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
             return;
         try
         {
-            var bitmap = asset.LocalPath is { } path
-                ? await loader.LoadLocalAsync(path, asset.IsImage, owner.DecodeWidth, ct)
-                : await loader.LoadAsync(asset.Id, AssetImageSize.Thumbnail, owner.DecodeWidth, ct);
-            if (ct.IsCancellationRequested)
-                bitmap?.Dispose();
+            if (asset.LocalPath is { } path)
+            {
+                var local = await loader.LoadLocalAsync(path, asset.IsImage, owner.DecodeWidth, ct);
+                if (ct.IsCancellationRequested)
+                    local?.Dispose();
+                else
+                {
+                    Thumbnail = local;
+                    _ownsThumbnail = true;
+                }
+            }
             else
-                Thumbnail = bitmap;
+            {
+                // Shared, decoded thumbnails: scrolling back shows them instantly (the cache owns them).
+                var bitmap = await loader.LoadGridThumbnailAsync(asset.Id, owner.DecodeWidth, ct);
+                if (!ct.IsCancellationRequested)
+                {
+                    Thumbnail = bitmap;
+                    _ownsThumbnail = false;
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -275,12 +289,15 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
         }
     }
 
+    bool _ownsThumbnail;
+
     internal void Release()
     {
         var bitmap = Thumbnail;
         _thumbnailTried = false;
         Thumbnail = null;
-        bitmap?.Dispose();
+        if (_ownsThumbnail)
+            bitmap?.Dispose();
     }
 
     /// <summary>Opens the photo, or (while selecting) adds it to the selection.</summary>

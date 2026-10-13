@@ -183,6 +183,24 @@ static class Screens
             overview.Apply(Synced);
             Shot(main, outDir, $"11-overview-synced-{suffix}", height: 860);
 
+            // Search: suggestions for people, places and albums as you type, and history.
+            if (suffix == "light")
+            {
+                shell.OnSearchFocused();
+                Pump(TimeSpan.FromSeconds(1));
+                shell.SearchText = "Li";
+                Pump(TimeSpan.FromMilliseconds(300));
+                Console.WriteLine($"Search 'Li' suggests: {string.Join(" | ", shell.Suggestions.Select(x => $"{x.Title} ({x.Subtitle})"))}");
+                Shot(main, outDir, "13-search-suggestions", height: 760, settle: TimeSpan.FromSeconds(0.5));
+                shell.ChooseCommand.Execute(shell.Suggestions.First(x => x.Subtitle == "Lisbon, Portugal" || x.Title == "Lisbon"));
+                Pump(TimeSpan.FromSeconds(1));
+                shell.SearchText = "";
+                shell.OnSearchFocused();
+                Console.WriteLine($"Search history: {string.Join(" | ", shell.Suggestions.Select(x => $"{x.Title} ({x.Subtitle})"))}");
+                shell.CloseSuggestions();
+                ((PhotosViewModel)Page(shell, ShellPage.Photos)).BackCommand.Execute(null); // back to the timeline
+                Pump(TimeSpan.FromSeconds(1));
+            }
             shell.Navigate(ShellPage.Photos);
             Shot(main, outDir, $"15-photos-{suffix}", height: 860, settle: TimeSpan.FromSeconds(3));
             // Hover the date rail between labels (where hovering used to do nothing).
@@ -240,7 +258,7 @@ static class Screens
 
             // The privacy check: runs the real on-device models over the demo library (on the CPU here),
             // then shows what it suggests for the locked folder.
-            if (suffix == "light")
+            if (suffix == "light" && Environment.GetEnvironmentVariable("IMMICH_SCREENS_QUICK") is null)
             {
                 // On public Wi-Fi it waits...
                 ImmichDesktop.Core.Platform.NetworkStatus.Override = new ImmichDesktop.Core.Platform.NetworkSnapshot("Cafe Wi-Fi", false, IsPrivate: false);
@@ -276,7 +294,7 @@ static class Screens
             var privacyPage = (PhotosViewModel)Page(shell, ShellPage.Utilities);
             privacyPage.OpenPrivacyCommand.Execute(null);
             Shot(main, outDir, $"19p-privacy-{suffix}", height: 860, settle: TimeSpan.FromSeconds(2));
-            if (suffix == "light" && privacyPage.Privacy is { } review)
+            if (suffix == "light" && privacyPage.Privacy is { } review && Environment.GetEnvironmentVariable("IMMICH_SCREENS_QUICK") is null)
             {
                 review.ShowDetails = true;
                 Shot(main, outDir, "19p3-privacy-how-it-works", height: 2100, settle: TimeSpan.FromSeconds(1));
@@ -303,6 +321,9 @@ static class Screens
             Shot(main, outDir, $"19-utilities-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1.5));
             utilities.OpenDuplicatesCommand.Execute(null);
             Shot(main, outDir, $"19b-duplicates-{suffix}", height: 860, settle: TimeSpan.FromSeconds(2));
+            utilities.BackCommand.Execute(null);
+            utilities.OpenScreenCapturesCommand.Execute(null);
+            Shot(main, outDir, $"19c2-screenshots-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
             utilities.BackCommand.Execute(null);
             utilities.OpenLargeFilesCommand.Execute(null);
             Shot(main, outDir, $"19c-large-files-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
@@ -360,6 +381,26 @@ static class Screens
                 Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(w).OfType<ImmichDesktop.App.Controls.MapView>().First().CenterOn(39, -96, 4.2));
             Shot(main, outDir, $"19d3-map-world-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1), interact: w =>
                 Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(w).OfType<ImmichDesktop.App.Controls.MapView>().First().CenterOn(18, 40, 2.4));
+            {
+                var mapPage = (PhotosViewModel)Page(shell, ShellPage.Map);
+                ImmichDesktop.App.Controls.MapView MapOf(MainWindow w) =>
+                    Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(w).OfType<ImmichDesktop.App.Controls.MapView>().First();
+                // Up close, single photos show as thumbnails.
+                Shot(main, outDir, $"19d4-map-thumbnails-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2), interact: w =>
+                {
+                    MapOf(w).CenterOn(30.27, -97.74, 12.2);
+                    Pump(TimeSpan.FromSeconds(2));
+                });
+                mapPage.MapHeat = true;
+                Shot(main, outDir, $"19d5-map-heat-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1), interact: w => MapOf(w).CenterOn(39, -96, 4.2));
+                mapPage.MapHeat = false;
+                mapPage.ShowMapPhotos(mapPage.Markers.Take(60).ToList());
+                Shot(main, outDir, $"19d6-map-panel-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2), interact: w => MapOf(w).CenterOn(39, -96, 4.2));
+                mapPage.CloseMapPanelCommand.Execute(null);
+                mapPage.OpenMapSettingsCommand.Execute(null);
+                Shot(main, outDir, $"19d7-map-settings-{suffix}", height: 860, settle: TimeSpan.FromSeconds(1));
+                mapPage.Panel = null;
+            }
             shell.Navigate(ShellPage.Trash);
             Shot(main, outDir, $"19f-trash-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
             shell.Navigate(ShellPage.Locked);

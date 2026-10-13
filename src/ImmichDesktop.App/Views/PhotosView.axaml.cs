@@ -60,7 +60,24 @@ public partial class PhotosView : UserControl
         this.FindControl<Button>("FitButton")!.Click += (_, _) => _map.FitToMarkers();
         this.FindControl<Button>("ShowAreaButton")!.Click += (_, _) => _vm?.ShowMapPhotos(_map.VisibleMarkers());
         _map.ClusterOpened += markers => _vm?.ShowMapPhotos(markers);
-        _map.ViewChanged += UpdateAreaButton;
+        _map.ViewChanged += () =>
+        {
+            UpdateAreaButton();
+            _vm?.OnMapViewChanged(_map.VisibleMarkers());
+        };
+        // Single photos on the map show as round thumbnails.
+        _map.ThumbnailProvider = (id, ct) => _vm?.Thumbnails is { } loader
+            ? loader.LoadAsync(id, Core.Api.AssetImageSize.Thumbnail, 96, ct)
+            : Task.FromResult<Avalonia.Media.Imaging.Bitmap?>(null);
+        // The map's side panel is a small photo grid: rows load while on screen, like the main grid.
+        var panel = this.FindControl<ListBox>("MapPanelGrid")!;
+        panel.ContainerPrepared += (_, e) => (e.Container.DataContext as AssetRowViewModel)?.Realize();
+        panel.ContainerClearing += (_, e) => (e.Container.DataContext as AssetRowViewModel)?.Unrealize();
+        panel.SizeChanged += (_, e) =>
+        {
+            if (_vm is not null && e.NewSize.Width > 0)
+                _vm.MapPanelWidth = e.NewSize.Width - 14; // room for the scrollbar
+        };
 
         // Viewer: scroll to zoom, drag to move, double-click to toggle zoom.
         _stage.PointerWheelChanged += OnStageWheel;
@@ -79,6 +96,156 @@ public partial class PhotosView : UserControl
             return;
         _scroll.ScrollChanged += (_, _) => UpdateScrubber();
         _scroll.SizeChanged += (_, _) => UpdateScrubber();
+        // Smooth wheel scrolling (and Ctrl + wheel to resize thumbnails), before the list jumps by itself.
+        _grid.AddHandler(PointerWheelChangedEvent, OnGridWheel, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        // Middle-click autoscroll, like a web browser.
+        _grid.AddHandler(PointerPressedEvent, OnGridPressed, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        _grid.AddHandler(PointerMovedEvent, OnGridMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        _grid.AddHandler(PointerReleasedEvent, OnGridReleased, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+    }
+
+    // ---- Middle-click autoscroll ----
+    // Click the wheel, then move the pointer up or down: the further from where you clicked, the
+    // faster it scrolls. Click again (or let go after holding the wheel down and moving) to stop.
+
+    Point? _autoAnchor;
+    Point _autoPointer;
+    DateTime _autoStarted;
+    bool _autoHeld;
+    TimeSpan? _autoFrame;
+
+    void OnGridPressed(object? sender, PointerPressedEventArgs e)
+    {
+        var point = e.GetCurrentPoint(_grid);
+        if (_autoAnchor is not null)
+        {
+            StopAutoScroll(e.Pointer);
+            e.Handled = true;
+            return;
+        }
+        if (!point.Properties.IsMiddleButtonPressed || _scroll is null)
+            return;
+        e.Handled = true;
+        _scrollTarget = null;
+        _autoAnchor = _autoPointer = point.Position;
+        _autoStarted = DateTime.UtcNow;
+        _autoHeld = true;
+        e.Pointer.Capture(_grid);
+        _grid.Cursor = new Cursor(StandardCursorType.SizeNorthSouth);
+        _autoFrame = TimeSpan.Zero;
+        TopLevel.GetTopLevel(this)?.RequestAnimationFrame(OnAutoScrollFrame);
+    }
+
+    void OnGridMoved(object? sender, PointerEventArgs e)
+    {
+        if (_autoAnchor is null)
+            return;
+        _autoPointer = e.GetPosition(_grid);
+        e.Handled = true;
+    }
+
+    void OnGridReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_autoAnchor is not { } anchor || e.InitialPressMouseButton != MouseButton.Middle)
+            return;
+        e.Handled = true;
+        // Held down and moved: letting go stops. A quick click keeps it going until the next click.
+        if (_autoHeld && ((DateTime.UtcNow - _autoStarted).TotalMilliseconds > 350 || Math.Abs(_autoPointer.Y - anchor.Y) > 12))
+            StopAutoScroll(e.Pointer);
+        _autoHeld = false;
+    }
+
+    void StopAutoScroll(IPointer? pointer)
+    {
+        _autoAnchor = null;
+        _autoFrame = null;
+        _grid.Cursor = Cursor.Default;
+        pointer?.Capture(null);
+    }
+
+    void OnAutoScrollFrame(TimeSpan time)
+    {
+        if (_autoAnchor is not { } anchor || _scroll is null)
+        {
+            _autoFrame = null;
+            return;
+        }
+        var dt = _autoFrame is { } last && last > TimeSpan.Zero ? Math.Clamp((time - last).TotalSeconds, 0.001, 0.05) : 1 / 60.0;
+        _autoFrame = time;
+        var distance = _autoPointer.Y - anchor.Y;
+        const double deadZone = 10;
+        if (Math.Abs(distance) > deadZone)
+        {
+            // Speeds up faster than the distance: a little for reading, a lot for flying through years.
+            var speed = Math.Sign(distance) * Math.Pow(Math.Abs(distance) - deadZone, 1.6) * 2.2; // pixels per second
+            var max = Math.Max(0, _scroll.Extent.Height - _scroll.Viewport.Height);
+            _scroll.Offset = new Vector(_scroll.Offset.X, Math.Clamp(_scroll.Offset.Y + speed * dt, 0, max));
+        }
+        TopLevel.GetTopLevel(this)?.RequestAnimationFrame(OnAutoScrollFrame);
+    }
+
+    // ---- Smooth scrolling ----
+    // The wheel sets where to go; the grid glides there over a few frames instead of jumping.
+
+    double? _scrollTarget;
+    TimeSpan? _scrollFrame;
+
+    void OnGridWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if (_scroll is null || _vm is null)
+            return;
+        e.Handled = true;
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            _vm.ThumbnailSize *= Math.Pow(1.12, e.Delta.Y);
+            return;
+        }
+        var max = Math.Max(0, _scroll.Extent.Height - _scroll.Viewport.Height);
+        var from = _scrollTarget ?? _scroll.Offset.Y;
+        _scrollTarget = Math.Clamp(from - e.Delta.Y * 150, 0, max);
+        if (_scrollFrame is null)
+        {
+            _scrollFrame = TimeSpan.Zero;
+            TopLevel.GetTopLevel(this)?.RequestAnimationFrame(OnScrollFrame);
+        }
+    }
+
+    void OnScrollFrame(TimeSpan time)
+    {
+        if (_scroll is null || _scrollTarget is not { } target)
+        {
+            _scrollFrame = null;
+            return;
+        }
+        var dt = _scrollFrame is { } last && last > TimeSpan.Zero ? Math.Clamp((time - last).TotalSeconds, 0.001, 0.05) : 1 / 60.0;
+        _scrollFrame = time;
+        var current = _scroll.Offset.Y;
+        var diff = target - current;
+        if (Math.Abs(diff) < 0.5)
+        {
+            _scroll.Offset = new Vector(_scroll.Offset.X, target);
+            _scrollTarget = null;
+            _scrollFrame = null;
+            return;
+        }
+        // Ease out: a fixed share of the remaining distance each frame, whatever the frame rate.
+        _scroll.Offset = new Vector(_scroll.Offset.X, current + diff * (1 - Math.Pow(0.0002, dt)));
+        TopLevel.GetTopLevel(this)?.RequestAnimationFrame(OnScrollFrame);
+    }
+
+    /// <summary>The photo at the top of the grid, so resizing thumbnails keeps your place.</summary>
+    (BucketState Bucket, int Index)? TopAnchor()
+    {
+        if (_scroll is null)
+            return null;
+        foreach (var container in _grid.GetRealizedContainers().OrderBy(c => _grid.IndexFromContainer(c)))
+        {
+            if (container.TranslatePoint(default, _scroll) is not { } top || top.Y + container.Bounds.Height <= 1)
+                continue;
+            if (container.DataContext is AssetRowViewModel row)
+                return (row.Bucket, row.Start);
+        }
+        return null;
     }
 
     /// <summary>With the date rail showing, the grid's own scrollbar would just crowd it.</summary>
@@ -165,11 +332,25 @@ public partial class PhotosView : UserControl
             button.IsEnabled = count > 0;
     }
 
+    void OnScrollToRow(int index)
+    {
+        _scrollTarget = null;
+        // After the new rows are laid out.
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (_vm is not null)
+                SeekTo(_vm.RowOffset(index));
+        }, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
         if (_vm is not null)
+        {
             _vm.PropertyChanged -= OnViewModelChanged;
+            _vm.ScrollToRowRequested -= OnScrollToRow;
+        }
         _vm = DataContext as PhotosViewModel;
         if (_vm is null)
         {
@@ -177,6 +358,9 @@ public partial class PhotosView : UserControl
             return;
         }
         _vm.PropertyChanged += OnViewModelChanged;
+        _vm.GetTopAnchor = TopAnchor;
+        _vm.ScrollToRowRequested -= OnScrollToRow;
+        _vm.ScrollToRowRequested += OnScrollToRow;
         SetViewer(_vm.Viewer); // a viewer may already be open (this view can be recreated)
         UpdateScrollBar(force: true);
         if (_grid.Bounds.Width > 0)
@@ -191,6 +375,7 @@ public partial class PhotosView : UserControl
                 SetViewer(_vm?.Viewer);
                 break;
             case nameof(PhotosViewModel.Rows):
+                _scrollTarget = null;
                 _scroll?.ScrollToHome();
                 break;
             case nameof(PhotosViewModel.HasSections):

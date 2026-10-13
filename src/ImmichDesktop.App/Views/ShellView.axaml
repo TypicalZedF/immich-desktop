@@ -19,15 +19,47 @@
       </StackPanel>
 
       <!-- Search, like the web app's top bar -->
-      <TextBox Grid.Column="1" MaxWidth="560" HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="8,0,24,0"
-               Text="{Binding SearchText}" l:Tr.Watermark="Search your photos" CornerRadius="999" Padding="12,9">
-        <TextBox.InnerLeftContent>
-          <mi:MaterialIcon Kind="Magnify" Width="20" Height="20" Margin="14,0,0,0" Foreground="{DynamicResource AppTextTertiaryBrush}" />
-        </TextBox.InnerLeftContent>
-        <TextBox.KeyBindings>
-          <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
-        </TextBox.KeyBindings>
-      </TextBox>
+      <Panel Grid.Column="1" MaxWidth="560" HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="8,0,24,0">
+        <TextBox Name="SearchBox" Text="{Binding SearchText}" l:Tr.Watermark="Search people, places, albums or anything in your photos"
+                 CornerRadius="999" Padding="12,9">
+          <TextBox.InnerLeftContent>
+            <mi:MaterialIcon Kind="Magnify" Width="20" Height="20" Margin="14,0,0,0" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+          </TextBox.InnerLeftContent>
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <!-- Suggestions: people, places, albums, file names, and recent searches -->
+        <Popup Name="SearchPopup" IsOpen="{Binding IsSuggestionsOpen}" PlacementTarget="{Binding #SearchBox}" Placement="BottomEdgeAlignedLeft"
+               VerticalOffset="6" IsLightDismissEnabled="True" Width="{Binding #SearchBox.Bounds.Width}">
+          <Border Classes="card" Padding="6" CornerRadius="16" Background="{DynamicResource AppPageBrush}" BoxShadow="0 10 30 0 #33000000">
+            <StackPanel>
+              <Grid ColumnDefinitions="*,Auto" Margin="10,4,4,4" IsVisible="{Binding ShowClearHistory}">
+                <TextBlock Classes="caption" l:Tr.Text="Recent searches" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="ghost" Padding="8,3" l:Tr.Content="Clear" Command="{Binding ClearSearchHistoryCommand}" />
+              </Grid>
+              <ListBox Name="SuggestionList" ItemsSource="{Binding Suggestions}" SelectedItem="{Binding SelectedSuggestion}" MaxHeight="420"
+                       Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SearchSuggestion">
+                    <Grid ColumnDefinitions="Auto,*,Auto" Background="Transparent">
+                      <mi:MaterialIcon Kind="{Binding Icon}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondaryBrush}" />
+                      <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="caption" Text="{Binding Subtitle}" IsVisible="{Binding HasSubtitle}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <Button Grid.Column="2" Classes="ghost icon" Padding="4" IsVisible="{Binding IsHistory}" l:Tr.Tip="Remove from history"
+                              Command="{Binding $parent[UserControl].((vm:ShellViewModel)DataContext).ForgetSearchCommand}" CommandParameter="{Binding}">
+                        <mi:MaterialIcon Kind="Close" Width="14" Height="14" />
+                      </Button>
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </StackPanel>
+          </Border>
+        </Popup>
+      </Panel>
 
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="0,0,20,0" VerticalAlignment="Center">
         <Button Classes="ghost icon" Command="{Binding OpenWebCommand}" l:Tr.Tip="Open Immich in your browser">

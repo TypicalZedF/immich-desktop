@@ -113,6 +113,53 @@ public sealed partial class PhotosViewModel
     [RelayCommand]
     void OpenNotBackedUp() => OpenDrill(new GridQuery(Tr.T("Not backed up yet"), async (_, ct) => BucketState.FromAssets(await LocalOnlyAssetsAsync(ct))));
 
+    /// <summary>Screenshots and screen recordings still in the timeline, grouped by kind, to archive.</summary>
+    [RelayCommand]
+    void OpenScreenCaptures() => OpenDrill(new GridQuery(Tr.T("Screenshots and screen recordings"), async (client, ct) =>
+    {
+        var found = await client.FindScreenCapturesAsync(ct);
+        var groups = new List<BucketState>();
+        foreach (var (kind, label) in new[]
+        {
+            (CaptureKind.Screenshot, Tr.T("Screenshots")),
+            (CaptureKind.ScreenRecording, Tr.T("Screen recordings")),
+            (CaptureKind.LikelyScreenshot, Tr.T("Probably screenshots (pictures with no camera details)")),
+        })
+        {
+            var assets = found.Where(f => f.Kind == kind).Select(f => f.Asset).ToList();
+            if (assets.Count > 0)
+                groups.Add(new BucketState(label, assets.Count, groups.Count, () => Task.FromResult(assets)));
+        }
+        return groups;
+    }, OffersArchiveAll: true));
+
+    /// <summary>Archives everything in the open list (they stay in Immich and in albums, just off the timeline).</summary>
+    [RelayCommand]
+    async Task ArchiveAllAsync()
+    {
+        if (Client is not { } client || _main is null || _buckets.Count == 0)
+            return;
+        var ids = new List<string>();
+        foreach (var bucket in _buckets)
+            ids.AddRange((await bucket.GetAssetsAsync(CancellationToken.None)).Select(a => a.Id));
+        var what = Format.Plural(ids.Count, "photo or video", "photos and videos");
+        if (!await _main.ConfirmAsync(Tr.T("Archive {0}?", what),
+                Tr.T("They leave your timeline but stay in Immich, in their albums and in search. You can find them under Archive and unarchive them anytime."),
+                Tr.T("Archive"), danger: false))
+            return;
+        try
+        {
+            foreach (var chunk in ids.Chunk(500))
+                await client.SetVisibilityAsync(chunk, "archive", CancellationToken.None);
+            ShowNotice(Tr.T("Archived {0}", what));
+            _ = LoadGridAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(Tr.T("Couldn't archive. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
+
     /// <summary>Opens one photo in the viewer (e.g. from the duplicates review), without editing actions.</summary>
     internal void OpenAsset(TimelineAsset asset) =>
         Viewer = new PhotoViewerViewModel(this, BucketState.FromAssets([asset], "")[0], 0, asset, null, readOnly: true);

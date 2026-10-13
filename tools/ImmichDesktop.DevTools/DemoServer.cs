@@ -160,6 +160,22 @@ sealed class DemoServer : HttpMessageHandler
         people = new[] { new { name = "Alex" }, new { name = "Sam" } },
     };
 
+    /// <summary>The screenshots utility's searches: a few screenshots, recordings and iPhone PNGs.</summary>
+    static HttpResponseMessage CaptureSearch(string body)
+    {
+        IEnumerable<object> Items(int from, int count, string type) => Enumerable.Range(from, count).Select(i => (object)new
+        {
+            id = $"202608-{i}", type, isFavorite = false, originalFileName = $"Screenshot_{i}.png",
+            fileCreatedAt = new DateTime(2026, 8, 20, 12, 0, 0, DateTimeKind.Utc).AddDays(-i).ToString("o"),
+            duration = type == "VIDEO" ? "0:00:42.000" : "0:00:00.00000",
+        });
+        var items = body.Contains("\"Screenshot\"", StringComparison.Ordinal) ? Items(0, 7, "IMAGE")
+            : body.Contains("\"RPReplay\"", StringComparison.Ordinal) ? Items(10, 2, "VIDEO")
+            : body.Contains("\"make\":null", StringComparison.Ordinal) ? Items(14, 3, "IMAGE")
+            : [];
+        return Json(new { assets = new { items, nextPage = (string?)null } });
+    }
+
     static HttpResponseMessage Search(int count) =>
         Json(new { assets = new { total = count, count, items = Enumerable.Range(0, count).Select(i => AssetJson($"202609-{i % 41}", i)), nextPage = (string?)null } });
 
@@ -222,6 +238,8 @@ sealed class DemoServer : HttpMessageHandler
                 city = c.City,
                 country = c.Country,
             }))),
+            "/api/search/metadata" when request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() is { } body
+                && (body.Contains("visibility\":\"timeline", StringComparison.Ordinal)) => CaptureSearch(body),
             "/api/search/smart" or "/api/search/metadata" => Search(17),
             _ when path.StartsWith("/api/shared-links/", StringComparison.Ordinal) && request.Method == HttpMethod.Delete => DeleteLink(path),
             "/api/shared-links" when request.Method == HttpMethod.Post => Json(new { id = "l1", key = "Xq7cT2pLm9vR4sWz" }),

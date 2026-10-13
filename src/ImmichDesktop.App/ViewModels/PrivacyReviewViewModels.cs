@@ -102,16 +102,79 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
                 Tr.T("Forget results"), danger: true))
             return;
         AppServices.Database.ClearPrivacyScans();
-        foreach (var item in Items)
+        foreach (var item in _all)
             item.Dispose();
-        Items.Clear();
-        Count = 0;
-        UpdateSelection();
+        _all.Clear();
+        BuildKindFilters();
+        ApplyFilter();
         AppServices.PrivacyScan.Restart();
         _owner.ShowNotice(Tr.T("Results forgotten"));
     }
 
+    /// <summary>The suggestions shown (after the type and confidence filters).</summary>
     public ObservableCollection<PrivacySuggestionViewModel> Items { get; } = [];
+
+    /// <summary>Every suggestion waiting for a decision.</summary>
+    readonly List<PrivacySuggestionViewModel> _all = [];
+
+    // ---- Filters: by kind (several can be on; none = all) and by how sure the check is ----
+
+    public ObservableCollection<PrivacyKindFilter> KindFilters { get; } = [];
+
+    /// <summary>Only show suggestions at least this sure (0–100).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MinConfidenceText))]
+    public partial double MinConfidence { get; set; }
+
+    public string MinConfidenceText => MinConfidence <= 0 ? Tr.T("Any") : Tr.T("{0}% or more", ((int)MinConfidence).ToString(System.Globalization.CultureInfo.CurrentCulture));
+
+    partial void OnMinConfidenceChanged(double value) => ApplyFilter();
+
+    [ObservableProperty]
+    public partial string FilterSummary { get; set; } = "";
+
+    internal void ApplyFilter()
+    {
+        var kinds = KindFilters.Where(f => f.IsOn).Aggregate(SensitiveKind.None, (all, f) => all | f.Kind);
+        var shown = _all.Where(i => (kinds == SensitiveKind.None || (i.Kinds & kinds) != 0) && i.Score * 100 >= MinConfidence - 0.001).ToList();
+        foreach (var hidden in Items.Except(shown).Where(i => i.IsSelected))
+            hidden.IsSelected = false; // actions only ever apply to what you can see
+        Items.Clear();
+        foreach (var item in shown)
+            Items.Add(item);
+        Count = Items.Count;
+        FilterSummary = Items.Count == _all.Count ? "" : Tr.T("{0} of {1} shown", Items.Count.ToString("N0"), _all.Count.ToString("N0"));
+        UpdateSelection();
+    }
+
+    /// <summary>One chip per kind that's actually among the suggestions, with how many.</summary>
+    void BuildKindFilters()
+    {
+        var on = KindFilters.Where(f => f.IsOn).Select(f => f.Kind).ToHashSet();
+        KindFilters.Clear();
+        foreach (var kind in Enum.GetValues<SensitiveKind>().Where(k => k != SensitiveKind.None))
+        {
+            var count = _all.Count(i => i.Kinds.HasFlag(kind));
+            if (count > 0)
+                KindFilters.Add(new PrivacyKindFilter(this, kind, PrivacySuggestionViewModel.Reasons(kind).First(), count, on.Contains(kind)));
+        }
+        OnPropertyChanged(nameof(HasKindFilters));
+        OnPropertyChanged(nameof(ShowConfidenceFilter));
+    }
+
+    public bool HasKindFilters => KindFilters.Count > 1;
+
+    /// <summary>The confidence filter shows once there's something to filter (or it's in use).</summary>
+    public bool ShowConfidenceFilter => _all.Count > 1 || MinConfidence > 0;
+
+    [RelayCommand]
+    void ClearFilters()
+    {
+        foreach (var f in KindFilters)
+            f.SetQuietly(false);
+        MinConfidence = 0;
+        ApplyFilter();
+    }
 
     // ---- Settings ----
 
@@ -204,8 +267,15 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
     public bool HasItems => Count > 0;
     public bool ShowEmpty => Count == 0;
 
+    /// <summary>Show every picture unblurred (each also unblurs while the pointer is over it).</summary>
     [ObservableProperty]
     public partial bool ShowPictures { get; set; }
+
+    partial void OnShowPicturesChanged(bool value)
+    {
+        foreach (var item in Items)
+            item.OnRevealChanged();
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelection), nameof(SelectionText))]
@@ -221,19 +291,18 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
         {
             var rows = await Task.Run(AppServices.Database.GetPrivacySuggestions);
             _shownSuggestions = rows.Count;
-            var known = Items.ToDictionary(i => i.Id);
+            var known = _all.ToDictionary(i => i.Id);
             var keep = new List<PrivacySuggestionViewModel>();
             foreach (var (id, kinds, score) in rows)
                 keep.Add(known.Remove(id, out var existing) ? existing : new PrivacySuggestionViewModel(this, id, (SensitiveKind)kinds, score));
             foreach (var gone in known.Values)
                 gone.Dispose();
-            Items.Clear();
-            foreach (var item in keep)
-                Items.Add(item);
-            Count = Items.Count;
-            UpdateSelection();
+            _all.Clear();
+            _all.AddRange(keep);
+            BuildKindFilters();
+            ApplyFilter();
             if (_owner.Thumbnails is { } loader)
-                foreach (var item in Items.ToList())
+                foreach (var item in _all.ToList())
                     _ = item.LoadThumbnailAsync(loader, ThumbnailWidth, _lifetime.Token);
         }
         catch (Exception ex)
@@ -314,11 +383,12 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
         foreach (var item in items)
         {
             Items.Remove(item);
+            _all.Remove(item);
             item.Dispose();
         }
-        Count = Items.Count;
-        _shownSuggestions = Count;
-        UpdateSelection();
+        _shownSuggestions = _all.Count;
+        BuildKindFilters();
+        ApplyFilter();
         AppServices.PrivacyScan.Refresh();
     }
 
@@ -329,8 +399,33 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
     {
         _lifetime.Cancel();
         AppServices.PrivacyScan.StatusChanged -= OnStatus;
-        foreach (var item in Items)
+        foreach (var item in _all)
             item.Dispose();
+    }
+}
+
+/// <summary>A filter chip on the review page: one kind of private thing, and how many were found.</summary>
+public sealed partial class PrivacyKindFilter(PrivacyReviewViewModel owner, SensitiveKind kind, string label, int count, bool isOn) : ViewModelBase
+{
+    bool _quiet;
+
+    public SensitiveKind Kind { get; } = kind;
+    public string Label { get; } = $"{label} ({count:N0})";
+
+    [ObservableProperty]
+    public partial bool IsOn { get; set; } = isOn;
+
+    partial void OnIsOnChanged(bool value)
+    {
+        if (!_quiet)
+            owner.ApplyFilter();
+    }
+
+    internal void SetQuietly(bool value)
+    {
+        _quiet = true;
+        IsOn = value;
+        _quiet = false;
     }
 }
 
@@ -352,6 +447,9 @@ public sealed partial class PrivacySuggestionViewModel(PrivacyReviewViewModel ow
 
     /// <summary>Why it was flagged, e.g. "Payment card · Text".</summary>
     public string Reason => string.Join(" · ", Reasons(Kinds));
+
+    /// <summary>How sure the check is, e.g. "92%".</summary>
+    public string ConfidenceText => Tr.T("{0}% sure", ((int)Math.Round(Score * 100)).ToString(System.Globalization.CultureInfo.CurrentCulture));
 
     internal static IEnumerable<string> Reasons(SensitiveKind kinds)
     {
@@ -375,6 +473,11 @@ public sealed partial class PrivacySuggestionViewModel(PrivacyReviewViewModel ow
     public partial bool IsSelected { get; set; }
 
     partial void OnIsSelectedChanged(bool value) => owner.UpdateSelection();
+
+    /// <summary>Shown unblurred because "Show pictures" is on.</summary>
+    public bool Revealed => owner.ShowPictures;
+
+    internal void OnRevealChanged() => OnPropertyChanged(nameof(Revealed));
 
     [RelayCommand]
     void ToggleSelect() => IsSelected = !IsSelected;

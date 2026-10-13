@@ -144,6 +144,58 @@ public class LibraryApiTests
     }
 
     [Fact]
+    public async Task Map_settings_become_the_web_apps_filters()
+    {
+        var handler = new Recorder((_, _) => Array.Empty<object>());
+        using var client = Client(handler);
+        var now = new DateTimeOffset(2026, 10, 13, 12, 0, 0, TimeSpan.Zero);
+
+        await client.GetMapMarkersAsync(null, CancellationToken.None);
+        await client.GetMapMarkersAsync(ImmichDesktop.Core.Settings.MapSettings.Filter(new ImmichDesktop.Core.Settings.AppSettings
+        {
+            MapOnlyFavorites = true, MapIncludeArchived = true, MapIncludePartners = true, MapIncludeSharedAlbums = true,
+            MapDateRange = ImmichDesktop.Core.Settings.MapDateRange.Week,
+        }, now), CancellationToken.None);
+        await client.GetMapMarkersAsync(ImmichDesktop.Core.Settings.MapSettings.Filter(new ImmichDesktop.Core.Settings.AppSettings
+        {
+            MapDateRange = ImmichDesktop.Core.Settings.MapDateRange.Custom, MapDateFrom = new DateTime(2025, 6, 1), MapDateTo = new DateTime(2025, 6, 30),
+        }, now), CancellationToken.None);
+
+        Assert.Equal("/api/map/markers", handler.Requests[0].PathAndQuery); // nothing unasked-for (older servers)
+        Assert.Equal("/api/map/markers?isFavorite=true&isArchived=true&withPartners=true&withSharedAlbums=true&fileCreatedAfter=2026-10-06T12%3A00%3A00.000Z",
+            handler.Requests[1].PathAndQuery);
+        Assert.Equal("/api/map/markers?fileCreatedAfter=2025-06-01T00%3A00%3A00.000Z&fileCreatedBefore=2025-06-30T23%3A59%3A59.999Z",
+            handler.Requests[2].PathAndQuery);
+    }
+
+    [Fact]
+    public async Task Screen_captures_are_found_by_name_folder_and_iphone_pngs()
+    {
+        var handler = new Recorder((_, body) =>
+        {
+            var b = JsonDocument.Parse(body).RootElement;
+            var items = new List<object>();
+            if (b.TryGetProperty("originalFileName", out var name) && name.GetString() == "Screenshot")
+                items.Add(new { id = "shot", type = "IMAGE", isFavorite = false, fileCreatedAt = "2026-10-01T10:00:00.000Z" });
+            if (b.TryGetProperty("originalFileName", out var rec) && rec.GetString() == "RPReplay")
+                items.Add(new { id = "rec", type = "VIDEO", isFavorite = false, fileCreatedAt = "2026-09-01T10:00:00.000Z" });
+            if (b.TryGetProperty("make", out var make))
+                items.Add(new { id = "iphone", type = "IMAGE", isFavorite = false, fileCreatedAt = "2026-08-01T10:00:00.000Z" });
+            return new { assets = new { items, nextPage = (string?)null } };
+        });
+        using var client = Client(handler);
+
+        var found = await client.FindScreenCapturesAsync(CancellationToken.None);
+
+        Assert.Equal([("shot", CaptureKind.Screenshot), ("rec", CaptureKind.ScreenRecording), ("iphone", CaptureKind.LikelyScreenshot)],
+            found.Select(f => (f.Asset.Id, f.Kind)));
+        Assert.All(handler.Requests, r => Assert.Contains("\"visibility\":\"timeline\"", r.Body)); // already-archived ones aren't offered again
+        var withMake = handler.Requests.Where(r => r.Body.Contains("\"make\":null")).ToList();
+        Assert.Single(withMake); // only the iPhone search asks for "no camera"
+        Assert.Contains("\"originalFileName\":\".png\"", withMake[0].Body);
+    }
+
+    [Fact]
     public async Task Large_files_come_biggest_first()
     {
         var handler = new Recorder((_, _) => new object[]

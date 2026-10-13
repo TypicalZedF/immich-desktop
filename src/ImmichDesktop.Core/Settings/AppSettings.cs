@@ -17,6 +17,19 @@ public enum UpdateChannel
 }
 
 /// <summary>What backup does on a metered connection (e.g. a phone hotspot or a capped plan).</summary>
+/// <summary>A past search: what was searched for and, for a person, place or album, which one.</summary>
+public sealed class SearchHistoryEntry
+{
+    public SearchKind Kind { get; set; }
+    public string Text { get; set; } = "";
+    public string? Id { get; set; }
+    public string? Extra { get; set; }
+}
+
+public enum SearchKind { Text, FileName, Person, Place, Album }
+
+public enum MapDateRange { All, Day, Week, Month, Year, ThreeYears, Custom }
+
 public enum MeteredBackup
 {
     Normal,
@@ -120,6 +133,21 @@ public sealed class AppSettings
     /// requested from map services (which would otherwise learn roughly where your photos are).
     /// </summary>
     public bool MapStreetDetail { get; set; }
+
+    /// <summary>Recent searches (newest first), shown under the search box.</summary>
+    public List<SearchHistoryEntry> SearchHistory { get; set; } = [];
+
+    // Map settings (like the web app's): which photos, and how they're shown.
+    public bool MapAllowDark { get; set; } = true;
+    public bool MapOnlyFavorites { get; set; }
+    public bool MapIncludeArchived { get; set; }
+    public bool MapIncludePartners { get; set; }
+    public bool MapIncludeSharedAlbums { get; set; }
+    public bool MapShowPanel { get; set; }
+    public bool MapHeat { get; set; }
+    public MapDateRange MapDateRange { get; set; } = MapDateRange.All;
+    public DateTime? MapDateFrom { get; set; }
+    public DateTime? MapDateTo { get; set; }
     public bool CheckForUpdates { get; set; } = true;
 
     /// <summary>

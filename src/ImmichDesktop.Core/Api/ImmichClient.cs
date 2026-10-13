@@ -495,13 +495,31 @@ public sealed class ImmichClient : IDisposable
     }
 
     /// <summary>
-    /// Every photo with a location, for the map. No filters: older filter names (isArchived) are
-    /// rejected by newer servers' strict validation.
+    /// Photos with a location, for the map, like the web app's map settings. Only options that are
+    /// switched on are sent, so older servers that don't know some of them still work.
     /// </summary>
-    public async Task<List<MapMarker>> GetMapMarkersAsync(CancellationToken ct)
+    public async Task<List<MapMarker>> GetMapMarkersAsync(MapFilter? filter, CancellationToken ct)
     {
-        var markers = await SendAsync<List<MapMarkerDto>>(HttpMethod.Get, "map/markers", null, ct, TimeSpan.FromSeconds(90));
+        var markers = await SendAsync<List<MapMarkerDto>>(HttpMethod.Get, "map/markers" + MapQuery(filter ?? MapFilter.Everything), null, ct, TimeSpan.FromSeconds(90));
         return markers.Select(m => new MapMarker(m.Id, m.Lat, m.Lon, m.City, m.Country)).ToList();
+    }
+
+    internal static string MapQuery(MapFilter filter)
+    {
+        var parts = new List<string>();
+        if (filter.OnlyFavorites)
+            parts.Add("isFavorite=true");
+        if (filter.IncludeArchived)
+            parts.Add("isArchived=true");
+        if (filter.WithPartners)
+            parts.Add("withPartners=true");
+        if (filter.WithSharedAlbums)
+            parts.Add("withSharedAlbums=true");
+        if (filter.After is { } after)
+            parts.Add("fileCreatedAfter=" + Uri.EscapeDataString(IsoDate(after.UtcDateTime)));
+        if (filter.Before is { } before)
+            parts.Add("fileCreatedBefore=" + Uri.EscapeDataString(IsoDate(before.UtcDateTime)));
+        return parts.Count == 0 ? "" : "?" + string.Join("&", parts);
     }
 
     static TimelineAsset ToTimelineAsset(AssetDto a)
@@ -536,6 +554,49 @@ public sealed class ImmichClient : IDisposable
             await SendAsync(HttpMethod.Delete, "assets", new DeleteAssetsRequestDto(trash, Force: false), ct);
         if (keep.Count > 0)
             await SendAsync(HttpMethod.Put, "assets", new ClearDuplicateDto(keep, null), ct);
+    }
+
+    // Common names for screenshots and screen recordings (Android, Windows, macOS, iPhone, other languages).
+    static readonly string[] ScreenshotNames = ["Screenshot", "Screen Shot", "Captura de pantalla", "Captura de tela", "Bildschirmfoto", "Capture d", "Schermafbeelding", "Schermata", "Skärmbild", "Zrzut ekranu", "スクリーンショット"];
+    static readonly string[] RecordingNames = ["Screen Recording", "Screen_Recording", "ScreenRecording", "screen-recording", "Screencast", "RPReplay", "record_screen", "Grabación de pantalla", "Bildschirmaufnahme"];
+    static readonly string[] CaptureFolders = ["Screenshots", "Screen recordings", "ScreenRecorder", "Screenrecorder"];
+
+    /// <summary>
+    /// Screenshots and screen recordings still in the timeline (Utilities → Archive screenshots):
+    /// by their usual file names and folders, plus iPhone screenshots (PNG files with no camera).
+    /// </summary>
+    public async Task<List<ScreenCapture>> FindScreenCapturesAsync(CancellationToken ct)
+    {
+        var found = new Dictionary<string, ScreenCapture>(StringComparer.Ordinal);
+        async Task Collect(Func<int, object> request, Func<AssetDto, CaptureKind> kind, int max = 5000)
+        {
+            for (var page = 1; found.Count < 20000; page++)
+            {
+                var response = await SendAsync<SearchResponseDto>(HttpMethod.Post, "search/metadata", request(page), ct, TimeSpan.FromSeconds(60));
+                foreach (var a in response.Assets.Items)
+                    found.TryAdd(a.Id, new ScreenCapture(ToTimelineAsset(a), kind(a)));
+                if (string.IsNullOrEmpty(response.Assets.NextPage) || response.Assets.Items.Count == 0 || page * 250 >= max)
+                    break;
+            }
+        }
+        static CaptureKind ByType(AssetDto a) =>
+            string.Equals(a.Type, "VIDEO", StringComparison.OrdinalIgnoreCase) ? CaptureKind.ScreenRecording : CaptureKind.Screenshot;
+        foreach (var name in RecordingNames)
+            await Collect(page => new CaptureSearchRequestDto(name, null, null, "timeline", page, 250), _ => CaptureKind.ScreenRecording);
+        foreach (var name in ScreenshotNames)
+            await Collect(page => new CaptureSearchRequestDto(name, null, null, "timeline", page, 250), ByType);
+        foreach (var folder in CaptureFolders)
+            await Collect(page => new CaptureSearchRequestDto(null, folder, null, "timeline", page, 250), ByType);
+        // iPhone screenshots are IMG_1234.PNG with no camera details.
+        try
+        {
+            await Collect(page => new NoCameraSearchRequestDto(".png", "IMAGE", "timeline", page, 250), _ => CaptureKind.LikelyScreenshot);
+        }
+        catch (ImmichApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            Log.Info($"Search for PNGs without a camera isn't supported here: {ex.Message}");
+        }
+        return [.. found.Values.OrderByDescending(c => c.Asset.FileCreatedAt, StringComparer.Ordinal)];
     }
 
     /// <summary>Your biggest photos and videos, largest first (Immich 1.124 and newer).</summary>

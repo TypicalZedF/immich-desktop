@@ -33,6 +33,48 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
         }, ct);
     }
 
+    // Decoded grid thumbnails, shared by every cell showing that photo. Eviction just drops the
+    // reference (a cell may still be drawing it); the memory is freed once nothing uses it.
+    const long DecodedBudgetBytes = 192L * 1024 * 1024;
+    readonly Dictionary<string, LinkedListNode<(string Key, Bitmap Bitmap, long Bytes)>> _decoded = [];
+    readonly LinkedList<(string Key, Bitmap Bitmap, long Bytes)> _decodedOrder = new();
+    long _decodedBytes;
+
+    /// <summary>A grid thumbnail, decoded once and reused (don't dispose it: the cache owns it).</summary>
+    public async Task<Bitmap?> LoadGridThumbnailAsync(string assetId, int decodeWidth, CancellationToken ct)
+    {
+        // Round the width so small layout changes reuse what's decoded.
+        var width = Math.Max(64, (decodeWidth + 31) / 32 * 32);
+        var key = $"{assetId}:{width}";
+        lock (_gate)
+        {
+            if (_decoded.TryGetValue(key, out var node))
+            {
+                _decodedOrder.Remove(node);
+                _decodedOrder.AddFirst(node);
+                return node.Value.Bitmap;
+            }
+        }
+        var bitmap = await LoadAsync(assetId, AssetImageSize.Thumbnail, width, ct);
+        if (bitmap is null)
+            return null;
+        lock (_gate)
+        {
+            if (_decoded.TryGetValue(key, out var raced))
+                return raced.Value.Bitmap;
+            var bytes = (long)bitmap.PixelSize.Width * bitmap.PixelSize.Height * 4;
+            _decoded[key] = _decodedOrder.AddFirst((key, bitmap, bytes));
+            _decodedBytes += bytes;
+            while (_decodedBytes > DecodedBudgetBytes && _decodedOrder.Last is { } oldest)
+            {
+                _decodedOrder.RemoveLast();
+                _decoded.Remove(oldest.Value.Key);
+                _decodedBytes -= oldest.Value.Bytes;
+            }
+        }
+        return bitmap;
+    }
+
     /// <summary>
     /// An image for the full-window viewer: the right way up (full-size images can be straight from a camera)
     /// and decoded to fit <paramref name="maxSize"/> pixels with high-quality scaling, so it looks sharp.
@@ -144,6 +186,9 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
     {
         lock (_gate)
         {
+            _decoded.Clear();
+            _decodedOrder.Clear();
+            _decodedBytes = 0;
             _index.Clear();
             _lru.Clear();
             _cachedBytes = 0;
