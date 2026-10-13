@@ -7,7 +7,7 @@ namespace ImmichDesktop.App.ViewModels;
 /// <summary>Root of the window: onboarding until set up, the lock screen when locked, otherwise the main shell.</summary>
 public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
-    ShellPage _pendingPage = ShellPage.Overview;
+    ShellPage _pendingPage = ShellPage.Photos;
 
     public MainWindowViewModel()
     {
@@ -72,7 +72,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public Task<string?> PickFolderAsync(string title) => PickFolder?.Invoke(title) ?? Task.FromResult<string?>(null);
 
-    public void ShowShell(ShellPage page = ShellPage.Overview)
+    public void ShowShell(ShellPage page = ShellPage.Photos)
     {
         Replace(new ShellViewModel(this));
         Navigate(page);
@@ -96,7 +96,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         Dialog?.CancelCommand.Execute(null);
         CloseOverlay(Overlay);
-        _pendingPage = (Content as ShellViewModel)?.SelectedNav.Page ?? ShellPage.Overview;
+        _pendingPage = (Content as ShellViewModel)?.SelectedNav.Page ?? ShellPage.Photos;
         Replace(new LockViewModel(this, Unlock));
     }
 

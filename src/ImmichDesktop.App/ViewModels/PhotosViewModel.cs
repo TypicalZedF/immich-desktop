@@ -8,24 +8,29 @@ using ImmichDesktop.Core.Api;
 
 namespace ImmichDesktop.App.ViewModels;
 
-public enum PhotosTab
+/// <summary>The library sections in the sidebar (like the Immich web app's, with the mobile app's Library group).</summary>
+public enum LibraryPage
 {
-    Photos,
-    Favorites,
-    Albums,
-    People,
-    Places,
+    Timeline,
+    Explore,
     Map,
+    Sharing,
+    Albums,
+    Favorites,
+    Archive,
+    Locked,
+    Trash,
 }
 
 /// <summary>What the grid is showing: a title and how to load its groups.</summary>
 public sealed record GridQuery(string Title, Func<ImmichClient, CancellationToken, Task<List<BucketState>>> Load, AlbumInfo? Album = null);
 
 /// <summary>
-/// Your Immich library, like the web app: the timeline, favorites, albums, people, places and a map,
-/// plus search. Grids only build what's on screen: months load as their rows scroll into view and
-/// thumbnails are released when they scroll away. Select photos to share, favorite, add to an album,
-/// download or move to the trash.
+/// One section of your Immich library (see <see cref="LibraryPage"/>): the timeline, Explore (people
+/// and places), the map, sharing, albums, favorites, the archive, the locked folder or the trash, plus
+/// search results and anything opened from them. Grids only build what's on screen: months load as
+/// their rows scroll into view and thumbnails are released when they scroll away. Select photos to act
+/// on them (what's offered depends on the section).
 /// </summary>
 public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
 {
@@ -45,23 +50,23 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     List<BucketState> _buckets = [];
     int _columns;
     double _width;
-    bool _albumsLoaded, _peopleLoaded, _placesLoaded, _markersLoaded;
 
-    public PhotosViewModel(ShellViewModel shell) : this(shell.Main, null)
+    public PhotosViewModel(ShellViewModel shell, LibraryPage page) : this(shell.Main, null, page)
     {
     }
 
-    PhotosViewModel(MainWindowViewModel? main, Action<AssetCellViewModel>? pick)
+    PhotosViewModel(MainWindowViewModel? main, Action<AssetCellViewModel>? pick, LibraryPage page)
     {
         _main = main;
         _pick = pick;
+        Page = page;
         if (Client is { } client)
             Thumbnails = new ThumbnailLoader(client);
-        _ = LoadGridAsync();
+        _ = LoadPageAsync();
     }
 
     /// <summary>The same library for choosing a photo (e.g. a profile picture): clicking a photo picks it instead of opening it.</summary>
-    public static PhotosViewModel ForPicking(Action<AssetCellViewModel> pick) => new(null, pick);
+    public static PhotosViewModel ForPicking(Action<AssetCellViewModel> pick) => new(null, pick, LibraryPage.Timeline);
 
     public bool IsPicker => _pick is not null;
     public bool IsNotPicker => !IsPicker;
@@ -78,71 +83,57 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     /// <summary>False once the server turns out not to offer full-size images (older versions).</summary>
     internal bool FullsizeSupported { get; set; } = true;
 
-    // ---- Tabs ----
+    // ---- Page ----
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowGrid), nameof(ShowAlbums), nameof(ShowPeople), nameof(ShowPlaces), nameof(ShowMap),
-        nameof(IsPhotosTab), nameof(IsFavoritesTab), nameof(IsAlbumsTab), nameof(IsPeopleTab), nameof(IsPlacesTab), nameof(IsMapTab), nameof(Heading))]
-    public partial PhotosTab Tab { get; set; }
+    public LibraryPage Page { get; }
 
-    public bool IsPhotosTab { get => Tab == PhotosTab.Photos; set { if (value) SelectTab(PhotosTab.Photos); } }
-    public bool IsFavoritesTab { get => Tab == PhotosTab.Favorites; set { if (value) SelectTab(PhotosTab.Favorites); } }
-    public bool IsAlbumsTab { get => Tab == PhotosTab.Albums; set { if (value) SelectTab(PhotosTab.Albums); } }
-    public bool IsPeopleTab { get => Tab == PhotosTab.People; set { if (value) SelectTab(PhotosTab.People); } }
-    public bool IsPlacesTab { get => Tab == PhotosTab.Places; set { if (value) SelectTab(PhotosTab.Places); } }
-    public bool IsMapTab { get => Tab == PhotosTab.Map; set { if (value) SelectTab(PhotosTab.Map); } }
+    public bool IsTrash => Page == LibraryPage.Trash && Drill is null;
+    public bool IsArchive => Page == LibraryPage.Archive && Drill is null;
+    public bool IsLockedFolder => Page == LibraryPage.Locked;
 
-    void SelectTab(PhotosTab tab)
+    Task LoadPageAsync() => Page switch
     {
-        if (Tab == tab && Drill is null)
-            return;
-        Tab = tab;
-        Drill = null;
-        ClearSelection();
-        switch (tab)
-        {
-            case PhotosTab.Photos or PhotosTab.Favorites:
-                _ = LoadGridAsync();
-                break;
-            case PhotosTab.Albums when !_albumsLoaded:
-                _ = LoadAlbumsAsync();
-                break;
-            case PhotosTab.People when !_peopleLoaded:
-                _ = LoadPeopleAsync();
-                break;
-            case PhotosTab.Places when !_placesLoaded:
-                _ = LoadPlacesAsync();
-                break;
-            case PhotosTab.Map when !_markersLoaded:
-                _ = LoadMarkersAsync();
-                break;
-        }
-    }
+        LibraryPage.Explore => Task.WhenAll(LoadPeopleAsync(), LoadPlacesAsync()),
+        LibraryPage.Map => LoadMarkersAsync(),
+        LibraryPage.Sharing => LoadSharingAsync(),
+        LibraryPage.Albums => LoadAlbumsAsync(),
+        LibraryPage.Locked => CheckLockedAsync(),
+        _ => LoadGridAsync(),
+    };
 
-    /// <summary>An album, person, place, search or map area opened from a tab; Back returns to the tab.</summary>
+    /// <summary>An album, person, place, search or map area opened from the page; Back returns to the page.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowGrid), nameof(ShowAlbums), nameof(ShowPeople), nameof(ShowPlaces), nameof(ShowMap),
-        nameof(IsDrilledIn), nameof(Heading), nameof(CanShareAlbum), nameof(ShowHeading))]
+    [NotifyPropertyChangedFor(nameof(ShowGrid), nameof(ShowAlbums), nameof(ShowExplore), nameof(ShowMap), nameof(ShowSharing),
+        nameof(ShowLockedPrompt), nameof(IsDrilledIn), nameof(Heading), nameof(CanShareAlbum), nameof(ShowHeading),
+        nameof(IsTrash), nameof(IsArchive), nameof(ShowTrashActions), nameof(ShowLockAction))]
     public partial GridQuery? Drill { get; set; }
 
     public bool IsDrilledIn => Drill is not null;
 
     /// <summary>The profile picture dialog has its own title, so only show ours once you've opened something.</summary>
     public bool ShowHeading => !IsPicker || IsDrilledIn;
-    public bool ShowGrid => Drill is not null || Tab is PhotosTab.Photos or PhotosTab.Favorites;
-    public bool ShowAlbums => Drill is null && Tab == PhotosTab.Albums;
-    public bool ShowPeople => Drill is null && Tab == PhotosTab.People;
-    public bool ShowPlaces => Drill is null && Tab == PhotosTab.Places;
-    public bool ShowMap => Drill is null && Tab == PhotosTab.Map;
+    public bool ShowGrid => Drill is not null
+        || Page is LibraryPage.Timeline or LibraryPage.Favorites or LibraryPage.Archive or LibraryPage.Trash
+        || (Page == LibraryPage.Locked && IsUnlocked);
+    public bool ShowAlbums => Drill is null && Page == LibraryPage.Albums;
+    public bool ShowExplore => Drill is null && Page == LibraryPage.Explore;
+    public bool ShowMap => Drill is null && Page == LibraryPage.Map;
+    public bool ShowSharing => Drill is null && Page == LibraryPage.Sharing;
+    public bool ShowLockedPrompt => Drill is null && Page == LibraryPage.Locked && !IsUnlocked;
+    public bool ShowTrashActions => IsTrash && !IsEmpty && !IsLoading;
+    public bool ShowLockAction => Page == LibraryPage.Locked && IsUnlocked && Drill is null;
     public bool CanShareAlbum => Drill?.Album is not null && !IsPicker;
 
-    public string Heading => Drill?.Title ?? Tab switch
+    public string Heading => Drill?.Title ?? Page switch
     {
-        PhotosTab.Favorites => Tr.T("Favorites"),
-        PhotosTab.Albums => Tr.T("Albums"),
-        PhotosTab.People => Tr.T("People"),
-        PhotosTab.Places => Tr.T("Places"),
-        PhotosTab.Map => Tr.T("Map"),
+        LibraryPage.Explore => Tr.T("Explore"),
+        LibraryPage.Map => Tr.T("Map"),
+        LibraryPage.Sharing => Tr.T("Sharing"),
+        LibraryPage.Albums => Tr.T("Albums"),
+        LibraryPage.Favorites => Tr.T("Favorites"),
+        LibraryPage.Archive => Tr.T("Archive"),
+        LibraryPage.Locked => Tr.T("Locked folder"),
+        LibraryPage.Trash => Tr.T("Trash"),
         _ => Tr.T("Photos"),
     };
 
@@ -154,7 +145,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         Drill = null;
         ClearSelection();
         ReleaseRows();
-        if (Tab is PhotosTab.Photos or PhotosTab.Favorites)
+        if (ShowGrid)
             _ = LoadGridAsync();
     }
 
@@ -178,12 +169,14 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     public bool HasSections => Sections.Count > 0;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowTrashActions))]
     public partial bool IsLoading { get; set; } = true;
 
     [ObservableProperty]
     public partial string? Error { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowTrashActions))]
     public partial bool IsEmpty { get; set; }
 
     [ObservableProperty]
@@ -196,23 +189,16 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     public partial PhotoViewerViewModel? Viewer { get; set; }
 
     [RelayCommand]
-    Task Refresh()
-    {
-        if (ShowGrid)
-            return LoadGridAsync();
-        return Tab switch
-        {
-            PhotosTab.Albums => LoadAlbumsAsync(),
-            PhotosTab.People => LoadPeopleAsync(),
-            PhotosTab.Places => LoadPlacesAsync(),
-            PhotosTab.Map => LoadMarkersAsync(),
-            _ => Task.CompletedTask,
-        };
-    }
+    Task Refresh() => ShowGrid ? LoadGridAsync() : LoadPageAsync();
 
-    GridQuery CurrentQuery => Drill ?? (Tab == PhotosTab.Favorites
-        ? new GridQuery(Tr.T("Favorites"), (c, ct) => TimelineAsync(c, new TimelineFilter(Favorites: true), ct))
-        : new GridQuery(Tr.T("Photos"), (c, ct) => TimelineAsync(c, TimelineFilter.All, ct)));
+    GridQuery CurrentQuery => Drill ?? Page switch
+    {
+        LibraryPage.Favorites => new GridQuery(Tr.T("Favorites"), (c, ct) => TimelineAsync(c, new TimelineFilter(Favorites: true), ct)),
+        LibraryPage.Archive => new GridQuery(Tr.T("Archive"), (c, ct) => TimelineAsync(c, new TimelineFilter(Visibility: "archive"), ct)),
+        LibraryPage.Locked => new GridQuery(Tr.T("Locked folder"), (c, ct) => TimelineAsync(c, new TimelineFilter(Visibility: "locked"), ct)),
+        LibraryPage.Trash => new GridQuery(Tr.T("Trash"), (c, ct) => TimelineAsync(c, new TimelineFilter(Trashed: true), ct)),
+        _ => new GridQuery(Tr.T("Photos"), (c, ct) => TimelineAsync(c, TimelineFilter.All, ct)),
+    };
 
     static async Task<List<BucketState>> TimelineAsync(ImmichClient client, TimelineFilter filter, CancellationToken ct)
     {
@@ -246,9 +232,14 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             var total = _buckets.Sum(b => b.Count);
             Summary = Format.Plural(total, Tr.T("photo or video"), Tr.T("photos and videos"));
             IsEmpty = total == 0;
-            EmptyText = Drill is not null ? Tr.T("Nothing here.")
-                : Tab == PhotosTab.Favorites ? Tr.T("No favorites yet. Tap the heart on a photo to add it here.")
-                : Tr.T("No photos yet. They'll appear here once they're backed up.");
+            EmptyText = Drill is not null ? Tr.T("Nothing here.") : Page switch
+            {
+                LibraryPage.Favorites => Tr.T("No favorites yet. Tap the heart on a photo to add it here."),
+                LibraryPage.Archive => Tr.T("Nothing archived. Archived photos are hidden from your timeline but kept in Immich."),
+                LibraryPage.Locked => Tr.T("Your locked folder is empty. Photos here are hidden everywhere until you unlock it with your PIN."),
+                LibraryPage.Trash => Tr.T("The trash is empty."),
+                _ => Tr.T("No photos yet. They'll appear here once they're backed up."),
+            };
             RebuildRows();
         }
         catch (OperationCanceledException)
@@ -360,6 +351,13 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial string SearchText { get; set; } = "";
 
+    /// <summary>Searches from outside (the top bar).</summary>
+    public void SearchFor(string text)
+    {
+        SearchText = text;
+        Search();
+    }
+
     [RelayCommand]
     void Search()
     {
@@ -383,11 +381,16 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         }));
     }
 
-    // ---- Albums, people, places ----
+    // ---- Albums, Explore (people and places), Sharing ----
+
+    /// <summary>How many people and places Explore shows before "Show all".</summary>
+    const int ExplorePreview = 12;
 
     public ObservableCollection<AlbumCardViewModel> Albums { get; } = [];
     public ObservableCollection<PersonCardViewModel> People { get; } = [];
     public ObservableCollection<PlaceCardViewModel> Places { get; } = [];
+    readonly List<PersonCardViewModel> _allPeople = [];
+    readonly List<PlaceCardViewModel> _allPlaces = [];
 
     [ObservableProperty]
     public partial bool IsLoadingCollection { get; set; }
@@ -395,49 +398,67 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial string? CollectionMessage { get; set; }
 
-    Task LoadAlbumsAsync() => LoadCollectionAsync(Albums, async c =>
+    [ObservableProperty]
+    public partial string? PeopleMessage { get; set; }
+
+    [ObservableProperty]
+    public partial string? PlacesMessage { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasMorePeople { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasMorePlaces { get; set; }
+
+    Task LoadAlbumsAsync() => LoadCardsAsync(async c =>
     {
-        _albumsLoaded = true;
         var albums = await c.GetAlbumsAsync(_lifetime.Token);
         return albums.OrderByDescending(a => a.AssetCount > 0).ThenBy(a => a.AlbumName, StringComparer.CurrentCultureIgnoreCase)
             .Select(a => new AlbumCardViewModel(this, a)).ToList();
-    }, Tr.T("No albums yet. Create one from selected photos with “Add to album”."));
+    }, Albums, null, Tr.T("No albums yet. Create one from selected photos with “Add to album”."), m => CollectionMessage = m);
 
-    Task LoadPeopleAsync() => LoadCollectionAsync(People, async c =>
+    Task LoadPeopleAsync() => LoadCardsAsync(async c =>
     {
-        _peopleLoaded = true;
         var people = await c.GetPeopleAsync(_lifetime.Token);
         // Named people first, like the web app.
         return people.OrderByDescending(p => p.Name.Length > 0).Select(p => new PersonCardViewModel(this, p)).ToList();
-    }, Tr.T("No people yet. Immich finds faces when machine learning is turned on in your server settings."));
+    }, People, _allPeople, Tr.T("No people yet. Immich finds faces when machine learning is turned on in your server settings."),
+        m => PeopleMessage = m, more => HasMorePeople = more);
 
-    Task LoadPlacesAsync() => LoadCollectionAsync(Places, async c =>
+    Task LoadPlacesAsync() => LoadCardsAsync(async c =>
     {
-        _placesLoaded = true;
         var places = await c.GetPlacesAsync(_lifetime.Token);
         return places.Select(p => new PlaceCardViewModel(this, p)).ToList();
-    }, Tr.T("No places yet. Photos with a location show up here."));
+    }, Places, _allPlaces, Tr.T("No places yet. Photos with a location show up here."),
+        m => PlacesMessage = m, more => HasMorePlaces = more);
 
-    async Task LoadCollectionAsync<T>(ObservableCollection<T> target, Func<ImmichClient, Task<List<T>>> load, string emptyText)
+    /// <summary>
+    /// Loads cards into <paramref name="shown"/>. With <paramref name="all"/>, only a preview is shown
+    /// (Explore) and the rest waits for "Show all"; covers load only for cards on screen.
+    /// </summary>
+    async Task LoadCardsAsync<T>(Func<ImmichClient, Task<List<T>>> load, ObservableCollection<T> shown, List<T>? all,
+        string emptyText, Action<string?> setMessage, Action<bool>? setHasMore = null)
         where T : LibraryCardViewModel
     {
         if (Client is not { } client)
             return;
         IsLoadingCollection = true;
-        CollectionMessage = null;
+        setMessage(null);
         try
         {
             var items = await load(client);
-            foreach (var old in target)
+            foreach (var old in shown.Concat(all ?? []).Distinct())
                 old.Dispose();
-            target.Clear();
-            foreach (var item in items)
-                target.Add(item);
+            shown.Clear();
+            all?.Clear();
+            all?.AddRange(items);
+            var preview = all is null ? items : items.Take(ExplorePreview).ToList();
+            foreach (var item in preview)
+                shown.Add(item);
+            setHasMore?.Invoke(items.Count > preview.Count);
             if (items.Count == 0)
-                CollectionMessage = emptyText;
-            if (Thumbnails is { } loader)
-                foreach (var item in items)
-                    _ = item.LoadCoverAsync(loader, CardDecodeWidth, _lifetime.Token);
+                setMessage(emptyText);
+            LoadCovers(preview);
         }
         catch (OperationCanceledException)
         {
@@ -445,12 +466,35 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             Log.Warn("Could not load the library page", ex);
-            CollectionMessage = Tr.T("Couldn't load this page. {0}", NetworkErrors.Describe(ex));
+            setMessage(Tr.T("Couldn't load this page. {0}", NetworkErrors.Describe(ex)));
         }
         finally
         {
             IsLoadingCollection = false;
         }
+    }
+
+    void LoadCovers(IEnumerable<LibraryCardViewModel> cards)
+    {
+        if (Thumbnails is not { } loader)
+            return;
+        foreach (var card in cards)
+            _ = card.LoadCoverAsync(loader, CardDecodeWidth, _lifetime.Token);
+    }
+
+    [RelayCommand]
+    void ShowAllPeople() => ShowAll(_allPeople, People, more => HasMorePeople = more);
+
+    [RelayCommand]
+    void ShowAllPlaces() => ShowAll(_allPlaces, Places, more => HasMorePlaces = more);
+
+    void ShowAll<T>(List<T> all, ObservableCollection<T> shown, Action<bool> setHasMore) where T : LibraryCardViewModel
+    {
+        var rest = all.Skip(shown.Count).ToList();
+        foreach (var item in rest)
+            shown.Add(item);
+        setHasMore(false);
+        LoadCovers(rest);
     }
 
     internal void OpenAlbum(AlbumInfo album) =>
@@ -462,7 +506,237 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     internal void OpenPlace(PlaceInfo place) =>
         OpenDrill(new GridQuery(place.City, async (c, ct) => BucketState.FromAssets(await c.SearchAsync(null, place.City, 2000, ct))));
 
-    internal void OnAlbumsChanged() => _albumsLoaded = false;
+    internal void OpenPartner(PartnerInfo partner) =>
+        OpenDrill(new GridQuery(partner.Name, (c, ct) => TimelineAsync(c, new TimelineFilter(UserId: partner.Id), ct)));
+
+    internal void OnAlbumsChanged()
+    {
+        if (Page == LibraryPage.Albums)
+            _ = LoadAlbumsAsync();
+    }
+
+    // Sharing: albums shared with you or by you, your shared links, and partners sharing with you.
+
+    public ObservableCollection<AlbumCardViewModel> SharedAlbums { get; } = [];
+    public ObservableCollection<SharedLinkViewModel> SharedLinks { get; } = [];
+    public ObservableCollection<PartnerViewModel> Partners { get; } = [];
+
+    [ObservableProperty]
+    public partial string? SharedAlbumsMessage { get; set; }
+
+    [ObservableProperty]
+    public partial string? SharedLinksMessage { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasPartners { get; set; }
+
+    async Task LoadSharingAsync()
+    {
+        var albums = LoadCardsAsync(async c => (await c.GetSharedAlbumsAsync(_lifetime.Token))
+                .OrderBy(a => a.AlbumName, StringComparer.CurrentCultureIgnoreCase).Select(a => new AlbumCardViewModel(this, a)).ToList(),
+            SharedAlbums, null, Tr.T("No shared albums yet."), m => SharedAlbumsMessage = m);
+        await Task.WhenAll(albums, LoadSharedLinksAsync(), LoadPartnersAsync());
+    }
+
+    async Task LoadSharedLinksAsync()
+    {
+        if (Client is not { } client)
+            return;
+        try
+        {
+            var links = await client.GetSharedLinksAsync(_lifetime.Token);
+            var baseUrl = await client.GetShareBaseUrlAsync(AppServices.Settings.Current.WebUrl ?? client.ApiUrl.ToString(), _lifetime.Token);
+            foreach (var old in SharedLinks)
+                old.Dispose();
+            SharedLinks.Clear();
+            foreach (var link in links)
+                SharedLinks.Add(new SharedLinkViewModel(this, link, $"{baseUrl}/share/{link.Key}"));
+            SharedLinksMessage = links.Count == 0 ? Tr.T("No shared links yet. Select photos (or open an album) and choose Share.") : null;
+            if (Thumbnails is { } loader)
+                foreach (var link in SharedLinks)
+                    _ = link.LoadCoverAsync(loader, _lifetime.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Could not load shared links", ex);
+            SharedLinksMessage = Tr.T("Couldn't load your shared links. {0}", NetworkErrors.Describe(ex));
+        }
+    }
+
+    async Task LoadPartnersAsync()
+    {
+        if (Client is not { } client)
+            return;
+        try
+        {
+            var partners = await client.GetPartnersAsync(_lifetime.Token);
+            Partners.Clear();
+            foreach (var partner in partners)
+                Partners.Add(new PartnerViewModel(this, partner));
+            HasPartners = Partners.Count > 0;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Info($"Partners unavailable: {ex.Message}");
+            HasPartners = false;
+        }
+    }
+
+    internal async Task DeleteSharedLinkAsync(SharedLinkViewModel link)
+    {
+        if (Client is not { } client || _main is null)
+            return;
+        if (!await _main.ConfirmAsync(Tr.T("Delete this link?"), Tr.T("Anyone who has it won't be able to open it anymore. The photos stay in Immich."),
+                Tr.T("Delete link"), danger: true))
+            return;
+        try
+        {
+            await client.DeleteSharedLinkAsync(link.Link.Id, CancellationToken.None);
+            SharedLinks.Remove(link);
+            link.Dispose();
+            if (SharedLinks.Count == 0)
+                SharedLinksMessage = Tr.T("No shared links yet. Select photos (or open an album) and choose Share.");
+            ShowNotice(Tr.T("Link deleted"));
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(Tr.T("Couldn't delete the link. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
+
+    // ---- Locked folder (needs the account's PIN, like the web and mobile apps) ----
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowGrid), nameof(ShowLockedPrompt), nameof(ShowLockAction))]
+    public partial bool IsUnlocked { get; set; }
+
+    [ObservableProperty]
+    public partial string Pin { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string? LockedMessage { get; set; }
+
+    [ObservableProperty]
+    public partial bool CanEnterPin { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsUnlocking { get; set; }
+
+    async Task CheckLockedAsync()
+    {
+        if (Client is not { } client)
+            return;
+        IsLoading = false;
+        LockedMessage = null;
+        CanEnterPin = false;
+        try
+        {
+            var status = await client.GetAuthStatusAsync(_lifetime.Token);
+            if (!status.HasPin)
+            {
+                LockedMessage = Tr.T("Set up a PIN code in Immich first (Account settings → PIN code), then come back here.");
+                return;
+            }
+            if (status.IsElevated)
+            {
+                IsUnlocked = true;
+                await LoadGridAsync();
+                return;
+            }
+            CanEnterPin = true;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ImmichApiException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized)
+        {
+            LockedMessage = Tr.T("The locked folder needs signing in with your password or SSO (an API key can't open it).");
+        }
+        catch (Exception ex)
+        {
+            LockedMessage = Tr.T("Couldn't check the locked folder. {0}", NetworkErrors.Describe(ex));
+        }
+    }
+
+    [RelayCommand]
+    async Task UnlockAsync()
+    {
+        if (Client is not { } client || Pin.Length == 0 || IsUnlocking)
+            return;
+        IsUnlocking = true;
+        LockedMessage = null;
+        try
+        {
+            await client.UnlockSessionAsync(Pin, CancellationToken.None);
+            Pin = "";
+            IsUnlocked = true;
+            await LoadGridAsync();
+        }
+        catch (ImmichApiException ex) when ((int)ex.StatusCode is >= 400 and < 500)
+        {
+            LockedMessage = Tr.T("That PIN isn't right.");
+        }
+        catch (Exception ex)
+        {
+            LockedMessage = Tr.T("Couldn't unlock. {0}", NetworkErrors.Describe(ex));
+        }
+        finally
+        {
+            IsUnlocking = false;
+        }
+    }
+
+    /// <summary>Locks the folder again (also when leaving the page).</summary>
+    [RelayCommand]
+    public async Task LockAsync()
+    {
+        if (!IsUnlocked)
+            return;
+        IsUnlocked = false;
+        Drill = null;
+        ClearSelection();
+        ReleaseRows();
+        Viewer = null;
+        CanEnterPin = true;
+        try
+        {
+            if (Client is { } client)
+                await client.LockSessionAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Log.Info($"Locking the session failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>Asks for the PIN (in a panel) and then runs <paramref name="then"/>; used to move photos into the locked folder.</summary>
+    async Task<bool> EnsureUnlockedAsync()
+    {
+        if (Client is not { } client)
+            return false;
+        try
+        {
+            var status = await client.GetAuthStatusAsync(CancellationToken.None);
+            if (status.IsElevated)
+                return true;
+            if (!status.HasPin)
+            {
+                ShowNotice(Tr.T("Set up a PIN code in Immich first (Account settings → PIN code), then come back here."));
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(Tr.T("Couldn't check the locked folder. {0}", NetworkErrors.Describe(ex)));
+            return false;
+        }
+        var panel = new PinPanelViewModel(this);
+        Panel = panel;
+        return await panel.Result;
+    }
 
     // ---- Map ----
 
@@ -490,7 +764,6 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         CollectionMessage = null;
         try
         {
-            _markersLoaded = true;
             Markers = await client.GetMapMarkersAsync(_lifetime.Token);
             if (Markers.Count == 0)
                 CollectionMessage = Tr.T("No photos with a location yet.");
@@ -575,6 +848,138 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             ClearSelection();
     }
 
+    // What the selection bar offers depends on where you are.
+    bool InTrash => Page == LibraryPage.Trash && Drill is null;
+    bool InArchive => Page == LibraryPage.Archive && Drill is null;
+    bool InLocked => Page == LibraryPage.Locked;
+
+    /// <summary>Normal actions (share, album, favorite, download, archive, trash): everywhere but the trash and the locked folder.</summary>
+    public bool CanUseNormalActions => !InTrash && !InLocked;
+    public bool CanArchive => CanUseNormalActions && !InArchive;
+    public bool CanUnarchive => InArchive;
+    public bool CanMoveToLocked => CanUseNormalActions;
+    public bool CanMoveOutOfLocked => InLocked;
+    public bool CanRestore => InTrash;
+
+    partial void OnDrillChanged(GridQuery? value)
+    {
+        foreach (var name in new[] { nameof(CanUseNormalActions), nameof(CanArchive), nameof(CanUnarchive), nameof(CanMoveToLocked), nameof(CanRestore) })
+            OnPropertyChanged(name);
+    }
+
+    [RelayCommand]
+    Task ArchiveSelectionAsync() => MoveSelectionAsync("archive", Tr.T("Archived {0}"));
+
+    [RelayCommand]
+    Task UnarchiveSelectionAsync() => MoveSelectionAsync("timeline", Tr.T("Moved {0} back to your timeline"));
+
+    [RelayCommand]
+    async Task MoveSelectionToLockedAsync()
+    {
+        if (await EnsureUnlockedAsync())
+            await MoveSelectionAsync("locked", Tr.T("Moved {0} to the locked folder"));
+    }
+
+    [RelayCommand]
+    Task MoveSelectionOutOfLockedAsync() => MoveSelectionAsync("timeline", Tr.T("Moved {0} back to your timeline"));
+
+    async Task MoveSelectionAsync(string visibility, string doneFormat)
+    {
+        if (Client is not { } client || _selected.Count == 0)
+            return;
+        var ids = SelectedIds;
+        try
+        {
+            await client.SetVisibilityAsync(ids, visibility, CancellationToken.None);
+            ClearSelection();
+            ShowNotice(string.Format(System.Globalization.CultureInfo.CurrentCulture, doneFormat, Format.Plural(ids.Count, "photo")));
+            _ = LoadGridAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(Tr.T("Couldn't move the photos. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
+
+    [RelayCommand]
+    async Task RestoreSelectionAsync()
+    {
+        if (Client is not { } client || _selected.Count == 0)
+            return;
+        var ids = SelectedIds;
+        try
+        {
+            await client.RestoreFromTrashAsync(ids, CancellationToken.None);
+            ClearSelection();
+            ShowNotice(Tr.T("Restored {0}", Format.Plural(ids.Count, "photo")));
+            _ = LoadGridAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(Tr.T("Couldn't restore. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
+
+    [RelayCommand]
+    async Task DeleteSelectionForeverAsync()
+    {
+        if (Client is not { } client || _main is null || _selected.Count == 0)
+            return;
+        var ids = SelectedIds;
+        var what = Format.Plural(ids.Count, "photo");
+        if (!await _main.ConfirmAsync(Tr.T("Delete {0} forever?", what), Tr.T("They're removed from Immich for good. This can't be undone."),
+                Tr.T("Delete forever"), danger: true))
+            return;
+        try
+        {
+            await client.DeletePermanentlyAsync(ids, CancellationToken.None);
+            ClearSelection();
+            ShowNotice(Tr.T("Deleted {0}", what));
+            _ = LoadGridAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(Tr.T("Couldn't delete. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
+
+    [RelayCommand]
+    async Task RestoreAllAsync()
+    {
+        if (Client is not { } client)
+            return;
+        try
+        {
+            await client.RestoreAllFromTrashAsync(CancellationToken.None);
+            ShowNotice(Tr.T("Restored everything in the trash"));
+            _ = LoadGridAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(Tr.T("Couldn't restore. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
+
+    [RelayCommand]
+    async Task EmptyTrashAsync()
+    {
+        if (Client is not { } client || _main is null)
+            return;
+        if (!await _main.ConfirmAsync(Tr.T("Empty the trash?"), Tr.T("Everything in the trash is removed from Immich for good. This can't be undone."),
+                Tr.T("Empty trash"), danger: true))
+            return;
+        try
+        {
+            await client.EmptyTrashAsync(CancellationToken.None);
+            ShowNotice(Tr.T("The trash is empty."));
+            _ = LoadGridAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(Tr.T("Couldn't empty the trash. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
+
     // ---- Actions (selection and viewer) ----
 
     /// <summary>A small panel over the page: sharing or adding to an album.</summary>
@@ -585,6 +990,13 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     {
         if (ReferenceEquals(Panel, panel))
             Panel = null;
+    }
+
+    partial void OnPanelChanged(ViewModelBase? oldValue, ViewModelBase? newValue)
+    {
+        // A PIN prompt closed some other way (Esc) counts as cancelled.
+        if (oldValue is PinPanelViewModel pin && newValue is null)
+            pin.CloseCommand.Execute(null);
     }
 
     internal void ShowShare(IReadOnlyList<string> assetIds) =>

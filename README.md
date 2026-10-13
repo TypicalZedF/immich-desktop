@@ -17,7 +17,8 @@
 
 - **Looks like Immich.** Official Immich logo, Google Sans, Immich's colors and layout (top bar, sidebar, storage meter and server status).
 - **Light, dark or follow Windows.** One click on the sun/moon in the top bar, or choose in Settings.
-- **Your library, like the web app.** Timeline with a date rail to jump through the years, Favorites, Albums, People, Places and a heat map of where photos were taken, plus smart search. A sharp full-screen viewer with zoom, favorite, download, add to album, trash and photo info.
+- **Your library, like the web and mobile apps.** A sidebar with Photos (with a date rail to jump through the years), Explore (people and places), Map, Sharing (shared albums, your links, partners) and Albums, plus a Library group: Favorites, Archive, Locked Folder (unlocked with your PIN) and Trash. Search from the top bar. A sharp full-screen viewer with zoom, favorite, copy, download, add to album, trash and photo info.
+- **Offline map.** A built-in world map with country and state lines; online street detail is optional.
 - **Share.** Select photos (or a whole album) and create a share link with an expiry date, copied straight to your clipboard.
 - **Desktop picture frame.** Your desktop background can rotate through photos from your favorites, an album or the whole library.
 - **Your profile picture.** Shown from Immich. Change it in Settings by picking a photo from your Immich library (or your PC), then move, zoom and rotate it in the circle, just like the web app.

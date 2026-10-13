@@ -179,22 +179,24 @@ static class Screens
             photos.Panel = null;
             photos.ClearSelectionCommand.Execute(null);
 
-            photos.IsAlbumsTab = true;
+            shell.Navigate(ShellPage.Albums);
             Shot(main, outDir, $"19a-albums-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
-            photos.IsPeopleTab = true;
-            Shot(main, outDir, $"19b-people-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
-            photos.IsPlacesTab = true;
-            Shot(main, outDir, $"19c-places-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
-            photos.IsMapTab = true;
+            shell.Navigate(ShellPage.Explore);
+            Shot(main, outDir, $"19b-explore-{suffix}", height: 860, settle: TimeSpan.FromSeconds(2));
+            shell.Navigate(ShellPage.Sharing);
+            Shot(main, outDir, $"19c-sharing-{suffix}", height: 860, settle: TimeSpan.FromSeconds(2));
+            shell.Navigate(ShellPage.Map);
             Shot(main, outDir, $"19d-map-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
             Shot(main, outDir, $"19d2-map-usa-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1), interact: w =>
                 Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(w).OfType<ImmichDesktop.App.Controls.MapView>().First().CenterOn(39, -96, 4.2));
-            Shot(main, outDir, $"19d3-map-pacific-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1), interact: w =>
-                Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(w).OfType<ImmichDesktop.App.Controls.MapView>().First().CenterOn(20, 180, 1.6));
-            photos.SearchText = "beach";
-            photos.SearchCommand.Execute(null);
+            shell.Navigate(ShellPage.Trash);
+            Shot(main, outDir, $"19f-trash-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            shell.Navigate(ShellPage.Locked);
+            Shot(main, outDir, $"19g-locked-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1));
+            shell.SearchText = "beach";
+            shell.SearchCommand.Execute(null);
             Shot(main, outDir, $"19e-search-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
-            photos.IsPhotosTab = true;
+            shell.Navigate(ShellPage.Photos);
 
             shell.Navigate(ShellPage.Folders);
             ((FoldersViewModel)Page(shell, ShellPage.Folders)).Folders[1].IsExpanded = true;

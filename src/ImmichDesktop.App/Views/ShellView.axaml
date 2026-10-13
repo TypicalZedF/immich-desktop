@@ -18,12 +18,26 @@
         </Border>
       </StackPanel>
 
+      <!-- Search, like the web app's top bar -->
+      <TextBox Grid.Column="1" MaxWidth="560" HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="8,0,24,0"
+               Text="{Binding SearchText}" l:Tr.Watermark="Search your photos" CornerRadius="999" Padding="12,9">
+        <TextBox.InnerLeftContent>
+          <mi:MaterialIcon Kind="Magnify" Width="20" Height="20" Margin="14,0,0,0" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+        </TextBox.InnerLeftContent>
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
+        </TextBox.KeyBindings>
+      </TextBox>
+
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="0,0,20,0" VerticalAlignment="Center">
         <Button Classes="ghost icon" Command="{Binding OpenWebCommand}" l:Tr.Tip="Open Immich in your browser">
           <mi:MaterialIcon Kind="OpenInNew" Width="20" Height="20" />
         </Button>
         <Button Classes="ghost icon" Command="{Binding LockNowCommand}" IsVisible="{Binding IsLockEnabled}" l:Tr.Tip="Lock now">
           <mi:MaterialIcon Kind="LockOutline" Width="20" Height="20" />
+        </Button>
+        <Button Classes="ghost icon" Command="{Binding OpenSettingsCommand}" l:Tr.Tip="Settings">
+          <mi:MaterialIcon Kind="CogOutline" Width="20" Height="20" />
         </Button>
         <Button Classes="ghost icon" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{Binding ThemeTip}">
           <mi:MaterialIcon Kind="{Binding ThemeIcon}" Width="20" Height="20" />
@@ -44,36 +58,30 @@
     <Grid Grid.Row="1" ColumnDefinitions="256,*">
       <DockPanel Background="{DynamicResource AppSidebarBrush}" Margin="0,6,0,0">
 
-        <!-- Server status (Immich-style) -->
-        <StackPanel DockPanel.Dock="Bottom" Margin="24,0,24,20" Spacing="4">
-          <Border Classes="divider" Margin="0,0,0,14" />
-          <Grid ColumnDefinitions="Auto,*,Auto">
-            <mi:MaterialIcon Kind="Server" Width="18" Height="18" Foreground="{DynamicResource AppTextSecondaryBrush}" />
-            <TextBlock Grid.Column="1" Classes="caption" l:Tr.Text="Server" Margin="10,0,0,0" VerticalAlignment="Center" />
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <!-- Storage and server, compact (Immich-style) -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="24,0,24,16" Spacing="6">
+          <StackPanel Spacing="6" IsVisible="{Binding HasStorage}">
+            <Grid ColumnDefinitions="Auto,*">
+              <mi:MaterialIcon Kind="Cloud" Width="16" Height="16" Foreground="{DynamicResource AppTextSecondaryBrush}" />
+              <TextBlock Grid.Column="1" Classes="caption" FontSize="11.5" Margin="8,0,0,0" Text="{Binding StorageText}" VerticalAlignment="Center" />
+            </Grid>
+            <ProgressBar Classes="thin" Value="{Binding StoragePercent}" Maximum="100" />
+          </StackPanel>
+          <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0" ToolTip.Tip="{Binding ServerStatusText}">
+            <Panel Width="16" Height="16">
               <Ellipse Width="8" Height="8" Fill="{DynamicResource AppSuccessBrush}" IsVisible="{Binding IsServerOnline}" />
               <Ellipse Width="8" Height="8" Fill="{DynamicResource AppDangerBrush}" IsVisible="{Binding !IsServerOnline}" />
-              <TextBlock Classes="caption" Text="{Binding ServerStatusText}" />
-            </StackPanel>
+            </Panel>
+            <TextBlock Grid.Column="1" Classes="caption tertiary" FontSize="11.5" Margin="8,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+              <Run Text="{Binding ServerHost}" /><Run Text="  " /><Run Text="{Binding ServerVersion}" />
+            </TextBlock>
           </Grid>
-          <TextBlock Classes="caption tertiary" Margin="28,0,0,0" FontSize="11.5">
-            <Run Text="{Binding ServerHost}" /><Run Text="  " /><Run Text="{Binding ServerVersion}" />
-          </TextBlock>
         </StackPanel>
 
-        <!-- Storage (Immich-style) -->
-        <StackPanel DockPanel.Dock="Bottom" Margin="24,0,24,16" Spacing="8" IsVisible="{Binding HasStorage}">
-          <StackPanel Orientation="Horizontal" Spacing="10">
-            <mi:MaterialIcon Kind="Cloud" Width="18" Height="18" Foreground="{DynamicResource AppTextSecondaryBrush}" />
-            <TextBlock Classes="caption" l:Tr.Text="Storage space" VerticalAlignment="Center" />
-          </StackPanel>
-          <ProgressBar Classes="thin" Value="{Binding StoragePercent}" Maximum="100" />
-          <TextBlock Classes="caption tertiary" FontSize="11.5" Text="{Binding StorageText}" />
-        </StackPanel>
-
-        <!-- Live backup status -->
-        <Border DockPanel.Dock="Bottom" Margin="16,0,16,18" CornerRadius="14" Padding="12,10"
-                Background="{DynamicResource AppCardBrush}" ToolTip.Tip="{Binding Status.Detail}">
+        <!-- Live backup status (opens the Backup page) -->
+        <Button DockPanel.Dock="Bottom" Margin="16,0,16,14" CornerRadius="14" Padding="12,10" HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch" Background="{DynamicResource AppCardBrush}" BorderThickness="0"
+                Command="{Binding ShowBackupCommand}" ToolTip.Tip="{Binding Status.Detail}">
           <Grid ColumnDefinitions="Auto,*">
             <Border Classes="tone" Width="30" Height="30" CornerRadius="15"
                     Classes.busy="{Binding Status.IsBusy}" Classes.paused="{Binding Status.IsPaused}"
@@ -83,21 +91,28 @@
             <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" FontWeight="Medium"
                        Text="{Binding Status.Title}" TextTrimming="CharacterEllipsis" />
           </Grid>
-        </Border>
+        </Button>
 
-        <!-- Navigation -->
-        <ListBox Classes="nav" ItemsSource="{Binding NavItems}" SelectedItem="{Binding SelectedNav}">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:NavItem">
-              <StackPanel Orientation="Horizontal" Spacing="16">
-                <Panel Width="22" Height="22">
-                  <mi:MaterialIcon Classes="inactive" Kind="{Binding Icon}" Width="22" Height="22" />
-                  <mi:MaterialIcon Classes="active" Kind="{Binding ActiveIcon}" Width="22" Height="22" />
+        <!-- Navigation: library sections, the Library group, this PC's backup, settings -->
+        <ListBox Name="Nav" Classes="nav" ItemsSource="{Binding NavEntries}" SelectedItem="{Binding SelectedNav}">
+          <ListBox.DataTemplates>
+            <DataTemplate DataType="vm:NavHeader">
+              <Panel>
+                <TextBlock Text="{Binding Title}" IsVisible="{Binding !IsDivider}" FontSize="11.5" FontWeight="SemiBold" LetterSpacing="0.6"
+                           Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                <Border Classes="divider" IsVisible="{Binding IsDivider}" Margin="0,4,0,0" />
+              </Panel>
+            </DataTemplate>
+            <DataTemplate DataType="vm:NavItem">
+              <StackPanel Orientation="Horizontal" Spacing="14">
+                <Panel Width="20" Height="20">
+                  <mi:MaterialIcon Classes="inactive" Kind="{Binding Icon}" Width="20" Height="20" />
+                  <mi:MaterialIcon Classes="active" Kind="{Binding ActiveIcon}" Width="20" Height="20" />
                 </Panel>
-                <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="Medium" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" />
               </StackPanel>
             </DataTemplate>
-          </ListBox.ItemTemplate>
+          </ListBox.DataTemplates>
         </ListBox>
       </DockPanel>
 

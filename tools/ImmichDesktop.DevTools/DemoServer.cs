@@ -184,7 +184,17 @@ sealed class DemoServer : HttpMessageHandler
                 country = c.Country,
             }))),
             "/api/search/smart" or "/api/search/metadata" => Search(17),
-            "/api/shared-links" => Json(new { id = "l1", key = "Xq7cT2pLm9vR4sWz" }),
+            "/api/shared-links" when request.Method == HttpMethod.Post => Json(new { id = "l1", key = "Xq7cT2pLm9vR4sWz" }),
+            "/api/shared-links" => Json(new object[]
+            {
+                new { id = "l1", key = "Xq7cT2pLm9vR4sWz", type = "ALBUM", description = (string?)null, album = new { albumName = "Summer in Lisbon", albumThumbnailAssetId = "202609-1", assetCount = 48 },
+                      assets = Array.Empty<object>(), createdAt = DateTimeOffset.Now.AddDays(-3), expiresAt = (DateTimeOffset?)null, allowDownload = true },
+                new { id = "l2", key = "Kd82nQpZ1sYb7Lmv", type = "INDIVIDUAL", description = (string?)null, album = (object?)null,
+                      assets = new[] { new { id = "202609-4" }, new { id = "202609-5" }, new { id = "202609-6" } }, createdAt = DateTimeOffset.Now.AddDays(-20),
+                      expiresAt = (DateTimeOffset?)DateTimeOffset.Now.AddDays(10), allowDownload = false },
+            }),
+            "/api/partners" => Json(new[] { new { id = "pt1", name = "Sam Morgan", email = "sam@example.com" } }),
+            "/api/auth/status" => Json(new { pinCode = true, isElevated = false, password = true }),
             "/api/server/config" => Json(new { externalDomain = "" }),
             _ when path.StartsWith("/api/assets/", StringComparison.Ordinal) && path.Count(c => c == '/') == 3 => Json(AssetJson(path.Split('/')[3], 4)),
             "/api/server/ping" => Json(new { res = "pong" }),

@@ -334,7 +334,7 @@
     <Setter Property="Padding" Value="0" />
   </Style>
   <Style Selector="ListBox.nav ListBoxItem">
-    <Setter Property="Padding" Value="26,13" />
+    <Setter Property="Padding" Value="26,9" />
     <Setter Property="Margin" Value="0,1,16,1" />
     <Setter Property="CornerRadius" Value="0,999,999,0" />
     <Setter Property="Cursor" Value="Hand" />

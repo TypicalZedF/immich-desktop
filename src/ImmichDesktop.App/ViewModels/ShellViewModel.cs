@@ -12,8 +12,16 @@ namespace ImmichDesktop.App.ViewModels;
 
 public enum ShellPage
 {
-    Overview,
     Photos,
+    Explore,
+    Map,
+    Sharing,
+    Albums,
+    Favorites,
+    Archive,
+    Locked,
+    Trash,
+    Overview,
     Folders,
     Activity,
     Settings,
@@ -31,6 +39,13 @@ public sealed class NavItem(ShellPage page, string title, MaterialIconKind icon,
     public bool IsCreated => _viewModel.IsValueCreated;
 }
 
+/// <summary>A group heading in the sidebar ("LIBRARY"); an empty title is just a divider.</summary>
+public sealed class NavHeader(string title)
+{
+    public string Title { get; } = title;
+    public bool IsDivider => Title.Length == 0;
+}
+
 /// <summary>Signed-in layout, modeled on the Immich web app: top bar, sidebar, storage and server status.</summary>
 public sealed partial class ShellViewModel : ViewModelBase, IDisposable
 {
@@ -39,14 +54,30 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     public ShellViewModel(MainWindowViewModel main)
     {
         Main = main;
-        NavItems =
+        NavItem Library(ShellPage page, string title, MaterialIconKind icon, MaterialIconKind active, LibraryPage section) =>
+            new(page, title, icon, active, () => new PhotosViewModel(this, section));
+
+        // Like the Immich web app's sidebar, with the mobile app's Library group, plus this PC's backup.
+        NavEntries =
         [
-            new NavItem(ShellPage.Overview, Tr.T("Overview"), MaterialIconKind.ViewDashboardOutline, MaterialIconKind.ViewDashboard, () => new OverviewViewModel(this)),
-            new NavItem(ShellPage.Photos, Tr.T("Photos"), MaterialIconKind.ImageMultipleOutline, MaterialIconKind.ImageMultiple, () => new PhotosViewModel(this)),
+            Library(ShellPage.Photos, Tr.T("Photos"), MaterialIconKind.ImageMultipleOutline, MaterialIconKind.ImageMultiple, LibraryPage.Timeline),
+            Library(ShellPage.Explore, Tr.T("Explore"), MaterialIconKind.CompassOutline, MaterialIconKind.Compass, LibraryPage.Explore),
+            Library(ShellPage.Map, Tr.T("Map"), MaterialIconKind.MapOutline, MaterialIconKind.Map, LibraryPage.Map),
+            Library(ShellPage.Sharing, Tr.T("Sharing"), MaterialIconKind.AccountMultipleOutline, MaterialIconKind.AccountMultiple, LibraryPage.Sharing),
+            Library(ShellPage.Albums, Tr.T("Albums"), MaterialIconKind.ImageAlbum, MaterialIconKind.ImageAlbum, LibraryPage.Albums),
+            new NavHeader(Tr.T("LIBRARY")),
+            Library(ShellPage.Favorites, Tr.T("Favorites"), MaterialIconKind.HeartOutline, MaterialIconKind.Heart, LibraryPage.Favorites),
+            Library(ShellPage.Archive, Tr.T("Archive"), MaterialIconKind.ArchiveOutline, MaterialIconKind.Archive, LibraryPage.Archive),
+            Library(ShellPage.Locked, Tr.T("Locked folder"), MaterialIconKind.LockOutline, MaterialIconKind.Lock, LibraryPage.Locked),
+            Library(ShellPage.Trash, Tr.T("Trash"), MaterialIconKind.TrashCanOutline, MaterialIconKind.TrashCan, LibraryPage.Trash),
+            new NavHeader(Tr.T("THIS PC")),
+            new NavItem(ShellPage.Overview, Tr.T("Backup"), MaterialIconKind.CloudUploadOutline, MaterialIconKind.CloudUpload, () => new OverviewViewModel(this)),
             new NavItem(ShellPage.Folders, Tr.T("Folders"), MaterialIconKind.FolderOutline, MaterialIconKind.Folder, () => new FoldersViewModel(this)),
             new NavItem(ShellPage.Activity, Tr.T("Activity"), MaterialIconKind.History, MaterialIconKind.History, () => new ActivityViewModel(this)),
-            new NavItem(ShellPage.Settings, Tr.T("Settings"), MaterialIconKind.CogOutline, MaterialIconKind.Cog, () => new SettingsViewModel(this)),
         ];
+        // Settings live in the top bar (like the web and mobile apps' account menu), not the sidebar.
+        NavItems = [.. NavEntries.OfType<NavItem>(),
+            new NavItem(ShellPage.Settings, Tr.T("Settings"), MaterialIconKind.CogOutline, MaterialIconKind.Cog, () => new SettingsViewModel(this))];
         SelectedNav = NavItems[0];
 
         var settings = AppServices.Settings.Current;
@@ -65,13 +96,41 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
 
     public IReadOnlyList<NavItem> NavItems { get; }
 
+    /// <summary>The sidebar: pages and group headings.</summary>
+    public IReadOnlyList<object> NavEntries { get; }
+
     [ObservableProperty]
     public partial NavItem SelectedNav { get; set; }
 
     [ObservableProperty]
     public partial ViewModelBase? CurrentPage { get; set; }
 
-    partial void OnSelectedNavChanged(NavItem value) => CurrentPage = value?.ViewModel;
+    partial void OnSelectedNavChanged(NavItem oldValue, NavItem newValue)
+    {
+        // Leaving the locked folder locks it again, like the Immich apps.
+        if (oldValue is { IsCreated: true, ViewModel: PhotosViewModel { IsLockedFolder: true } locked })
+            _ = locked.LockAsync();
+        CurrentPage = newValue?.ViewModel;
+    }
+
+    // ---- Search (top bar, like the web app) ----
+
+    [ObservableProperty]
+    public partial string SearchText { get; set; } = "";
+
+    [RelayCommand]
+    void Search()
+    {
+        var text = SearchText.Trim();
+        if (text.Length == 0)
+            return;
+        Navigate(ShellPage.Photos);
+        if (SelectedNav.ViewModel is PhotosViewModel photos)
+            photos.SearchFor(text);
+    }
+
+    [RelayCommand]
+    void ShowBackup() => Navigate(ShellPage.Overview);
 
     public void Navigate(ShellPage page) => SelectedNav = NavItems.First(n => n.Page == page);
 
@@ -132,6 +191,9 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
 
     [RelayCommand]
     void OpenAccount() => Navigate(ShellPage.Settings);
+
+    [RelayCommand]
+    void OpenSettings() => Navigate(ShellPage.Settings);
 
     void OnThemeChanged(AppTheme _) => UpdateThemeIcon();
 

@@ -281,3 +281,131 @@ public sealed partial class AlbumPickerViewModel : ViewModelBase
     [RelayCommand]
     void Close() => _owner.ClosePanel(this);
 }
+
+/// <summary>One of your shared links on the Sharing page.</summary>
+public sealed partial class SharedLinkViewModel(PhotosViewModel owner, SharedLinkSummary link, string url) : ViewModelBase, IDisposable
+{
+    public SharedLinkSummary Link { get; } = link;
+    public string Url { get; } = url;
+
+    public string Title => Link.Title.Length > 0 ? Link.Title
+        : Link.IsAlbum ? Tr.T("Shared album") : Format.Plural(Link.AssetCount, "photo");
+
+    public string Subtitle
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (Link.IsAlbum)
+                parts.Add(Format.Plural(Link.AssetCount, "item"));
+            if (Link.CreatedAt is { } created)
+                parts.Add(Tr.T("Created {0}", Format.Relative(created)));
+            parts.Add(Link.ExpiresAt is not { } expires ? Tr.T("Never expires")
+                : Link.IsExpired ? Tr.T("Expired")
+                : Tr.T("Expires {0}", expires.ToLocalTime().ToString("d", System.Globalization.CultureInfo.CurrentCulture)));
+            return string.Join(" · ", parts);
+        }
+    }
+
+    public bool IsExpired => Link.IsExpired;
+
+    [ObservableProperty]
+    public partial Bitmap? Cover { get; set; }
+
+    internal async Task LoadCoverAsync(ThumbnailLoader loader, CancellationToken ct)
+    {
+        if (Link.CoverAssetId is not { } id)
+            return;
+        try
+        {
+            Cover = await loader.LoadAsync(id, AssetImageSize.Thumbnail, 160, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Info($"Shared link cover failed: {ex.Message}");
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    [RelayCommand]
+    async Task CopyAsync()
+    {
+        await owner.CopyTextAsync(Url);
+        owner.ShowNotice(Tr.T("Link copied"));
+    }
+
+    [RelayCommand]
+    void Open() => ShellLauncher.Open(Url);
+
+    [RelayCommand]
+    Task DeleteAsync() => owner.DeleteSharedLinkAsync(this);
+
+    public void Dispose()
+    {
+        Cover?.Dispose();
+        Cover = null;
+    }
+}
+
+/// <summary>Someone sharing their library with you; opens their photos.</summary>
+public sealed partial class PartnerViewModel(PhotosViewModel owner, PartnerInfo partner) : ViewModelBase
+{
+    public PartnerInfo Partner { get; } = partner;
+    public string Initial => Partner.Name.Length > 0 ? char.ToUpperInvariant(Partner.Name[0]).ToString() : "?";
+
+    [RelayCommand]
+    void Open() => owner.OpenPartner(Partner);
+}
+
+/// <summary>Asks for the account's PIN to unlock the locked folder (e.g. before moving photos into it).</summary>
+public sealed partial class PinPanelViewModel(PhotosViewModel owner) : ViewModelBase
+{
+    readonly TaskCompletionSource<bool> _result = new();
+
+    public Task<bool> Result => _result.Task;
+
+    [ObservableProperty]
+    public partial string Pin { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string? Error { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsWorking { get; set; }
+
+    [RelayCommand]
+    async Task UnlockAsync()
+    {
+        if (AppServices.Account.Client is not { } client || Pin.Length == 0 || IsWorking)
+            return;
+        IsWorking = true;
+        Error = null;
+        try
+        {
+            await client.UnlockSessionAsync(Pin, CancellationToken.None);
+            owner.ClosePanel(this);
+            _result.TrySetResult(true);
+        }
+        catch (ImmichApiException ex) when ((int)ex.StatusCode is >= 400 and < 500)
+        {
+            Error = Tr.T("That PIN isn't right.");
+        }
+        catch (Exception ex)
+        {
+            Error = Tr.T("Couldn't unlock. {0}", NetworkErrors.Describe(ex));
+        }
+        finally
+        {
+            IsWorking = false;
+        }
+    }
+
+    [RelayCommand]
+    void Close()
+    {
+        owner.ClosePanel(this);
+        _result.TrySetResult(false);
+    }
+}

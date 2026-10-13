@@ -315,10 +315,13 @@ public sealed class ImmichClient : IDisposable
 
     static string TimelineQuery(TimelineFilter filter)
     {
-        // Albums show everything in them, archived photos included, like the web app.
-        var query = filter.AlbumId is { } album
-            ? $"order=desc&albumId={Uri.EscapeDataString(album)}"
-            : "visibility=timeline&order=desc";
+        // Albums show everything in them, archived photos included, like the web app; the trash shows
+        // whatever was trashed.
+        var query = filter.AlbumId is { } album ? $"order=desc&albumId={Uri.EscapeDataString(album)}"
+            : filter.Trashed ? "isTrashed=true&order=desc"
+            : $"visibility={Uri.EscapeDataString(filter.Visibility ?? "timeline")}&order=desc";
+        if (filter.UserId is { } user)
+            query += $"&userId={Uri.EscapeDataString(user)}";
         if (filter.PersonId is { } person)
             query += $"&personId={Uri.EscapeDataString(person)}";
         if (filter.Favorites)
@@ -467,7 +470,63 @@ public sealed class ImmichClient : IDisposable
         return new TimelineAsset(a.Id, !string.Equals(a.Type, "VIDEO", StringComparison.OrdinalIgnoreCase), a.IsFavorite, ratio, duration, a.FileCreatedAt);
     }
 
+    // ---- Archive, locked folder, trash -------------------------------------------------------
+
+    /// <summary>Moves assets to the timeline ("timeline"), the archive ("archive") or the locked folder ("locked").</summary>
+    public Task SetVisibilityAsync(IReadOnlyList<string> assetIds, string visibility, CancellationToken ct) =>
+        SendAsync(HttpMethod.Put, "assets", new VisibilityRequestDto(assetIds, visibility), ct);
+
+    public Task RestoreFromTrashAsync(IReadOnlyList<string> assetIds, CancellationToken ct) =>
+        SendAsync(HttpMethod.Post, "trash/restore/assets", new IdsRequestDto(assetIds), ct);
+
+    public Task RestoreAllFromTrashAsync(CancellationToken ct) => SendAsync(HttpMethod.Post, "trash/restore", null, ct);
+
+    public Task EmptyTrashAsync(CancellationToken ct) => SendAsync(HttpMethod.Post, "trash/empty", null, ct);
+
+    /// <summary>Deletes assets for good (skipping the trash).</summary>
+    public Task DeletePermanentlyAsync(IReadOnlyList<string> assetIds, CancellationToken ct) =>
+        SendAsync(HttpMethod.Delete, "assets", new DeleteAssetsRequestDto(assetIds, Force: true), ct);
+
+    public async Task<AuthStatus> GetAuthStatusAsync(CancellationToken ct)
+    {
+        var status = await SendAsync<AuthStatusDto>(HttpMethod.Get, "auth/status", null, ct);
+        return new AuthStatus(status.PinCode, status.IsElevated);
+    }
+
+    /// <summary>Unlocks the locked folder for this session with the account's PIN.</summary>
+    public Task UnlockSessionAsync(string pin, CancellationToken ct) =>
+        SendAsync(HttpMethod.Post, "auth/session/unlock", new SessionUnlockDto(pin), ct);
+
+    public Task LockSessionAsync(CancellationToken ct) => SendAsync(HttpMethod.Post, "auth/session/lock", null, ct);
+
     // ---- Sharing -----------------------------------------------------------------------------
+
+    /// <summary>Links you've shared, newest first.</summary>
+    public async Task<List<SharedLinkSummary>> GetSharedLinksAsync(CancellationToken ct)
+    {
+        var links = await SendAsync<List<SharedLinkFullDto>>(HttpMethod.Get, "shared-links", null, ct);
+        return links.Select(l =>
+        {
+            var isAlbum = string.Equals(l.Type, "ALBUM", StringComparison.OrdinalIgnoreCase);
+            var count = isAlbum ? l.Album?.AssetCount ?? 0 : l.Assets?.Count ?? 0;
+            var title = !string.IsNullOrWhiteSpace(l.Description) ? l.Description!
+                : isAlbum ? l.Album?.AlbumName ?? ""
+                : "";
+            var cover = isAlbum ? l.Album?.AlbumThumbnailAssetId : l.Assets?.FirstOrDefault()?.Id;
+            return new SharedLinkSummary(l.Id, l.Key, isAlbum, title, cover, count, l.CreatedAt, l.ExpiresAt, l.AllowDownload);
+        }).OrderByDescending(l => l.CreatedAt).ToList();
+    }
+
+    public Task DeleteSharedLinkAsync(string id, CancellationToken ct) =>
+        SendAsync(HttpMethod.Delete, $"shared-links/{Uri.EscapeDataString(id)}", null, ct);
+
+    /// <summary>People who share their library with you.</summary>
+    public async Task<List<PartnerInfo>> GetPartnersAsync(CancellationToken ct)
+    {
+        var partners = await SendAsync<List<PartnerDto>>(HttpMethod.Get, "partners?direction=shared-with", null, ct);
+        return partners.Select(p => new PartnerInfo(p.Id, p.Name ?? p.Email ?? "", p.Email ?? "")).ToList();
+    }
+
 
     /// <summary>Creates a public link to some photos, or to an album.</summary>
     public Task<SharedLinkInfo> CreateSharedLinkAsync(IReadOnlyList<string>? assetIds, string? albumId, bool allowDownload, DateTimeOffset? expiresAt, CancellationToken ct) =>
@@ -495,6 +554,10 @@ public sealed class ImmichClient : IDisposable
 
     public Task<List<AlbumInfo>> GetAlbumsAsync(CancellationToken ct) =>
         SendAsync<List<AlbumInfo>>(HttpMethod.Get, "albums", null, ct);
+
+    /// <summary>Albums shared with you or by you.</summary>
+    public Task<List<AlbumInfo>> GetSharedAlbumsAsync(CancellationToken ct) =>
+        SendAsync<List<AlbumInfo>>(HttpMethod.Get, "albums?shared=true", null, ct);
 
     public Task<AlbumInfo> CreateAlbumAsync(string name, IReadOnlyList<string>? assetIds, CancellationToken ct) =>
         SendAsync<AlbumInfo>(HttpMethod.Post, "albums", new CreateAlbumRequestDto(name, assetIds), ct);

@@ -65,7 +65,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
 
     public bool IsVideo => !Asset.IsImage;
     public string DurationText => Asset.DurationMs is { } ms and > 0 ? AssetCellViewModel.FormatDuration(ms) : "";
-    public bool CanEdit => !_owner.IsPicker;
+    public bool CanEdit => !_owner.IsPicker && _owner.CanUseNormalActions;
 
     // Info panel lines
     public string? FileName => Details?.OriginalFileName;
