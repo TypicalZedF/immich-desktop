@@ -469,6 +469,19 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial IReadOnlyList<MapMarker> Markers { get; set; } = [];
 
+    /// <summary>Online street detail over the built-in map (remembered; off by default for privacy).</summary>
+    public bool ShowStreetDetail
+    {
+        get => AppServices.Settings.Current.MapStreetDetail;
+        set
+        {
+            if (value == ShowStreetDetail)
+                return;
+            AppServices.Settings.Update(s => s.MapStreetDetail = value);
+            OnPropertyChanged();
+        }
+    }
+
     async Task LoadMarkersAsync()
     {
         if (Client is not { } client)

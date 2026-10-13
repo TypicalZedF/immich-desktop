@@ -450,10 +450,13 @@ public sealed class ImmichClient : IDisposable
             .ToList();
     }
 
-    /// <summary>Every photo with a location, for the map.</summary>
+    /// <summary>
+    /// Every photo with a location, for the map. No filters: older filter names (isArchived) are
+    /// rejected by newer servers' strict validation.
+    /// </summary>
     public async Task<List<MapMarker>> GetMapMarkersAsync(CancellationToken ct)
     {
-        var markers = await SendAsync<List<MapMarkerDto>>(HttpMethod.Get, "map/markers?isArchived=false", null, ct, TimeSpan.FromSeconds(90));
+        var markers = await SendAsync<List<MapMarkerDto>>(HttpMethod.Get, "map/markers", null, ct, TimeSpan.FromSeconds(90));
         return markers.Select(m => new MapMarker(m.Id, m.Lat, m.Lon, m.City, m.Country)).ToList();
     }
 

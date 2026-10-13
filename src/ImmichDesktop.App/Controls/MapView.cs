@@ -19,13 +19,24 @@ public sealed class MapView : Control
     public static readonly StyledProperty<IReadOnlyList<MapMarker>?> MarkersProperty =
         AvaloniaProperty.Register<MapView, IReadOnlyList<MapMarker>?>(nameof(Markers));
 
+    /// <summary>Draw online street detail over the built-in map (off: nothing is fetched from map services).</summary>
+    public static readonly StyledProperty<bool> ShowStreetDetailProperty =
+        AvaloniaProperty.Register<MapView, bool>(nameof(ShowStreetDetail));
+
     const double TileSize = 256;
     const double MinZoom = 1.5;
     const double MaxZoom = 18;
     const double ClusterCell = 64;
 
-    static readonly IBrush LandFallback = new SolidColorBrush(Color.Parse("#E5E7EB"));
-    static readonly IBrush LandFallbackDark = new SolidColorBrush(Color.Parse("#1F2937"));
+    // The built-in map's colors, matching the app's light and dark themes.
+    static readonly IBrush Water = new SolidColorBrush(Color.Parse("#D6E4F0"));
+    static readonly IBrush WaterDark = new SolidColorBrush(Color.Parse("#141A22"));
+    static readonly IBrush LandBrush = new SolidColorBrush(Color.Parse("#F5F5F2"));
+    static readonly IBrush LandDark = new SolidColorBrush(Color.Parse("#262A30"));
+    static readonly Color Coast = Color.Parse("#B8C4D0");
+    static readonly Color CoastDark = Color.Parse("#3A4250");
+    static readonly Color Border = Color.Parse("#C9CDD4");
+    static readonly Color BorderDark = Color.Parse("#3F4652");
     static readonly Typeface CountFont = new("Google Sans", FontStyle.Normal, FontWeight.SemiBold);
 
     MapTiles? _tiles;
@@ -53,6 +64,12 @@ public sealed class MapView : Control
     {
         get => GetValue(MarkersProperty);
         set => SetValue(MarkersProperty, value);
+    }
+
+    public bool ShowStreetDetail
+    {
+        get => GetValue(ShowStreetDetailProperty);
+        set => SetValue(ShowStreetDetailProperty, value);
     }
 
     /// <summary>A bubble that can't be split further was clicked.</summary>
@@ -89,6 +106,10 @@ public sealed class MapView : Control
         else if (change.Property == BoundsProperty && !_userMoved)
         {
             FitToMarkers();
+        }
+        else if (change.Property == ShowStreetDetailProperty)
+        {
+            InvalidateVisual();
         }
     }
 
@@ -180,16 +201,43 @@ public sealed class MapView : Control
     {
         var bounds = new Rect(Bounds.Size);
         var dark = IsDark;
-        context.FillRectangle(dark ? LandFallbackDark : LandFallback, bounds);
-        DrawTiles(context, dark);
+        context.FillRectangle(dark ? WaterDark : Water, bounds);
+        DrawWorld(context, dark);
+        var street = ShowStreetDetail && _tiles is { AllFailed: false };
+        if (street)
+            DrawTiles(context, dark);
         DrawClusters(context, dark);
 
-        // Attribution (required by the map data licence).
-        var text = new FormattedText(MapTiles.Attribution, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, 10.5,
+        // Credit the map data, as its licence asks.
+        var credit = street ? _tiles!.Provider.Attribution : WorldMap.Attribution;
+        var text = new FormattedText(credit, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, 10.5,
             dark ? Brushes.White : Brushes.Black);
         var box = new Rect(Bounds.Width - text.Width - 12, Bounds.Height - text.Height - 6, text.Width + 12, text.Height + 6);
         context.FillRectangle(new SolidColorBrush(dark ? Color.Parse("#99000000") : Color.Parse("#B3FFFFFF")), box);
         context.DrawText(text, new Point(box.X + 6, box.Y + 3));
+    }
+
+    /// <summary>The built-in map: land, coastlines and country borders, for every copy of the world on screen.</summary>
+    void DrawWorld(DrawingContext context, bool dark)
+    {
+        if (WorldMap.Land is not { } land)
+            return;
+        var size = WorldSize;
+        var origin = ToScreen(0, 0);
+        // Lines stay one screen pixel wide whatever the zoom.
+        var coast = new Pen(new SolidColorBrush(dark ? CoastDark : Coast), 1.2 / size);
+        var border = new Pen(new SolidColorBrush(dark ? BorderDark : Border), 0.9 / size);
+        var first = (int)Math.Floor(-origin.X / size);
+        var last = (int)Math.Floor((Bounds.Width - origin.X) / size);
+        for (var copy = first; copy <= last; copy++)
+        {
+            using (context.PushTransform(Matrix.CreateScale(size, size) * Matrix.CreateTranslation(origin.X + copy * size, origin.Y)))
+            {
+                context.DrawGeometry(dark ? LandDark : LandBrush, coast, land);
+                if (WorldMap.Borders is { } borders)
+                    context.DrawGeometry(null, border, borders);
+            }
+        }
     }
 
     void DrawTiles(DrawingContext context, bool dark)
@@ -197,8 +245,8 @@ public sealed class MapView : Control
         if (_tiles is null)
             return;
         var scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
-        // @2x tiles are 512px: pick the level whose pixels best match the screen's.
-        var z = (int)Math.Clamp(Math.Round(_zoom + Math.Log2(scaling) - 1), 0, 19);
+        // Pick the level whose pixels best match the screen's (high-resolution tiles are 512px).
+        var z = (int)Math.Clamp(Math.Round(_zoom + Math.Log2(scaling) - Math.Log2(_tiles.Provider.TilePixels / 256.0)), 0, 19);
         var n = 1 << z;
         var tileOnScreen = WorldSize / n;
         var origin = ToScreen(0, 0);
@@ -241,7 +289,21 @@ public sealed class MapView : Control
             cluster.SumY += p.Y;
             cluster.Members.Add(i);
         }
-        _clusters.AddRange(cells.Values);
+        // Bubbles from neighbouring cells can still overlap: fold close ones into the bigger one.
+        var merged = new List<Cluster>();
+        foreach (var c in cells.Values.OrderByDescending(c => c.Members.Count))
+        {
+            var target = merged.FirstOrDefault(m => Distance(m.Center, c.Center) < 36);
+            if (target is null)
+            {
+                merged.Add(c);
+                continue;
+            }
+            target.SumX += c.SumX;
+            target.SumY += c.SumY;
+            target.Members.AddRange(c.Members);
+        }
+        _clusters.AddRange(merged);
 
         var accent = dark ? Color.Parse("#ACCBFA") : Color.Parse("#4250AF");
         var onAccent = dark ? Brushes.Black : Brushes.White;
@@ -329,6 +391,8 @@ public sealed class MapView : Control
         ZoomAt(_zoom + e.Delta.Y * 0.5, e.GetPosition(this));
         e.Handled = true;
     }
+
+    static double Distance(Point a, Point b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
 
     Cluster? HitCluster(Point p) =>
         _clusters.FirstOrDefault(c => Math.Abs(c.Center.X - p.X) < 18 && Math.Abs(c.Center.Y - p.Y) < 18);

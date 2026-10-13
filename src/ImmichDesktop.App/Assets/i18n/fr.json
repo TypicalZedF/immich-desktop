@@ -334,6 +334,8 @@
  "Starting…": "Démarrage…",
  "Stop backing up “{0}”?": "Arrêter de sauvegarder « {0} » ?",
  "Storage space": "Espace de stockage",
+ "Street detail": "Détails des rues",
+ "Street names and roads come from an online map service (no account or key needed). Off: only the built-in map is used, and nothing about your photos' locations leaves your PC.": "Les noms et tracés des rues viennent d'un service de cartes en ligne (sans compte ni clé). Désactivé : seule la carte intégrée est utilisée, et rien sur le lieu de vos photos ne quitte votre PC.",
  "Switch to dark theme": "Passer au thème sombre",
  "Switch to light theme": "Passer au thème clair",
  "Sync now": "Synchroniser maintenant",

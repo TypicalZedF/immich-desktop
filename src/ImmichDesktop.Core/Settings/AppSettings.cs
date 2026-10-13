@@ -108,6 +108,12 @@ public sealed class AppSettings
 
     /// <summary>App language code (e.g. "de"); null follows the system language.</summary>
     public string? Language { get; set; }
+
+    /// <summary>
+    /// Show online street detail on the map. Off: only the built-in map is drawn and nothing is
+    /// requested from map services (which would otherwise learn roughly where your photos are).
+    /// </summary>
+    public bool MapStreetDetail { get; set; }
     public bool CheckForUpdates { get; set; } = true;
 
     // Security: ask for Windows Hello or a password before showing the window (backup keeps running).
