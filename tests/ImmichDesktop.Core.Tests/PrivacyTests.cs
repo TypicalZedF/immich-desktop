@@ -110,6 +110,14 @@ public class OnDeviceModelTests
     }
 
     [Fact]
+    public void Source_link_points_at_the_commit_this_was_built_from()
+    {
+        var url = AppInfo.SourceUrl("src/ImmichDesktop.Core/Privacy");
+        Assert.StartsWith("https://github.com/TypicalZedF/immich-desktop/tree/", url);
+        Assert.Matches("/tree/([0-9a-f]{7,40}|beta)/src/ImmichDesktop.Core/Privacy$", url);
+    }
+
+    [Fact]
     public void Telemetry_is_off_and_model_fingerprints_are_known()
     {
         Assert.True(OnDeviceModels.TelemetryDisabled);

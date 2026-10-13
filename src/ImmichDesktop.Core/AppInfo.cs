@@ -19,6 +19,19 @@ public static class AppInfo
 
     public static string ProjectUrl => $"https://github.com/{UpdateRepository}";
 
+    /// <summary>
+    /// The exact commit this copy was built from (the build adds it to the version as "+sha"), so
+    /// links to the source show the code that's actually running. Null for builds outside git.
+    /// </summary>
+    public static string? SourceCommit { get; } =
+        typeof(AppInfo).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+') is [_, var sha, ..]
+        && System.Text.RegularExpressions.Regex.IsMatch(sha, "^[0-9a-f]{7,40}$")
+            ? sha
+            : null;
+
+    /// <summary>A file or folder in the source code, at the commit this copy was built from.</summary>
+    public static string SourceUrl(string path) => $"{ProjectUrl}/tree/{SourceCommit ?? "beta"}/{path}";
+
     public static string Version { get; } =
         typeof(AppInfo).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
         ?? "1.0.0";

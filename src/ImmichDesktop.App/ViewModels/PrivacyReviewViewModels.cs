@@ -48,7 +48,8 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
     public string ServerHost => Uri.TryCreate(AppServices.Settings.Current.ServerUrl, UriKind.Absolute, out var uri) ? uri.Host : Tr.T("your Immich server");
     public string DatabasePath => AppPaths.DatabaseFile;
     public string ModelsFolder => OnDeviceModels.Directory;
-    public string SourceUrl => "https://github.com/TypicalZedF/immich-desktop/tree/main/src/ImmichDesktop.Core/Privacy";
+    /// <summary>The check's code at the exact commit this copy was built from.</summary>
+    public string SourceUrl => AppInfo.SourceUrl("src/ImmichDesktop.Core/Privacy");
 
     [ObservableProperty]
     public partial string RunsOn { get; set; } = "";
