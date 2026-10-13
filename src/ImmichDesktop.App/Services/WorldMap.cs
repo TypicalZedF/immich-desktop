@@ -7,21 +7,27 @@ using ImmichDesktop.Core;
 namespace ImmichDesktop.App.Services;
 
 /// <summary>
-/// A built-in world map (land and country borders from Natural Earth, public domain), so the map
-/// always works without any online map service. Shapes are in Web Mercator coordinates from 0 to 1,
-/// ready to be scaled to the current zoom.
+/// A built-in world map from Natural Earth (public domain): land, lakes, major rivers, country
+/// borders and state/province lines (US, Canada, Brazil, Australia), so the map always works without
+/// any online map service. Shapes are in Web Mercator coordinates from 0 to 1, ready to be scaled.
 /// </summary>
 public static class WorldMap
 {
-    static readonly Lazy<(Geometry? Land, Geometry? Borders)> Shapes = new(Load);
+    sealed record Layers(Geometry? Land, Geometry? Lakes, Geometry? Rivers, Geometry? Borders, Geometry? States);
+
+    static readonly Lazy<Layers> Shapes = new(Load);
 
     public static Geometry? Land => Shapes.Value.Land;
+    public static Geometry? Lakes => Shapes.Value.Lakes;
+    public static Geometry? Rivers => Shapes.Value.Rivers;
     public static Geometry? Borders => Shapes.Value.Borders;
+    public static Geometry? States => Shapes.Value.States;
 
     public const string Attribution = "Natural Earth";
 
-    static (Geometry?, Geometry?) Load()
+    static Layers Load()
     {
+        var none = new Layers(null, null, null, null, null);
         try
         {
             using var asset = AssetLoader.Open(new Uri("avares://ImmichDesktop/Assets/world-50m.bin.gz"));
@@ -29,8 +35,8 @@ public static class WorldMap
             using var data = new MemoryStream();
             gzip.CopyTo(data);
             var reader = new Reader(data.ToArray());
-            if (reader.Magic() != "IMWM1")
-                return (null, null);
+            if (reader.Magic() != "IMWM2")
+                return none;
             double sx = reader.Double(), sy = reader.Double(), tx = reader.Double(), ty = reader.Double();
             Point Project(long x, long y)
             {
@@ -39,14 +45,20 @@ public static class WorldMap
                 var sin = Math.Sin(lat * Math.PI / 180);
                 return new Point((lon + 180) / 360, 0.5 - Math.Log((1 + sin) / (1 - sin)) / (4 * Math.PI));
             }
-            var land = Read(reader, Project, closed: true);
-            var borders = Read(reader, Project, closed: false);
-            return (land, borders);
+            // Layer order is fixed by the converter: land, lakes, rivers, borders, states.
+            if (reader.Int32() != 5)
+                return none;
+            return new Layers(
+                Read(reader, Project, closed: true),
+                Read(reader, Project, closed: true),
+                Read(reader, Project, closed: false),
+                Read(reader, Project, closed: false),
+                Read(reader, Project, closed: false));
         }
         catch (Exception ex)
         {
             Log.Warn("Could not load the built-in world map", ex);
-            return (null, null);
+            return none;
         }
     }
 

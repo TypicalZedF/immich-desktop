@@ -51,6 +51,9 @@ sealed class DemoServer : HttpMessageHandler
     [
         ("Lisbon", "Lisbon", "Portugal", 38.72, -9.14, 40), ("Porto", "Porto", "Portugal", 41.15, -8.61, 12), ("Madrid", "Madrid", "Spain", 40.42, -3.70, 18),
         ("Paris", "Île-de-France", "France", 48.86, 2.35, 25), ("Amsterdam", "North Holland", "Netherlands", 52.37, 4.90, 9), ("Barcelona", "Catalonia", "Spain", 41.39, 2.17, 22),
+        ("New York", "New York", "United States", 40.71, -74.0, 120), ("Chicago", "Illinois", "United States", 41.88, -87.63, 60),
+        ("Austin", "Texas", "United States", 30.27, -97.74, 140), ("Denver", "Colorado", "United States", 39.74, -104.99, 45),
+        ("Seattle", "Washington", "United States", 47.61, -122.33, 50), ("Los Angeles", "California", "United States", 34.05, -118.24, 80),
     ];
 
     /// <summary>Must be called on the UI thread (renders the demo images).</summary>

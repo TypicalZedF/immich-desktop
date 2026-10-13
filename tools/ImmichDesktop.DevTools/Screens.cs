@@ -187,6 +187,10 @@ static class Screens
             Shot(main, outDir, $"19c-places-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
             photos.IsMapTab = true;
             Shot(main, outDir, $"19d-map-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            Shot(main, outDir, $"19d2-map-usa-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1), interact: w =>
+                Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(w).OfType<ImmichDesktop.App.Controls.MapView>().First().CenterOn(39, -96, 4.2));
+            Shot(main, outDir, $"19d3-map-pacific-{suffix}", height: 760, settle: TimeSpan.FromSeconds(1), interact: w =>
+                Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(w).OfType<ImmichDesktop.App.Controls.MapView>().First().CenterOn(20, 180, 1.6));
             photos.SearchText = "beach";
             photos.SearchCommand.Execute(null);
             Shot(main, outDir, $"19e-search-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));

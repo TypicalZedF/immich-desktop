@@ -35,8 +35,12 @@ public sealed class MapView : Control
     static readonly IBrush LandDark = new SolidColorBrush(Color.Parse("#262A30"));
     static readonly Color Coast = Color.Parse("#B8C4D0");
     static readonly Color CoastDark = Color.Parse("#3A4250");
-    static readonly Color Border = Color.Parse("#C9CDD4");
-    static readonly Color BorderDark = Color.Parse("#3F4652");
+    static readonly Color Border = Color.Parse("#B9BEC7");
+    static readonly Color BorderDark = Color.Parse("#4A5260");
+    static readonly Color State = Color.Parse("#D3D7DD");
+    static readonly Color StateDark = Color.Parse("#363C46");
+    static readonly Color River = Color.Parse("#C2D6E8");
+    static readonly Color RiverDark = Color.Parse("#1E2836");
     static readonly Typeface CountFont = new("Google Sans", FontStyle.Normal, FontWeight.SemiBold);
 
     MapTiles? _tiles;
@@ -153,6 +157,17 @@ public sealed class MapView : Control
         ViewChanged?.Invoke();
     }
 
+    /// <summary>Shows a place at a zoom level (used by the screenshot tool).</summary>
+    public void CenterOn(double lat, double lon, double zoom)
+    {
+        (_centerX, _centerY) = Project(lat, lon);
+        _zoom = Math.Clamp(zoom, MinZoom, MaxZoom);
+        _userMoved = true;
+        ClampCenter();
+        InvalidateVisual();
+        ViewChanged?.Invoke();
+    }
+
     public void ZoomBy(double factor) => ZoomAt(_zoom + Math.Log2(factor), new Point(Bounds.Width / 2, Bounds.Height / 2));
 
     void ZoomAt(double zoom, Point anchor)
@@ -217,23 +232,38 @@ public sealed class MapView : Control
         context.DrawText(text, new Point(box.X + 6, box.Y + 3));
     }
 
-    /// <summary>The built-in map: land, coastlines and country borders, for every copy of the world on screen.</summary>
+    /// <summary>
+    /// The built-in map, for every copy of the world on screen: land and coastlines, lakes, major
+    /// rivers, state lines (once zoomed in a little) and country borders.
+    /// </summary>
     void DrawWorld(DrawingContext context, bool dark)
     {
         if (WorldMap.Land is not { } land)
             return;
         var size = WorldSize;
         var origin = ToScreen(0, 0);
-        // Lines stay one screen pixel wide whatever the zoom.
-        var coast = new Pen(new SolidColorBrush(dark ? CoastDark : Coast), 1.2 / size);
-        var border = new Pen(new SolidColorBrush(dark ? BorderDark : Border), 0.9 / size);
-        var first = (int)Math.Floor(-origin.X / size);
+        // Lines stay the same width on screen whatever the zoom.
+        Pen Line(Color color, double width) => new(new SolidColorBrush(color), width / size);
+        var coast = Line(dark ? CoastDark : Coast, 1.2);
+        var border = Line(dark ? BorderDark : Border, 1.0);
+        var state = new Pen(new SolidColorBrush(dark ? StateDark : State), 0.9 / size, new DashStyle([3, 2], 0));
+        var river = Line(dark ? RiverDark : River, 1.0);
+        var water = dark ? WaterDark : Water;
+        var showStates = _zoom >= 2.5;
+        var showRivers = _zoom >= 3.5;
+        var first = (int)Math.Floor(-origin.X / size) - 1; // shapes may reach past 180°
         var last = (int)Math.Floor((Bounds.Width - origin.X) / size);
         for (var copy = first; copy <= last; copy++)
         {
             using (context.PushTransform(Matrix.CreateScale(size, size) * Matrix.CreateTranslation(origin.X + copy * size, origin.Y)))
             {
                 context.DrawGeometry(dark ? LandDark : LandBrush, coast, land);
+                if (WorldMap.Lakes is { } lakes)
+                    context.DrawGeometry(water, coast, lakes);
+                if (showRivers && WorldMap.Rivers is { } rivers)
+                    context.DrawGeometry(null, river, rivers);
+                if (showStates && WorldMap.States is { } states)
+                    context.DrawGeometry(null, state, states);
                 if (WorldMap.Borders is { } borders)
                     context.DrawGeometry(null, border, borders);
             }
