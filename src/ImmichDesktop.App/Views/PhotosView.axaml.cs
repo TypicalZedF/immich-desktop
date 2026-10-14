@@ -539,5 +539,10 @@ public partial class PhotosView : UserControl
             _vm.ClearSelectionCommand.Execute(null);
             e.Handled = true;
         }
+        else if (e.Key == Key.A && e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Source is not TextBox && _vm.ShowGrid && _vm.IsNotPicker)
+        {
+            _vm.SelectAllCommand.Execute(null);
+            e.Handled = true;
+        }
     }
 }

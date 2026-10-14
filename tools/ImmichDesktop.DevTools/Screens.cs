@@ -203,6 +203,36 @@ static class Screens
             }
             shell.Navigate(ShellPage.Photos);
             Shot(main, outDir, $"15-photos-{suffix}", height: 860, settle: TimeSpan.FromSeconds(3));
+            if (suffix == "light")
+            {
+                // Recent days are grouped by day: pretend today is the demo's newest day.
+                var timeline = (PhotosViewModel)Page(shell, ShellPage.Photos);
+                PhotosViewModel.Today = () => new DateTime(2026, 9, 28, 12, 0, 0);
+                timeline.RefreshCommand.Execute(null);
+                Pump(TimeSpan.FromSeconds(2));
+                var headers = timeline.Rows.OfType<MonthHeaderViewModel>().Select(h => h.Title).Take(9).ToList();
+                Console.WriteLine($"Recent days: {string.Join(" | ", headers)}");
+                Shot(main, outDir, "15d-photos-recent-days", height: 860, settle: TimeSpan.FromSeconds(2));
+                if (headers.Count < 4 || headers[0] != "Today" || headers[1] != "Yesterday" || headers[2] != "Saturday")
+                    throw new InvalidOperationException("Recent days aren't grouped by day");
+                // Select all: one photo, then everything shown.
+                var firstRow = timeline.Rows.OfType<AssetRowViewModel>().First();
+                firstRow.Cells[0].ToggleSelectCommand.Execute(null);
+                timeline.SelectAllCommand.Execute(null);
+                var waitAll = DateTime.UtcNow;
+                while (timeline.IsSelectingAll && DateTime.UtcNow - waitAll < TimeSpan.FromSeconds(20))
+                    Pump(TimeSpan.FromMilliseconds(200));
+                Pump(TimeSpan.FromMilliseconds(300));
+                Shot(main, outDir, "15e-photos-select-all", height: 860, settle: TimeSpan.FromSeconds(1));
+                var everything = timeline.Rows.OfType<AssetRowViewModel>().Sum(r => r.Cells.Count);
+                Console.WriteLine($"Select all: {timeline.SelectionCount} of {everything}");
+                if (timeline.SelectionCount != everything)
+                    throw new InvalidOperationException("Select all didn't select everything");
+                timeline.ClearSelectionCommand.Execute(null);
+                PhotosViewModel.Today = () => DateTime.Now;
+                timeline.RefreshCommand.Execute(null);
+                Pump(TimeSpan.FromSeconds(2));
+            }
             // Hover the date rail between labels (where hovering used to do nothing).
             Shot(main, outDir, $"15b-photos-rail-hover-{suffix}", height: 860, settle: TimeSpan.FromSeconds(1),
                 interact: w => w.MouseMove(new Avalonia.Point(1060 - 40, 520)));
@@ -307,6 +337,9 @@ static class Screens
                 review.ShowDetails = false;
                 review.ShowPictures = true;
                 Shot(main, outDir, "19p2-privacy-shown", height: 860, settle: TimeSpan.FromSeconds(0.5));
+                review.ShowDetails = true;
+                Shot(main, outDir, "19p4-privacy-narrow", width: 760, height: 700, settle: TimeSpan.FromSeconds(1));
+                review.ShowDetails = false;
                 // The "How sure" slider: at 90% only the card (95%) stays; the prescription (80%) comes back at 0.
                 foreach (var step in new[] { 30.0, 55, 75, 90 })
                 {

@@ -372,6 +372,15 @@
               <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
             </Button>
             <TextBlock Text="{Binding SelectionText}" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+            <Button Classes="ghost barAction" Command="{Binding SelectAllCommand}" Margin="8,0,0,0" l:Tr.Tip="Select all (Ctrl+A)">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Panel>
+                  <mi:MaterialIcon Kind="SelectAll" IsVisible="{Binding !IsSelectingAll}" />
+                  <mi:MaterialIcon Kind="Loading" Classes="spin" IsVisible="{Binding IsSelectingAll}" />
+                </Panel>
+                <TextBlock l:Tr.Text="Select all" />
+              </StackPanel>
+            </Button>
           </StackPanel>
           <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
             <Button Classes="ghost barAction" Command="{Binding RestoreSelectionCommand}" IsVisible="{Binding CanRestore}">
@@ -702,8 +711,9 @@
           <ContentControl Content="{Binding Privacy}">
             <ContentControl.DataTemplates>
               <DataTemplate DataType="vm:PrivacyReviewViewModel">
-                <DockPanel>
-                  <StackPanel DockPanel.Dock="Top" Spacing="12" Margin="28,0,24,14">
+                <!-- One scroll for the whole page, so it works on small screens -->
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                  <StackPanel Spacing="12" Margin="28,0,24,24">
                     <Border Classes="card" Padding="16,14" CornerRadius="16">
                       <Grid ColumnDefinitions="Auto,*">
                         <mi:MaterialIcon Kind="ShieldLockOutline" Width="26" Height="26" VerticalAlignment="Top" Margin="0,2,14,0"
@@ -751,6 +761,102 @@
                         </StackPanel>
                       </Grid>
                     </Border>
+                    <!-- Transparency (right under the card it opens from): where it runs, what leaves the PC, what's kept, the models and the rules -->
+                    <Border Classes="card" Padding="20,18" CornerRadius="16" IsVisible="{Binding ShowDetails}">
+                      <StackPanel Spacing="16">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Classes="h2" l:Tr.Text="How this works" VerticalAlignment="Center" />
+                          <Button Grid.Column="1" Classes="ghost icon" Command="{Binding ToggleDetailsCommand}" l:Tr.Tip="Hide">
+                            <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
+                          </Button>
+                        </Grid>
+                        <StackPanel Spacing="4">
+                          <TextBlock Classes="h3" l:Tr.Text="Exactly what it does, step by step" />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="1. Asks your Immich server for the list of your photos and videos (the timeline and the archive; never the locked folder or the trash)." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="2. For each one it hasn't checked yet, downloads its preview picture from your server into memory, the same picture you see when you scroll your photos. For videos, that's a still frame." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="3. Shrinks the picture and gives it to the nudity detector, which answers with five numbers: how much it looks like a drawing, hentai, an ordinary photo, porn or a revealing photo." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="4. Gives the picture to the text finder, then reads each line of text it found." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="5. Checks that text against the rules below (card numbers, ID wording and so on)." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="6. Writes down only the photo's ID, the kind of thing found and how sure it is, then throws the picture and the text away." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="7. Moves on to the next one. It never moves, changes or deletes anything: you decide in the list on this page." />
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                          <TextBlock Classes="h3" l:Tr.Text="Where it runs" />
+                          <TextBlock TextWrapping="Wrap" Text="{Binding RunsOn}" />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                     l:Tr.Text="Each photo's preview (about 1440 pixels) is fetched from your own Immich server, checked in memory and let go. Previews aren't saved to disk." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                     l:Tr.Text="Only on a private network, like at home: one set to Private in Windows' network settings, or where the app reaches your server at its home address. On public Wi-Fi (a café, an airport) it waits. It also waits on battery and on metered connections." />
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                          <TextBlock Classes="h3" l:Tr.Text="What leaves this PC" />
+                          <TextBlock TextWrapping="Wrap" l:Tr.Text="Nothing. The check only talks to your own Immich server:" />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding ServerHost, StringFormat='• {0}'}" FontWeight="Medium" />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                     l:Tr.Text="It lists your photos and fetches their previews, and when you click “Move to locked folder” it asks your server to move them. No other server, account, model download or analytics is involved." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding TelemetryText}" />
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                          <TextBlock Classes="h3" l:Tr.Text="What's kept" />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                     l:Tr.Text="For each photo: its Immich ID, what kind of thing was found (for example “Payment card”), how sure the check is, and your choice. Never the picture, and never the text read from it. Stored in the app's local database:" />
+                          <SelectableTextBlock Classes="caption" Text="{Binding DatabasePath}" TextWrapping="Wrap" />
+                          <Button Classes="secondary" HorizontalAlignment="Left" Margin="0,4,0,0" Command="{Binding ForgetResultsCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <mi:MaterialIcon Kind="DeleteOutline" Width="16" Height="16" />
+                              <TextBlock l:Tr.Text="Forget all results" />
+                            </StackPanel>
+                          </Button>
+                        </StackPanel>
+                        <StackPanel Spacing="8">
+                          <TextBlock Classes="h3" l:Tr.Text="The models" />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                     l:Tr.Text="Three small open-source models ship inside the app and run with ONNX Runtime. Their fingerprints (SHA-256) let anyone confirm they're the published files." />
+                          <ItemsControl ItemsSource="{Binding Models}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:PrivacyModelViewModel">
+                                <StackPanel Spacing="2" Margin="0,0,0,10">
+                                  <TextBlock Text="{Binding Description}" TextWrapping="Wrap" />
+                                  <SelectableTextBlock Classes="caption tertiary" Text="{Binding Fingerprint}" TextWrapping="Wrap" />
+                                </StackPanel>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <Button Classes="secondary" HorizontalAlignment="Left" Command="{Binding OpenModelsFolderCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <mi:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" />
+                              <TextBlock l:Tr.Text="Open the models folder" />
+                            </StackPanel>
+                          </Button>
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                          <TextBlock Classes="h3" l:Tr.Text="The rules for text" />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="• Payment card: a 13–19 digit number that passes the card checksum, or a card brand together with “valid thru”, “CVV” or similar." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="• ID document: a passport's machine-readable lines, or “passport”, “driver license” and the like together with “date of birth”, “expires” and so on." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="• Bank or tax details: a bank account number (IBAN, checksum-verified), “account number”, “routing number”, “sort code”, tax forms, pay slips." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="• Passwords or codes: “recovery codes”, “seed phrase”, “private key”, “Wi-Fi password”, a numbered list of 12+ words, or a username and password together." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="• Medical: “prescription”, “diagnosis”, “medical record”, “lab results”, or several medical words together." />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="Single common words (like “bank” on a sign, or “Visa” on a receipt) aren't enough on their own." />
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                          <TextBlock Classes="h3" l:Tr.Text="Check it yourself" />
+                          <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="Immich Desktop is open source. This is the code that does the check:" />
+                          <Button Classes="secondary" HorizontalAlignment="Left" Command="{Binding OpenSourceCommand}" ToolTip.Tip="{Binding SourceUrl}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <mi:MaterialIcon Kind="CodeBraces" Width="16" Height="16" />
+                              <TextBlock l:Tr.Text="See the code on GitHub" />
+                            </StackPanel>
+                          </Button>
+                          <SelectableTextBlock Classes="caption tertiary" Text="{Binding SourceUrl}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Classes="secondary" HorizontalAlignment="Center" Command="{Binding ToggleDetailsCommand}">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <mi:MaterialIcon Kind="ChevronUp" Width="16" Height="16" />
+                            <TextBlock l:Tr.Text="Hide how this works" />
+                          </StackPanel>
+                        </Button>
+                      </StackPanel>
+                    </Border>
                     <!-- Filters: what kind of thing, and how sure the check is -->
                     <StackPanel Spacing="8" IsVisible="{Binding HasKindFilters}">
                       <ItemsControl ItemsSource="{Binding KindFilters}">
@@ -773,168 +879,68 @@
                                 IsVisible="{Binding FilterSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                       </StackPanel>
                     </Grid>
-                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasItems}">
-                      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                        <TextBlock Classes="h3" Text="{Binding Count, StringFormat='{}{0:N0}'}" />
+                    <WrapPanel IsVisible="{Binding HasItems}">
+                      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="0,0,24,8">
+                        <TextBlock Classes="h3" Text="{Binding Count, StringFormat='{}{0:N0}'}" VerticalAlignment="Center" />
                         <TextBlock Classes="secondary" l:Tr.Text="to review" VerticalAlignment="Center" />
                         <TextBlock Classes="secondary" Text="{Binding SelectionText}" IsVisible="{Binding HasSelection}" VerticalAlignment="Center" />
                       </StackPanel>
-                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                        <CheckBox IsChecked="{Binding ShowPictures}" l:Tr.Content="Show pictures" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <Button Classes="ghost" l:Tr.Content="Select all" Command="{Binding SelectAllCommand}" />
-                        <Button Classes="secondary" l:Tr.Content="Not sensitive" Command="{Binding NotSensitiveCommand}" />
-                        <Button Classes="secondary danger" Command="{Binding DeleteCommand}" l:Tr.Tip="Move to the trash in Immich">
+                      <WrapPanel>
+                        <CheckBox IsChecked="{Binding ShowPictures}" l:Tr.Content="Show pictures" VerticalAlignment="Center" Margin="0,0,16,8" />
+                        <Button Classes="ghost" l:Tr.Content="Select all" Command="{Binding SelectAllCommand}" Margin="0,0,8,8" />
+                        <Button Classes="secondary" l:Tr.Content="Not sensitive" Command="{Binding NotSensitiveCommand}" Margin="0,0,8,8" />
+                        <Button Classes="secondary danger" Command="{Binding DeleteCommand}" l:Tr.Tip="Move to the trash in Immich" Margin="0,0,8,8">
                           <StackPanel Orientation="Horizontal" Spacing="8">
                             <mi:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" />
                             <TextBlock l:Tr.Text="Delete" />
                           </StackPanel>
                         </Button>
-                        <Button Classes="primary" Command="{Binding MoveToLockedCommand}">
+                        <Button Classes="primary" Command="{Binding MoveToLockedCommand}" Margin="0,0,0,8">
                           <StackPanel Orientation="Horizontal" Spacing="8">
                             <mi:MaterialIcon Kind="LockOutline" Width="16" Height="16" />
                             <TextBlock l:Tr.Text="Move to locked folder" />
                           </StackPanel>
                         </Button>
-                      </StackPanel>
-                    </Grid>
-                  </StackPanel>
-                  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Spacing="14" Margin="28,0,24,24">
-                      <!-- Transparency: where it runs, what leaves the PC, what's kept, the models and the rules -->
-                      <Border Classes="card" Padding="20,18" CornerRadius="16" IsVisible="{Binding ShowDetails}">
-                        <StackPanel Spacing="16">
-                          <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Classes="h2" l:Tr.Text="How this works" VerticalAlignment="Center" />
-                            <Button Grid.Column="1" Classes="ghost icon" Command="{Binding ToggleDetailsCommand}" l:Tr.Tip="Hide">
-                              <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
-                            </Button>
-                          </Grid>
-                          <StackPanel Spacing="4">
-                            <TextBlock Classes="h3" l:Tr.Text="Exactly what it does, step by step" />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="1. Asks your Immich server for the list of your photos and videos (the timeline and the archive; never the locked folder or the trash)." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="2. For each one it hasn't checked yet, downloads its preview picture from your server into memory, the same picture you see when you scroll your photos. For videos, that's a still frame." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="3. Shrinks the picture and gives it to the nudity detector, which answers with five numbers: how much it looks like a drawing, hentai, an ordinary photo, porn or a revealing photo." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="4. Gives the picture to the text finder, then reads each line of text it found." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="5. Checks that text against the rules below (card numbers, ID wording and so on)." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="6. Writes down only the photo's ID, the kind of thing found and how sure it is, then throws the picture and the text away." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="7. Moves on to the next one. It never moves, changes or deletes anything: you decide in the list on this page." />
-                          </StackPanel>
-                          <StackPanel Spacing="4">
-                            <TextBlock Classes="h3" l:Tr.Text="Where it runs" />
-                            <TextBlock TextWrapping="Wrap" Text="{Binding RunsOn}" />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap"
-                                       l:Tr.Text="Each photo's preview (about 1440 pixels) is fetched from your own Immich server, checked in memory and let go. Previews aren't saved to disk." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap"
-                                       l:Tr.Text="Only on a private network, like at home: one set to Private in Windows' network settings, or where the app reaches your server at its home address. On public Wi-Fi (a café, an airport) it waits. It also waits on battery and on metered connections." />
-                          </StackPanel>
-                          <StackPanel Spacing="4">
-                            <TextBlock Classes="h3" l:Tr.Text="What leaves this PC" />
-                            <TextBlock TextWrapping="Wrap" l:Tr.Text="Nothing. The check only talks to your own Immich server:" />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding ServerHost, StringFormat='• {0}'}" FontWeight="Medium" />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap"
-                                       l:Tr.Text="It lists your photos and fetches their previews, and when you click “Move to locked folder” it asks your server to move them. No other server, account, model download or analytics is involved." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding TelemetryText}" />
-                          </StackPanel>
-                          <StackPanel Spacing="4">
-                            <TextBlock Classes="h3" l:Tr.Text="What's kept" />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap"
-                                       l:Tr.Text="For each photo: its Immich ID, what kind of thing was found (for example “Payment card”), how sure the check is, and your choice. Never the picture, and never the text read from it. Stored in the app's local database:" />
-                            <SelectableTextBlock Classes="caption" Text="{Binding DatabasePath}" TextWrapping="Wrap" />
-                            <Button Classes="secondary" HorizontalAlignment="Left" Margin="0,4,0,0" Command="{Binding ForgetResultsCommand}">
-                              <StackPanel Orientation="Horizontal" Spacing="8">
-                                <mi:MaterialIcon Kind="DeleteOutline" Width="16" Height="16" />
-                                <TextBlock l:Tr.Text="Forget all results" />
-                              </StackPanel>
-                            </Button>
-                          </StackPanel>
-                          <StackPanel Spacing="8">
-                            <TextBlock Classes="h3" l:Tr.Text="The models" />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap"
-                                       l:Tr.Text="Three small open-source models ship inside the app and run with ONNX Runtime. Their fingerprints (SHA-256) let anyone confirm they're the published files." />
-                            <ItemsControl ItemsSource="{Binding Models}">
-                              <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:PrivacyModelViewModel">
-                                  <StackPanel Spacing="2" Margin="0,0,0,10">
-                                    <TextBlock Text="{Binding Description}" TextWrapping="Wrap" />
-                                    <SelectableTextBlock Classes="caption tertiary" Text="{Binding Fingerprint}" TextWrapping="Wrap" />
-                                  </StackPanel>
-                                </DataTemplate>
-                              </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <Button Classes="secondary" HorizontalAlignment="Left" Command="{Binding OpenModelsFolderCommand}">
-                              <StackPanel Orientation="Horizontal" Spacing="8">
-                                <mi:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" />
-                                <TextBlock l:Tr.Text="Open the models folder" />
-                              </StackPanel>
-                            </Button>
-                          </StackPanel>
-                          <StackPanel Spacing="4">
-                            <TextBlock Classes="h3" l:Tr.Text="The rules for text" />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="• Payment card: a 13–19 digit number that passes the card checksum, or a card brand together with “valid thru”, “CVV” or similar." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="• ID document: a passport's machine-readable lines, or “passport”, “driver license” and the like together with “date of birth”, “expires” and so on." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="• Bank or tax details: a bank account number (IBAN, checksum-verified), “account number”, “routing number”, “sort code”, tax forms, pay slips." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="• Passwords or codes: “recovery codes”, “seed phrase”, “private key”, “Wi-Fi password”, a numbered list of 12+ words, or a username and password together." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="• Medical: “prescription”, “diagnosis”, “medical record”, “lab results”, or several medical words together." />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="Single common words (like “bank” on a sign, or “Visa” on a receipt) aren't enough on their own." />
-                          </StackPanel>
-                          <StackPanel Spacing="4">
-                            <TextBlock Classes="h3" l:Tr.Text="Check it yourself" />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="Immich Desktop is open source. This is the code that does the check:" />
-                            <Button Classes="secondary" HorizontalAlignment="Left" Command="{Binding OpenSourceCommand}" ToolTip.Tip="{Binding SourceUrl}">
-                              <StackPanel Orientation="Horizontal" Spacing="8">
-                                <mi:MaterialIcon Kind="CodeBraces" Width="16" Height="16" />
-                                <TextBlock l:Tr.Text="See the code on GitHub" />
-                              </StackPanel>
-                            </Button>
-                            <SelectableTextBlock Classes="caption tertiary" Text="{Binding SourceUrl}" TextWrapping="Wrap" />
-                          </StackPanel>
-                          <Button Classes="secondary" HorizontalAlignment="Center" Command="{Binding ToggleDetailsCommand}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                              <mi:MaterialIcon Kind="ChevronUp" Width="16" Height="16" />
-                              <TextBlock l:Tr.Text="Hide how this works" />
-                            </StackPanel>
-                          </Button>
-                        </StackPanel>
-                      </Border>
-                      <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding HasItems}">
-                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:PrivacySuggestionViewModel">
-                            <StackPanel Width="176" Margin="0,0,10,12" Spacing="5">
-                              <Button Classes="tile privacyTile" Classes.selected="{Binding IsSelected}" Classes.reveal="{Binding Revealed}"
-                                      Width="176" Height="176" Command="{Binding ToggleSelectCommand}">
-                                <Panel>
-                                  <!-- Blurred unless "Show pictures" is on or the pointer is over it -->
-                                  <Image Classes="sharp" Source="{Binding Thumbnail}" Stretch="UniformToFill" />
-                                  <Image Classes="blurred" Source="{Binding Blurred}" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality" />
-                                  <mi:MaterialIcon Classes="blurred" Kind="EyeOffOutline" Width="26" Height="26" Foreground="White" Opacity="0.85"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                  <Panel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6">
-                                    <Ellipse Width="22" Height="22" Fill="White" IsVisible="{Binding IsSelected}" />
-                                    <mi:MaterialIcon Kind="CheckCircle" Width="26" Height="26" IsVisible="{Binding IsSelected}" Foreground="{DynamicResource AppPrimaryBrush}" />
-                                    <mi:MaterialIcon Kind="CheckboxBlankCircleOutline" Width="24" Height="24" Foreground="White" IsVisible="{Binding !IsSelected}" />
-                                  </Panel>
-                                  <Button Classes="ghost icon" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
-                                          Command="{Binding OpenCommand}" l:Tr.Tip="View" Background="#66000000">
-                                    <mi:MaterialIcon Kind="ArrowExpand" Width="16" Height="16" Foreground="White" />
-                                  </Button>
+                      </WrapPanel>
+                    </WrapPanel>
+                    <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding HasItems}">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PrivacySuggestionViewModel">
+                          <StackPanel Width="176" Margin="0,0,10,12" Spacing="5">
+                            <Button Classes="tile privacyTile" Classes.selected="{Binding IsSelected}" Classes.reveal="{Binding Revealed}"
+                                    Width="176" Height="176" Command="{Binding ToggleSelectCommand}">
+                              <Panel>
+                                <!-- Blurred unless "Show pictures" is on or the pointer is over it -->
+                                <Image Classes="sharp" Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                <Image Classes="blurred" Source="{Binding Blurred}" Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                <mi:MaterialIcon Classes="blurred" Kind="EyeOffOutline" Width="26" Height="26" Foreground="White" Opacity="0.85"
+                                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Panel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6">
+                                  <Ellipse Width="22" Height="22" Fill="White" IsVisible="{Binding IsSelected}" />
+                                  <mi:MaterialIcon Kind="CheckCircle" Width="26" Height="26" IsVisible="{Binding IsSelected}" Foreground="{DynamicResource AppPrimaryBrush}" />
+                                  <mi:MaterialIcon Kind="CheckboxBlankCircleOutline" Width="24" Height="24" Foreground="White" IsVisible="{Binding !IsSelected}" />
                                 </Panel>
-                              </Button>
-                              <StackPanel Orientation="Horizontal" Spacing="6" Margin="2,0">
-                                <TextBlock Classes="caption" Text="{Binding Reason}" TextWrapping="Wrap" MaxWidth="110" />
-                                <TextBlock Classes="caption tertiary" Text="{Binding ConfidenceText}" />
-                              </StackPanel>
+                                <Button Classes="ghost icon" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
+                                        Command="{Binding OpenCommand}" l:Tr.Tip="View" Background="#66000000">
+                                  <mi:MaterialIcon Kind="ArrowExpand" Width="16" Height="16" Foreground="White" />
+                                </Button>
+                              </Panel>
+                            </Button>
+                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="2,0">
+                              <TextBlock Classes="caption" Text="{Binding Reason}" TextWrapping="Wrap" MaxWidth="110" />
+                              <TextBlock Classes="caption tertiary" Text="{Binding ConfidenceText}" />
                             </StackPanel>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                      <StackPanel Spacing="8" HorizontalAlignment="Center" Margin="0,40,0,0" MaxWidth="420" IsVisible="{Binding ShowEmpty}">
-                        <mi:MaterialIcon Kind="ShieldCheckOutline" Width="36" Height="36" Foreground="{DynamicResource AppPrimaryBrush}" />
-                        <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center" l:Tr.Text="Nothing to review right now." />
-                      </StackPanel>
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Spacing="8" HorizontalAlignment="Center" Margin="0,40,0,0" MaxWidth="420" IsVisible="{Binding ShowEmpty}">
+                      <mi:MaterialIcon Kind="ShieldCheckOutline" Width="36" Height="36" Foreground="{DynamicResource AppPrimaryBrush}" />
+                      <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center" l:Tr.Text="Nothing to review right now." />
                     </StackPanel>
-                  </ScrollViewer>
-                </DockPanel>
+                  </StackPanel>
+                </ScrollViewer>
               </DataTemplate>
             </ContentControl.DataTemplates>
           </ContentControl>

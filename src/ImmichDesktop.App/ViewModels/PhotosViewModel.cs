@@ -353,6 +353,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             if (!IsPicker)
                 _onDevice = await Task.Run(AppServices.Database.GetAssetsOnDevice, cts.Token);
             var buckets = await query.Load(client, cts.Token);
+            buckets = await BucketState.SplitRecentDaysAsync(buckets, Today(), cts.Token);
             if (cts.IsCancellationRequested)
                 return;
             _buckets = buckets;
@@ -494,7 +495,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         {
             var rowCount = (bucket.Count + _columns - 1) / _columns;
             var height = HeaderHeight + rowCount * (tile + Gap);
-            var shortLabel = bucket.Month is { } month ? month.ToString("MMM yyyy", System.Globalization.CultureInfo.CurrentCulture) : bucket.Label;
+            var shortLabel = bucket.Day is null && bucket.Month is { } month ? month.ToString("MMM yyyy", System.Globalization.CultureInfo.CurrentCulture) : bucket.Label;
             sections.Add(new TimelineSection(shortLabel, bucket.Month?.Year, offset, height));
             offset += height;
         }
@@ -1012,6 +1013,55 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     }
 
     IReadOnlyList<string> SelectedIds => _selected.ToList();
+
+    /// <summary>What "today" is for grouping recent days (replaceable for testing).</summary>
+    public static Func<DateTime> Today { get; set; } = () => DateTime.Now;
+
+    /// <summary>Reading the months not loaded yet, for "Select all".</summary>
+    [ObservableProperty]
+    public partial bool IsSelectingAll { get; set; }
+
+    /// <summary>Selects every photo and video shown here (reading months not loaded yet); again to clear.</summary>
+    [RelayCommand]
+    async Task SelectAllAsync()
+    {
+        var buckets = _buckets;
+        if (IsPicker || IsSelectingAll || buckets.Count == 0)
+            return;
+        if (_selected.Count >= buckets.Sum(b => b.Count))
+        {
+            ClearSelection();
+            return;
+        }
+        IsSelectingAll = true;
+        try
+        {
+            var ids = new List<string>();
+            // A few months at a time: a big library is hundreds of them.
+            foreach (var chunk in buckets.Chunk(6))
+            {
+                foreach (var assets in await Task.WhenAll(chunk.Select(b => b.GetAssetsAsync(_lifetime.Token))))
+                    ids.AddRange(assets.Select(a => a.Id));
+                if (!ReferenceEquals(buckets, _buckets))
+                    return; // the page changed meanwhile
+            }
+            _selected.UnionWith(ids);
+            SelectionCount = _selected.Count;
+            foreach (var cell in VisibleCells)
+                cell.IsSelected = cell.Asset is { } asset && _selected.Contains(asset.Id);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(Tr.T("Couldn't select everything. {0}", NetworkErrors.Describe(ex)));
+        }
+        finally
+        {
+            IsSelectingAll = false;
+        }
+    }
 
     [RelayCommand]
     void ShareSelection() => ShowShare(SelectedIds);
