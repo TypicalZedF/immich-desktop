@@ -14,4 +14,7 @@
     <Using Include="Xunit" />
     <ProjectReference Include="..\..\src\ImmichDesktop.Core\ImmichDesktop.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\ImmichDesktop.App\Assets\i18n\*.json" LinkBase="i18n" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

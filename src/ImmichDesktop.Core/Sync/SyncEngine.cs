@@ -91,6 +91,9 @@ public sealed class SyncEngine : IAsyncDisposable
     /// <summary>Whether the current connection is metered (for data saving). Set by the app.</summary>
     public Func<bool> IsMetered { get; set; } = () => false;
 
+    /// <summary>Whether the PC is running on battery (or a UPS). Replaceable for tests.</summary>
+    public Func<bool> IsOnBattery { get; set; } = PowerStatus.IsOnBattery;
+
     bool PausedForData(AppSettings settings) => settings.MeteredBackup == MeteredBackup.Pause && IsMetered();
     bool PhotosOnlyForData(AppSettings settings) => settings.MeteredBackup == MeteredBackup.PhotosOnly && IsMetered();
 
@@ -170,7 +173,7 @@ public sealed class SyncEngine : IAsyncDisposable
         try
         {
             var settings = _settings.Current;
-            var hold = (settings.PauseOnBattery && PowerStatus.IsOnBattery()) || PausedForData(settings);
+            var hold = (settings.PauseOnBattery && IsOnBattery()) || PausedForData(settings);
             if (hold == _lastHold)
                 return;
             _lastHold = hold;
@@ -210,7 +213,7 @@ public sealed class SyncEngine : IAsyncDisposable
     {
         var count = _db.RetryFailed();
         if (count > 0)
-            _activity.Add(ActivityKind.Info, $"Retrying {Format.Plural(count, "file")}");
+            _activity.Add(ActivityKind.Info, Loc.T("Retrying {0}", Format.Plural(count, "file")));
         Wake();
     }
 
@@ -219,7 +222,7 @@ public sealed class SyncEngine : IAsyncDisposable
     {
         _runCts?.Cancel();
         _db.ResetAll();
-        _activity.Add(ActivityKind.Info, "Re-checking all files against the server");
+        _activity.Add(ActivityKind.Info, Loc.T("Re-checking all files against the server"));
         _fullScanRequested = true;
         Wake();
     }
@@ -421,7 +424,7 @@ public sealed class SyncEngine : IAsyncDisposable
         {
             Resume();
             settings = _settings.Current;
-            _activity.Add(ActivityKind.Info, "Backup resumed");
+            _activity.Add(ActivityKind.Info, Loc.T("Backup resumed"));
         }
         if (settings.Paused)
         {
@@ -429,7 +432,7 @@ public sealed class SyncEngine : IAsyncDisposable
             SetState(SyncState.Paused);
             return settings.PausedUntil is { } resumeAt ? resumeAt - DateTimeOffset.Now : null;
         }
-        if (settings.PauseOnBattery && PowerStatus.IsOnBattery())
+        if (settings.PauseOnBattery && IsOnBattery())
         {
             RefreshCounts(settings);
             SetState(SyncState.WaitingForPower);
@@ -479,8 +482,8 @@ public sealed class SyncEngine : IAsyncDisposable
         catch (ImmichApiException ex) when (ex.IsUnauthorized)
         {
             Log.Warn("Server rejected our credentials", ex);
-            SetState(SyncState.AuthError, "Your sign-in has expired or was revoked. Sign in again to keep backing up.");
-            _activity.Add(ActivityKind.Error, "Signed out by the server. Sign in again to keep backing up.");
+            SetState(SyncState.AuthError, Loc.T("Your sign-in has expired or was revoked. Sign in again to keep backing up."));
+            _activity.Add(ActivityKind.Error, Loc.T("Signed out by the server. Sign in again to keep backing up."));
             return null;
         }
         catch (Exception ex) when (NetworkErrors.IsConnectivity(ex) && !shutdown.IsCancellationRequested)
@@ -489,7 +492,7 @@ public sealed class SyncEngine : IAsyncDisposable
             var delay = TimeSpan.FromSeconds(Math.Min(15 * Math.Pow(2, _offlineFailures - 1), 600));
             Log.Warn($"Server unreachable (attempt {_offlineFailures}), retrying in {delay}", ex);
             RefreshCounts(settings);
-            SetState(SyncState.Offline, $"{NetworkErrors.Describe(ex)} Retrying in {Format.Duration(delay)}.");
+            SetState(SyncState.Offline, NetworkErrors.Describe(ex) + " " + Loc.T("Retrying in {0}.", Format.Duration(delay)));
             return delay;
         }
         finally
@@ -544,7 +547,7 @@ public sealed class SyncEngine : IAsyncDisposable
             _dirtyPaths.Clear();
             _foldersToRescan.Clear();
             _pruneFolders = false;
-            SetState(SyncState.Scanning, "Looking for new photos and videos…");
+            SetState(SyncState.Scanning, Loc.T("Looking for new photos and videos…"));
             try
             {
                 await Task.Run(() =>
@@ -594,7 +597,7 @@ public sealed class SyncEngine : IAsyncDisposable
             return;
 
         if (targets.Count > 0)
-            SetState(SyncState.Scanning, targets.Count == 1 ? $"Applying your changes to \u201C{targets[0].DisplayName}\u201D\u2026" : "Applying your folder changes\u2026");
+            SetState(SyncState.Scanning, targets.Count == 1 ? Loc.T("Applying your changes to “{0}”…", targets[0].DisplayName) : Loc.T("Applying your folder changes…"));
         try
         {
             await Task.Run(() =>
@@ -741,7 +744,7 @@ public sealed class SyncEngine : IAsyncDisposable
 
         var uploaded = 0;
         var alreadyThere = 0;
-        SetState(SyncState.Uploading, "Checking files…");
+        SetState(SyncState.Uploading, Loc.T("Checking files…"));
         _progressTimer.Change(400, 400);
 
         try
@@ -749,7 +752,7 @@ public sealed class SyncEngine : IAsyncDisposable
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
-                if (settings.PauseOnBattery && PowerStatus.IsOnBattery())
+                if (settings.PauseOnBattery && IsOnBattery())
                     throw new WaitForPowerException();
                 if (PausedForData(settings))
                     throw new WaitForNetworkException();
@@ -771,7 +774,7 @@ public sealed class SyncEngine : IAsyncDisposable
                         if (!_deferredVideosNoted)
                         {
                             _deferredVideosNoted = true;
-                            _activity.Add(ActivityKind.Info, "On a metered connection: videos will upload when you're on an unmetered one");
+                            _activity.Add(ActivityKind.Info, Loc.T("On a metered connection: videos will upload when you're on an unmetered one"));
                         }
                         batch = batch.Except(videos).ToList();
                         if (batch.Count == 0)
@@ -811,8 +814,8 @@ public sealed class SyncEngine : IAsyncDisposable
                     }
                     else
                     {
-                        _db.MarkUnsupported(record.Path, "This file type isn't supported by your Immich server.");
-                        _activity.Add(ActivityKind.Warning, $"Skipped {Path.GetFileName(record.Path)} — file type not supported by the server", record.Path);
+                        _db.MarkUnsupported(record.Path, Loc.T("This file type isn't supported by your Immich server."));
+                        _activity.Add(ActivityKind.Warning, Loc.T("Skipped {0} — file type not supported by the server", Path.GetFileName(record.Path)), record.Path);
                         Interlocked.Increment(ref _runDone);
                     }
                 }
@@ -837,7 +840,7 @@ public sealed class SyncEngine : IAsyncDisposable
         {
             if (uploaded > 0 || alreadyThere > 0)
             {
-                var message = uploaded > 0 ? $"Backed up {Format.Plural(uploaded, "new file")}" : "No new files to upload";
+                var message = uploaded > 0 ? Loc.T("Backed up {0}", Format.Plural(uploaded, "new file")) : Loc.T("No new files to upload");
                 if (alreadyThere > 0)
                     message += $" · {Format.Count(alreadyThere)} already on the server";
                 _activity.Add(ActivityKind.Success, message);
@@ -886,7 +889,7 @@ public sealed class SyncEngine : IAsyncDisposable
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    _db.MarkFailed(record.Path, $"Couldn't read the file: {ex.Message}", NextAttempt(record.Attempts + 1));
+                    _db.MarkFailed(record.Path, Loc.T("Couldn't read the file: {0}", ex.Message), NextAttempt(record.Attempts + 1));
                     Interlocked.Increment(ref _runDone);
                     continue;
                 }
@@ -962,7 +965,7 @@ public sealed class SyncEngine : IAsyncDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && !NetworkErrors.IsConnectivity(ex))
         {
-            Fail(record, $"Couldn't read the file: {ex.Message}");
+            Fail(record, Loc.T("Couldn't read the file: {0}", ex.Message));
             return false;
         }
         catch (Exception ex) when (NetworkErrors.IsConnectivity(ex))
@@ -982,7 +985,7 @@ public sealed class SyncEngine : IAsyncDisposable
         Log.Warn($"Upload failed for {record.Path}: {reason}");
         _db.MarkFailed(record.Path, reason, NextAttempt(record.Attempts + 1));
         Interlocked.Increment(ref _runDone);
-        _activity.Add(ActivityKind.Error, $"Couldn't upload {Path.GetFileName(record.Path)}: {reason}", record.Path);
+        _activity.Add(ActivityKind.Error, Loc.T("Couldn't upload {0}: {1}", Path.GetFileName(record.Path), reason), record.Path);
     }
 
     static DateTime NextAttempt(int attempts) =>
@@ -1016,7 +1019,7 @@ public sealed class SyncEngine : IAsyncDisposable
                 catch (ImmichApiException ex) when (ex.StatusCode is HttpStatusCode.Forbidden)
                 {
                     if (_albumWarnings.Add(name))
-                        _activity.Add(ActivityKind.Warning, $"Couldn't add photos to the album “{name}”. If you signed in with an API key, give it album permissions.");
+                        _activity.Add(ActivityKind.Warning, Loc.T("Couldn't add photos to the album “{0}”. If you signed in with an API key, give it album permissions.", name));
                     break;
                 }
                 catch (ImmichApiException ex) when (ex.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound)
@@ -1052,7 +1055,7 @@ public sealed class SyncEngine : IAsyncDisposable
         var album = albums.FirstOrDefault(a => a.AlbumName == name)
                     ?? await client.CreateAlbumAsync(name, null, ct);
         if (!albums.Contains(album))
-            _activity.Add(ActivityKind.Info, $"Created album “{name}”");
+            _activity.Add(ActivityKind.Info, Loc.T("Created album “{0}”", name));
         _albumIds[name] = album.Id;
         return album.Id;
     }

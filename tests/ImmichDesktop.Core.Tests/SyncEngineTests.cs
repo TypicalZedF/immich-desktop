@@ -267,4 +267,35 @@ public class SyncEngineTests
         await h.RunAsync();
         Assert.Equal(["a.jpg", "b.mp4", "c.jpg"], h.Server.UploadedFileNames.Order());
     }
+
+    [Fact]
+    public async Task Pause_on_battery_holds_uploads_until_plugged_in()
+    {
+        await using var h = new Harness();
+        h.Temp.File("Photos/a.jpg");
+        var onBattery = true;
+        h.Engine.IsOnBattery = () => onBattery;
+        h.Settings.Update(s => s.PauseOnBattery = true);
+
+        await h.RunAsync();
+        Assert.Equal(SyncState.WaitingForPower, h.Engine.Status.State);
+        Assert.Empty(h.Server.UploadedFileNames);
+
+        onBattery = false;
+        h.Engine.SyncNow();
+        await h.RunAsync();
+        Assert.Equal(["a.jpg"], h.Server.UploadedFileNames);
+    }
+
+    [Fact]
+    public async Task Battery_is_ignored_when_the_setting_is_off()
+    {
+        await using var h = new Harness();
+        h.Temp.File("Photos/a.jpg");
+        h.Engine.IsOnBattery = () => true;
+        h.Settings.Update(s => s.PauseOnBattery = false);
+
+        await h.RunAsync();
+        Assert.Equal(["a.jpg"], h.Server.UploadedFileNames);
+    }
 }
