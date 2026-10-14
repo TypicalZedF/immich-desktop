@@ -581,8 +581,23 @@
               <Image Name="VideoSurface" Source="{Binding VideoFrame}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="MediumQuality" />
             </Panel>
           </Panel>
-          <mi:MaterialIcon Kind="Loading" Classes="spin" Width="28" Height="28" Foreground="White" IsVisible="{Binding IsLoading}"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+          <mi:MaterialIcon Kind="Loading" Classes="spin" Width="28" Height="28" Foreground="White"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+            <mi:MaterialIcon.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="IsLoading" />
+                <Binding Path="!IsVideoLoading" />
+              </MultiBinding>
+            </mi:MaterialIcon.IsVisible>
+          </mi:MaterialIcon>
+          <!-- Video: waiting for the first frame, and what it's waiting on -->
+          <Border HorizontalAlignment="Center" VerticalAlignment="Center" Padding="18,14" CornerRadius="14" Background="#99000000" MaxWidth="360"
+                  IsVisible="{Binding IsVideoLoading}" IsHitTestVisible="False">
+            <StackPanel Spacing="10">
+              <mi:MaterialIcon Kind="Loading" Classes="spin" Width="28" Height="28" Foreground="White" HorizontalAlignment="Center" />
+              <TextBlock Text="{Binding VideoLoadingText}" Foreground="White" TextWrapping="Wrap" TextAlignment="Center" />
+            </StackPanel>
+          </Border>
           <!-- Video: big play button (paused or not started) -->
           <Button Classes="playVideo" Command="{Binding PlayPauseCommand}" HorizontalAlignment="Center" VerticalAlignment="Center"
                   l:Tr.Tip="Play (Space)">

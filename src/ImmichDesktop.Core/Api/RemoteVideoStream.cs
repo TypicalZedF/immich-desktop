@@ -9,6 +9,7 @@ public sealed class RemoteVideoStream : Stream
 {
     public const int ChunkSize = 1024 * 1024;
     const int CachedChunks = 24;
+    const int MaxFailures = 3;
 
     readonly Func<long, int, CancellationToken, Task<VideoChunk>> _fetch;
     readonly CancellationTokenSource _cts = new();
@@ -18,6 +19,11 @@ public sealed class RemoteVideoStream : Stream
     byte[]? _whole; // the server sent everything at once (no range support)
     long _length = -1;
     long _position;
+    int _failures;
+    Exception? _gaveUp; // after repeated failures every read fails at once, without asking the server again
+
+    /// <summary>Raised once when the video can't be fetched (the server keeps refusing or can't be reached).</summary>
+    public event Action? Failed;
 
     public RemoteVideoStream(Func<long, int, CancellationToken, Task<VideoChunk>> fetch) => _fetch = fetch;
 
@@ -79,6 +85,8 @@ public sealed class RemoteVideoStream : Stream
 
     byte[] Chunk(long index)
     {
+        if (_gaveUp is { } reason)
+            throw new IOException(reason.Message, reason);
         Task<byte[]> task;
         lock (_gate)
             task = Start(index);
@@ -86,10 +94,21 @@ public sealed class RemoteVideoStream : Stream
         {
             return task.GetAwaiter().GetResult(); // called on the player's own reading thread
         }
-        catch
+        catch (Exception ex)
         {
+            var giveUp = false;
             lock (_gate)
+            {
                 _chunks.Remove(index); // let a later read try again
+                // The player retries straight away, over and over: after a few failures, stop asking.
+                if (++_failures >= MaxFailures && _gaveUp is null && !_cts.IsCancellationRequested)
+                {
+                    _gaveUp = ex;
+                    giveUp = true;
+                }
+            }
+            if (giveUp)
+                Failed?.Invoke();
             throw;
         }
     }

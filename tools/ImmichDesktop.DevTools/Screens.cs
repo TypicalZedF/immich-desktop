@@ -263,6 +263,12 @@ static class Screens
             {
                 var videoCell = photos.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).First(c => c.Asset is { IsImage: false, IsLocalOnly: false });
                 photos.OpenViewer(videoCell);
+                Console.WriteLine($"Video opening: {photos.Viewer?.VideoLoadingText}");
+                Shot(main, outDir, $"16d0-viewer-video-loading-{suffix}", height: 760, settle: TimeSpan.FromSeconds(0.2));
+                var waited = System.Diagnostics.Stopwatch.StartNew();
+                while (!VideoPlayer.IsReady && waited.Elapsed < TimeSpan.FromSeconds(60))
+                    Pump(TimeSpan.FromMilliseconds(200));
+                Console.WriteLine($"Video player ready after {waited.ElapsedMilliseconds} ms more");
                 Shot(main, outDir, $"16d-viewer-video-{suffix}", height: 760, settle: TimeSpan.FromSeconds(3));
                 var viewer = photos.Viewer!;
                 var frames = 0;
@@ -275,7 +281,7 @@ static class Screens
                         var px = (uint*)((byte*)fb.Address + fb.RowBytes * (fb.Size.Height / 2)) + fb.Size.Width / 3;
                         Console.WriteLine($"Video frame: {frames} repaints in 1s; a pixel = {*px:X8}");
                     }
-                Console.WriteLine($"Video: started={viewer.IsVideoStarted} playing={viewer.IsVideoPlaying} frame={viewer.VideoFrame?.PixelSize} time={viewer.VideoTimeText} error={viewer.VideoError} requests={demo.VideoRequests}");
+                Console.WriteLine($"Video: loading={viewer.VideoLoadingText ?? "done"} started={viewer.IsVideoStarted} playing={viewer.IsVideoPlaying} frame={viewer.VideoFrame?.PixelSize} time={viewer.VideoTimeText} error={viewer.VideoError} requests={demo.VideoRequests}");
                 viewer.VideoPosition = 0.75; // seek
                 Pump(TimeSpan.FromSeconds(1.5));
                 Console.WriteLine($"Video after seek: time={viewer.VideoTimeText} position={viewer.VideoPosition:0.00}");

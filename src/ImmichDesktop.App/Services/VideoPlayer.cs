@@ -69,6 +69,8 @@ public sealed class VideoPlayer : IDisposable
         _player.EndReached += (_, _) => Post(() => { Ended = true; StateChanged?.Invoke(); });
         _player.EncounteredError += (_, _) => Post(() => Failed?.Invoke());
         _player.TimeChanged += (_, _) => Post(() => TimeChanged?.Invoke());
+        if (input is ImmichDesktop.Core.Api.RemoteVideoStream remote)
+            remote.Failed += () => Post(() => Failed?.Invoke()); // VLC alone would keep retrying
         _player.LengthChanged += (_, _) => Post(() => TimeChanged?.Invoke());
     }
 

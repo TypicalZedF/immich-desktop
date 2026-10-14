@@ -305,7 +305,14 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(ShowBigPlay))]
     public partial bool IsVideoStarted { get; set; }
 
-    public bool ShowBigPlay => IsVideo && !IsVideoPlaying;
+    public bool ShowBigPlay => IsVideo && !IsVideoPlaying && !IsVideoLoading;
+
+    /// <summary>What the video is waiting on before its first frame (shown under a spinner), or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsVideoLoading), nameof(ShowBigPlay))]
+    public partial string? VideoLoadingText { get; set; }
+
+    public bool IsVideoLoading => VideoLoadingText is not null;
 
     /// <summary>Where the video is, from 0 to 1 (the seek bar; dragging it seeks).</summary>
     [ObservableProperty]
@@ -379,6 +386,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         if (!VideoPlayer.IsReady)
         {
             _wantVideo = true; // starts by itself once the player is ready
+            VideoLoadingText = Tr.T("Starting the video player… (only slow the first time)");
             if (!_waitingForPlayer)
                 _ = StartWhenPlayerReadyAsync();
             return;
@@ -398,9 +406,22 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         var asset = Asset;
         _video = player;
         player.IsMuted = IsMuted;
-        player.FrameChanged += () => { if (ReferenceEquals(_video, player)) VideoFrame = player.Frame; };
+        player.FrameChanged += () =>
+        {
+            if (!ReferenceEquals(_video, player))
+                return;
+            VideoFrame = player.Frame;
+            VideoLoadingText = null; // the first frame is here
+        };
         player.FrameReady += () => { if (ReferenceEquals(_video, player)) VideoFrameUpdated?.Invoke(); };
-        player.StateChanged += () => { if (ReferenceEquals(_video, player)) IsVideoPlaying = player.IsPlaying; };
+        player.StateChanged += () =>
+        {
+            if (!ReferenceEquals(_video, player))
+                return;
+            IsVideoPlaying = player.IsPlaying;
+            if (player.Ended)
+                VideoLoadingText = null;
+        };
         player.TimeChanged += () => { if (ReferenceEquals(_video, player)) UpdateVideoTime(player); };
         player.Failed += () =>
         {
@@ -411,7 +432,20 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
             VideoError = Tr.T("This video couldn't be played here.");
         };
         IsVideoStarted = true;
+        var fromServer = !(DevicePath is { } path && File.Exists(path));
+        VideoLoadingText = fromServer ? Tr.T("Loading the video from your server…") : Tr.T("Opening the video…");
+        _ = SayWhenSlowAsync(player, fromServer);
         player.Play();
+    }
+
+    /// <summary>If the first frame is slow to come, says why it might be.</summary>
+    async Task SayWhenSlowAsync(VideoPlayer player, bool fromServer)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(6));
+        if (ReferenceEquals(_video, player) && VideoLoadingText is not null)
+            VideoLoadingText = fromServer
+                ? Tr.T("Still loading… big videos or a slow connection to your server can take a moment.")
+                : Tr.T("Still opening… big videos can take a moment.");
     }
 
     /// <summary>The first video waits for VLC to start in the background instead of freezing the window.</summary>
@@ -445,6 +479,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     void StopVideo()
     {
         _wantVideo = false;
+        VideoLoadingText = null;
         var video = _video;
         _video = null;
         video?.Dispose();

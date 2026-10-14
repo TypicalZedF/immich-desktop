@@ -58,4 +58,25 @@ public class RemoteVideoStreamTests
         Assert.Equal(video, copy.ToArray());
         Assert.Equal(1, calls);
     }
+
+    [Fact]
+    public void A_video_the_server_wont_send_gives_up_instead_of_asking_forever()
+    {
+        // The player keeps reading after errors; the server must not be hammered (it was: 170,000 requests in seconds).
+        var calls = 0;
+        var failed = 0;
+        using var stream = new RemoteVideoStream((_, _, _) =>
+        {
+            Interlocked.Increment(ref calls);
+            return Task.FromException<VideoChunk>(new ImmichApiException(System.Net.HttpStatusCode.NotFound, "Not found"));
+        });
+        stream.Failed += () => failed++;
+
+        var buffer = new byte[1000];
+        for (var i = 0; i < 1000; i++)
+            Assert.ThrowsAny<Exception>(() => stream.Read(buffer, 0, buffer.Length));
+
+        Assert.InRange(calls, 1, 3);
+        Assert.Equal(1, failed);
+    }
 }

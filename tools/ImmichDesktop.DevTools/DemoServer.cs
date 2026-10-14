@@ -292,7 +292,10 @@ sealed class DemoServer : HttpMessageHandler
         return Task.FromResult(response);
     }
 
-    /// <summary>A test video for the player (set IMMICH_DEMO_VIDEO to an .mp4), served in ranges like Immich.</summary>
+    /// <summary>
+    /// A test video for the player (set IMMICH_DEMO_VIDEO to an .mp4), served in ranges like Immich. Any other value
+    /// makes the server refuse it; IMMICH_DEMO_VIDEO_DELAY_MS slows every reply.
+    /// </summary>
     static readonly byte[]? DemoVideo = Environment.GetEnvironmentVariable("IMMICH_DEMO_VIDEO") is { } file && File.Exists(file) ? File.ReadAllBytes(file) : null;
 
     public int VideoRequests;
@@ -300,6 +303,8 @@ sealed class DemoServer : HttpMessageHandler
     HttpResponseMessage Video(HttpRequestMessage request)
     {
         Interlocked.Increment(ref VideoRequests);
+        if (int.TryParse(Environment.GetEnvironmentVariable("IMMICH_DEMO_VIDEO_DELAY_MS"), out var delay))
+            Thread.Sleep(delay); // a slow server, to see the viewer's loading message
         if (DemoVideo is not { } video)
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         if (request.Headers.Range?.Ranges.FirstOrDefault() is not { From: { } from } range)
