@@ -162,6 +162,12 @@ public sealed class AppSettings
     /// <summary>Only check while the PC isn't being used, so it never slows down games or calls.</summary>
     public bool PrivacyScanOnlyWhenIdle { get; set; }
 
+    /// <summary>
+    /// Also use the thorough nudity check (CLIP, downloaded once), which understands drawings, art and
+    /// game screenshots. Slower; best with a graphics card.
+    /// </summary>
+    public bool PrivacyScanThorough { get; set; }
+
     // Security: ask for Windows Hello or a password before showing the window (backup keeps running).
     public AppLockMode AppLock { get; set; } = AppLockMode.Off;
 

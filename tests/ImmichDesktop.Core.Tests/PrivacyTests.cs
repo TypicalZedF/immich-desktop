@@ -76,14 +76,79 @@ public class OnDeviceModelTests
     [Fact]
     public void Ordinary_photos_are_not_explicit()
     {
-        using var classifier = new NsfwClassifier(useGpu: false);
+        using var detector = new NudeNetDetector(useGpu: false);
         foreach (var (sky, hill) in new[] { (0xFF7AB8E8u, 0xFF2E7D32u), (0xFFF2A65Au, 0xFF6D4C41u), (0xFF9FA8DAu, 0xFF37474Fu) })
         {
             using var photo = Landscape(sky, hill);
-            var scores = classifier.Classify(ToImage(photo));
-            Assert.True(scores.Explicit < 0.3f, $"explicit {scores.Explicit:0.00}");
-            Assert.InRange(scores.Drawing + scores.Hentai + scores.Neutral + scores.Porn + scores.Sexy, 0.99f, 1.01f);
+            var scores = detector.Detect(ToImage(photo));
+            Assert.True(scores.Explicit < 0.2f, $"explicit {scores.Explicit:0.00}");
+            Assert.True(scores.Revealing < 0.2f, $"revealing {scores.Revealing:0.00}");
         }
+    }
+
+    [Fact]
+    public void Bare_skin_alone_is_not_nudity()
+    {
+        // A close-up of skin (the old whole-picture model called this nudity): no exposed body part.
+        using var detector = new NudeNetDetector(useGpu: false);
+        using var skin = Draw(800, 600, c =>
+        {
+            c.Clear(new SKColor(0xFFE0AC90));
+            using var paint = new SKPaint { IsAntialias = true, Color = new SKColor(0xFFC98E73) };
+            c.DrawOval(new SKRect(120, 180, 700, 420), paint);
+        });
+        Assert.True(detector.Detect(ToImage(skin)).Explicit < 0.2f);
+    }
+
+    [Fact]
+    public void Thorough_check_head_matches_LAIONs_model()
+    {
+        // Reference values computed from LAION's original weights (tools/models/laion_nsfw_head.py).
+        var head = NsfwHead.Load(OnDeviceModels.PathOf(ClipNsfwClassifier.HeadFile));
+        var sin = Enumerable.Range(0, 512).Select(i => (float)Math.Sin(i * 0.37)).ToArray();
+        Assert.Equal(0.14689847f, head.Score(sin), 4);
+        var scaled = sin.Select(v => v * 7).ToArray();
+        Assert.Equal(head.Score(sin), head.Score(scaled), 5); // embeddings are normalised first
+    }
+
+    [Fact]
+    public void Thorough_check_runs_when_its_model_is_downloaded()
+    {
+        // CLIP is a 352 MB download, so this only runs where it's been fetched (set IMMICH_TEST_CLIP_MODEL to the file).
+        var model = Environment.GetEnvironmentVariable("IMMICH_TEST_CLIP_MODEL");
+        Assert.SkipWhen(model is null || !File.Exists(model), "CLIP model not downloaded");
+        using var classifier = new ClipNsfwClassifier(model!, useGpu: false);
+        foreach (var (sky, hill) in new[] { (0xFF7AB8E8u, 0xFF2E7D32u), (0xFFF2A65Au, 0xFF6D4C41u) })
+        {
+            using var photo = Landscape(sky, hill);
+            var score = classifier.Classify(ToImage(photo));
+            Assert.True(score < 0.3f, $"landscape scored {score:0.00}");
+        }
+    }
+
+    [Fact]
+    public async Task A_download_that_doesnt_match_is_never_used()
+    {
+        using var temp = new TempDir();
+        byte[] published = [1, 2, 3, 4];
+        var server = new BytesHandler(published);
+        var target = Path.Combine(temp.Path, "models", "model.onnx");
+        var wrongHash = new ModelDownload(new Uri("https://example.com/model.onnx"), target, 4, new string('0', 64));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => wrongHash.DownloadAsync(null, TestContext.Current.CancellationToken, server));
+        Assert.False(File.Exists(target));
+        Assert.False(File.Exists(target + ".part"));
+
+        var right = wrongHash with { Sha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(published)) };
+        await right.DownloadAsync(null, TestContext.Current.CancellationToken, server);
+        Assert.True(right.IsDownloaded);
+        Assert.Equal(published, File.ReadAllBytes(target));
+    }
+
+    sealed class BytesHandler(byte[] body) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(body) });
     }
 
     [Fact]
@@ -122,10 +187,12 @@ public class OnDeviceModelTests
     {
         Assert.True(OnDeviceModels.TelemetryDisabled);
         var files = OnDeviceModels.Files();
-        Assert.Equal(3, files.Count);
+        Assert.True(files.Count >= 4);
         Assert.All(files, f => Assert.Matches("^[0-9a-f]{64}$", f.Sha256));
-        // The NSFWJS conversion in this repo (tools/models/nsfwjs_to_onnx.py) produces exactly this file.
-        Assert.Equal("6fa22cc593949f9f47757f0b91310113f068ea91a9e701df82c8155d8a8c7c94", files.Single(f => f.File == NsfwClassifier.ModelFile).Sha256);
+        // NudeNet's published 320n.onnx (v3.4-weights release), unchanged.
+        Assert.Equal("c15d8273adad2d0a92f014cc69ab2d6c311a06777a55545f2c4eb46f51911f0f", files.Single(f => f.File == NudeNetDetector.ModelFile).Sha256);
+        // tools/models/laion_nsfw_head.py run on LAION's clip_autokeras_nsfw_b32.zip produces exactly this file.
+        Assert.Equal("4a975cf764e8629defa1ce0929678c1a8abc0e32a3a03c7c6473b62080407b71", files.Single(f => f.File == ClipNsfwClassifier.HeadFile).Sha256);
     }
 
     [Fact]

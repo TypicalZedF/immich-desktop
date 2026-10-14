@@ -9,15 +9,19 @@ public sealed record BgraImage(int Width, int Height, byte[] Pixels)
 }
 
 /// <summary>
-/// Loads the on-device models that ship with the app. Everything runs on this PC: on Windows on the
-/// graphics card when there is a usable one (DirectML, any DirectX 12 GPU), otherwise on the CPU.
-/// Nothing is downloaded or sent anywhere.
+/// Loads the on-device models. Everything runs on this PC: on Windows on the graphics card when there
+/// is a usable one (DirectML, any DirectX 12 GPU), otherwise on the CPU. The models ship with the app,
+/// except the optional thorough nudity check's, which is downloaded once when you turn it on. No
+/// photo or result is ever sent anywhere.
 /// </summary>
 public static class OnDeviceModels
 {
     public static string Directory => Path.Combine(AppContext.BaseDirectory, "Models");
 
     public static string PathOf(string file) => Path.Combine(Directory, file);
+
+    /// <summary>Optional models downloaded when asked for (kept with the app's data, not the install).</summary>
+    public static string DownloadedDirectory => Path.Combine(AppPaths.DataDir, "Models");
 
     /// <summary>
     /// Official Windows builds of ONNX Runtime can report usage events to Microsoft through
@@ -44,25 +48,34 @@ public static class OnDeviceModels
     /// <summary>A bundled model file: its size and SHA-256, so anyone can check it's the published one.</summary>
     public sealed record ModelFile(string File, string FullPath, long Bytes, string Sha256);
 
-    public static IReadOnlyList<ModelFile> Files() =>
-        new[] { NsfwClassifier.ModelFile, PhotoTextReader.DetectModelFile, PhotoTextReader.ReadModelFile }
-            .Select(file =>
+    static readonly string[] Bundled = [NudeNetDetector.ModelFile, ClipNsfwClassifier.HeadFile, PhotoTextReader.DetectModelFile, PhotoTextReader.ReadModelFile];
+
+    /// <summary>The bundled models, plus the thorough check's model once it's downloaded.</summary>
+    public static IReadOnlyList<ModelFile> Files()
+    {
+        var paths = Bundled.Select(PathOf).ToList();
+        if (ClipNsfwClassifier.Download.IsDownloaded)
+            paths.Add(ClipNsfwClassifier.Download.Path);
+        return paths.Select(path =>
             {
-                var path = PathOf(file);
+                var file = Path.GetFileName(path);
                 if (!File.Exists(path))
                     return new ModelFile(file, path, 0, "");
                 using var stream = File.OpenRead(path);
                 return new ModelFile(file, path, stream.Length, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(stream)));
             })
             .ToList();
+    }
 
-    public static bool Available =>
-        File.Exists(PathOf(NsfwClassifier.ModelFile)) && File.Exists(PathOf(PhotoTextReader.DetectModelFile)) && File.Exists(PathOf(PhotoTextReader.ReadModelFile));
+    public static bool Available => Bundled.All(file => File.Exists(PathOf(file)));
 
     /// <summary>Opens a model, on the GPU if asked and possible. <paramref name="onGpu"/> says where it ended up.</summary>
-    public static InferenceSession Open(string file, bool useGpu, out bool onGpu)
+    public static InferenceSession Open(string file, bool useGpu, out bool onGpu) => OpenPath(PathOf(file), useGpu, out onGpu);
+
+    /// <summary>Opens a model file at a full path (e.g. a downloaded one).</summary>
+    public static InferenceSession OpenPath(string path, bool useGpu, out bool onGpu)
     {
-        var path = PathOf(file);
+        var file = Path.GetFileName(path);
         _ = TelemetryOff.Value;
         if (useGpu && OperatingSystem.IsWindows())
         {
@@ -94,6 +107,54 @@ public static class OnDeviceModels
         };
         onGpu = false;
         return new InferenceSession(path, cpu);
+    }
+
+    internal delegate void PixelSink(int x, int y, float b, float g, float r);
+
+    /// <summary>
+    /// Resizes by averaging every source pixel under each target pixel (shrinking with plain
+    /// sampling would skip most of a big photo and see a noisy version of it).
+    /// </summary>
+    internal static void AreaResize(BgraImage image, int width, int height, PixelSink sink)
+    {
+        var sx = image.Width / (double)width;
+        var sy = image.Height / (double)height;
+        if (sx <= 1.5 && sy <= 1.5)
+        {
+            for (var y = 0; y < height; y++)
+                for (var x = 0; x < width; x++)
+                {
+                    Sample(image, (x + 0.5) * sx - 0.5, (y + 0.5) * sy - 0.5, out var b, out var g, out var r);
+                    sink(x, y, b, g, r);
+                }
+            return;
+        }
+        var p = image.Pixels;
+        var stride = image.Stride;
+        for (var y = 0; y < height; y++)
+        {
+            var y0 = (int)(y * sy);
+            var y1 = Math.Max(y0 + 1, Math.Min(image.Height, (int)((y + 1) * sy)));
+            for (var x = 0; x < width; x++)
+            {
+                var x0 = (int)(x * sx);
+                var x1 = Math.Max(x0 + 1, Math.Min(image.Width, (int)((x + 1) * sx)));
+                long b = 0, g = 0, r = 0;
+                for (var yy = y0; yy < y1; yy++)
+                {
+                    var row = yy * stride;
+                    for (var xx = x0; xx < x1; xx++)
+                    {
+                        var i = row + xx * 4;
+                        b += p[i];
+                        g += p[i + 1];
+                        r += p[i + 2];
+                    }
+                }
+                var n = (float)((y1 - y0) * (x1 - x0));
+                sink(x, y, b / n, g / n, r / n);
+            }
+        }
     }
 
     /// <summary>Bilinear sample of a BGRA image at (x, y) in source pixels; writes B, G, R as 0–255.</summary>

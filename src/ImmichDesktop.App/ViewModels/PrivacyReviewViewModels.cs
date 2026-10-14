@@ -33,7 +33,9 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
         IsEnabled = s.PrivacyScanEnabled;
         UseGpu = s.PrivacyScanUseGpu;
         OnlyWhenIdle = s.PrivacyScanOnlyWhenIdle;
+        Thorough = s.PrivacyScanThorough && ClipNsfwClassifier.Download.IsDownloaded;
         _loading = false;
+        UpdateThoroughText();
         AppServices.PrivacyScan.StatusChanged += OnStatus;
         Apply(AppServices.PrivacyScan.Status);
         _ = LoadAsync();
@@ -69,7 +71,9 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
                 : Tr.T("Couldn't confirm that ONNX Runtime's usage statistics are switched off; see the log.");
             string Describe(string file) => file switch
             {
-                NsfwClassifier.ModelFile => Tr.T("Nudity detector. NSFWJS MobileNetV2 by Infinite Red, MIT license. Looks at the whole picture shrunk to 224×224 and scores it as drawing, hentai, neutral, porn or sexy. Flagged as Nudity when porn + hentai is over 60%, Revealing when sexy is over 85%."),
+                NudeNetDetector.ModelFile => Tr.T("Nudity detector. NudeNet 320n by notAI-tech (based on YOLOv8), AGPL-3.0 license. Looks for exposed body parts in the picture shrunk to 320×320, so bare arms, legs or faces don't count. Flagged as Nudity when it's at least 45% sure, Revealing (underwear, swimwear) at 60%."),
+                ClipNsfwClassifier.HeadFile => Tr.T("Thorough check, part 2. LAION's CLIP-based NSFW detector, MIT license. Scores CLIP's description of the picture: Nudity at 90% or more, Revealing at 60%. Only used with the thorough check on."),
+                ClipNsfwClassifier.ModelFile => Tr.T("Thorough check, part 1 (downloaded). CLIP ViT-B/32 by OpenAI, MIT license, the copy Immich's own smart search uses. Describes the whole picture, so it understands drawings, art and game scenes."),
                 PhotoTextReader.DetectModelFile => Tr.T("Text finder. PaddleOCR PP-OCRv4 detection by PaddlePaddle (via RapidOCR), Apache 2.0 license. Marks where lines of text are."),
                 PhotoTextReader.ReadModelFile => Tr.T("Text reader. PaddleOCR PP-OCRv4 recognition, Apache 2.0 license. Reads each line. The text is only checked against the rules below, then thrown away."),
                 _ => file,
@@ -240,6 +244,117 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
         if (!_loading)
             AppServices.Settings.Update(s => s.PrivacyScanOnlyWhenIdle = value);
     }
+
+    // ---- Thorough check: CLIP, downloaded once when turned on ----
+
+    CancellationTokenSource? _download;
+
+    [ObservableProperty]
+    public partial bool Thorough { get; set; }
+
+    [ObservableProperty]
+    public partial string ThoroughText { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRemoveThorough))]
+    public partial bool IsDownloadingThorough { get; set; }
+
+    [ObservableProperty]
+    public partial double DownloadProgress { get; set; }
+
+    public bool CanRemoveThorough => !Thorough && !IsDownloadingThorough && ClipNsfwClassifier.Download.IsDownloaded;
+
+    partial void OnThoroughChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanRemoveThorough));
+        if (_loading)
+            return;
+        if (value && !ClipNsfwClassifier.Download.IsDownloaded)
+        {
+            _ = DownloadThoroughAsync();
+            return;
+        }
+        AppServices.Settings.Update(s => s.PrivacyScanThorough = value);
+        UpdateThoroughText();
+    }
+
+    async Task DownloadThoroughAsync()
+    {
+        var download = ClipNsfwClassifier.Download;
+        if (!await _owner.ConfirmAsync(Tr.T("Download the thorough check?"),
+                Tr.T("It needs CLIP, a {0} model, downloaded once from huggingface.co (Immich's published copy, the same one its smart search uses). Only the model is downloaded: nothing about your photos is sent. Checking takes longer, especially without a graphics card, and your library is checked again.",
+                    Format.Bytes(download.Bytes)),
+                Tr.T("Download"), danger: false))
+        {
+            SetThoroughQuietly(false);
+            return;
+        }
+        var cts = _download = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        IsDownloadingThorough = true;
+        DownloadProgress = 0;
+        UpdateThoroughText();
+        try
+        {
+            var progress = new Progress<double>(p => DownloadProgress = p);
+            await Task.Run(() => download.DownloadAsync(progress, cts.Token), cts.Token);
+            AppServices.Settings.Update(s => s.PrivacyScanThorough = true);
+            AppServices.PrivacyScan.ModelsChanged();
+            _ = LoadModelsAsync();
+            _owner.ShowNotice(Tr.T("Thorough check ready"));
+        }
+        catch (OperationCanceledException)
+        {
+            SetThoroughQuietly(false);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Thorough check download failed", ex);
+            SetThoroughQuietly(false);
+            _owner.ShowNotice(Tr.T("Couldn't download the thorough check: {0}", NetworkErrors.Describe(ex)), sticky: true);
+        }
+        finally
+        {
+            _download = null;
+            IsDownloadingThorough = false;
+            UpdateThoroughText();
+        }
+    }
+
+    [RelayCommand]
+    void CancelDownload() => _download?.Cancel();
+
+    /// <summary>Deletes the downloaded model (the thorough check is off).</summary>
+    [RelayCommand]
+    void RemoveThorough()
+    {
+        try
+        {
+            ClipNsfwClassifier.Download.Delete();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Could not remove the thorough check's model", ex);
+        }
+        AppServices.PrivacyScan.ModelsChanged();
+        _ = LoadModelsAsync();
+        UpdateThoroughText();
+        OnPropertyChanged(nameof(CanRemoveThorough));
+    }
+
+    void SetThoroughQuietly(bool value)
+    {
+        _loading = true;
+        Thorough = value;
+        _loading = false;
+    }
+
+    void UpdateThoroughText() => ThoroughText = IsDownloadingThorough
+        ? Tr.T("Downloading CLIP ({0})…", Format.Bytes(ClipNsfwClassifier.Download.Bytes))
+        : Thorough
+            ? Tr.T("Also understands drawings, art and game screenshots. Slower; best with a graphics card.")
+            : ClipNsfwClassifier.Download.IsDownloaded
+                ? Tr.T("Off. The model is still downloaded ({0}).", Format.Bytes(ClipNsfwClassifier.Download.Bytes))
+                : Tr.T("Better with drawings, art and game screenshots. Needs a one-time {0} download; best with a graphics card.", Format.Bytes(ClipNsfwClassifier.Download.Bytes));
 
     // ---- Progress ----
 

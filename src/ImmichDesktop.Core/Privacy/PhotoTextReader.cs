@@ -66,7 +66,7 @@ public sealed class PhotoTextReader : IDisposable
         var pixels = new float[3 * h * w];
         var input = new DenseTensor<float>(pixels, [1, 3, h, w]);
         var plane = w * h;
-        NsfwClassifier.AreaResize(image, w, h, (x, y, b, g, r) =>
+        OnDeviceModels.AreaResize(image, w, h, (x, y, b, g, r) =>
         {
             // BGR order, scaled to -1..1 (how PaddleOCR feeds OpenCV images).
             var i = y * w + x;
@@ -143,7 +143,7 @@ public sealed class PhotoTextReader : IDisposable
         var input = new DenseTensor<float>(pixels, [1, 3, LineHeight, width]);
         var plane = LineHeight * width;
         var crop = new BgraImage(box.Width, box.Height, CropPixels(image, box));
-        NsfwClassifier.AreaResize(crop, width, LineHeight, (x, y, b, g, r) =>
+        OnDeviceModels.AreaResize(crop, width, LineHeight, (x, y, b, g, r) =>
         {
             var i = y * width + x;
             pixels[i] = b / 127.5f - 1;

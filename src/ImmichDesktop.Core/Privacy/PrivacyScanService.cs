@@ -28,10 +28,17 @@ public sealed record PrivacyScanStatus(PrivacyScanState State, int Checked, int 
 public sealed class PrivacyScanService : IDisposable
 {
     /// <summary>Bump when the checks change enough that everything should be looked at again.</summary>
-    public const int ChecksVersion = 1;
+    /// <remarks>2: NudeNet replaced NSFWJS. Results of the thorough check are saved as the next version, so
+    /// turning it on checks everything again, and turning it off keeps its (better) results.</remarks>
+    public const int ChecksVersion = 2;
 
-    const float ExplicitThreshold = 0.6f;
-    const float SuggestiveThreshold = 0.85f;
+    // NudeNet: how sure it must be that it found an exposed part (or underwear/swimwear).
+    const float ExplicitThreshold = 0.45f;
+    const float RevealingThreshold = 0.6f;
+    // Thorough check (LAION's detector over CLIP): "NSFW" covers nudity and revealing pictures alike, so
+    // only a very sure score counts as nudity on its own.
+    const float ClipExplicitThreshold = 0.9f;
+    const float ClipRevealingThreshold = 0.6f;
     static readonly TimeSpan IdleNeeded = TimeSpan.FromMinutes(2);
     static readonly TimeSpan RecheckLibraryEvery = TimeSpan.FromHours(1);
 
@@ -45,6 +52,7 @@ public sealed class PrivacyScanService : IDisposable
     CancellationTokenSource? _run;
     Task? _task;
     bool? _runningWithGpu;
+    bool? _runningThorough;
     bool _once;        // a one-time check was asked for
     bool _wasEnabled;  // the setting, last time it was applied
 
@@ -85,7 +93,8 @@ public sealed class PrivacyScanService : IDisposable
                 _once = false;
             _wasEnabled = s.PrivacyScanEnabled;
             var wanted = (s.PrivacyScanEnabled || _once) && _account.IsSignedIn;
-            if (wanted && _task is { IsCompleted: false } && _runningWithGpu == s.PrivacyScanUseGpu)
+            var thorough = s.PrivacyScanThorough && ClipNsfwClassifier.Download.IsDownloaded;
+            if (wanted && _task is { IsCompleted: false } && _runningWithGpu == s.PrivacyScanUseGpu && _runningThorough == thorough)
                 return;
             _run?.Cancel();
             _run = null;
@@ -104,25 +113,25 @@ public sealed class PrivacyScanService : IDisposable
             var cts = _run = new CancellationTokenSource();
             var previous = _task;
             _runningWithGpu = s.PrivacyScanUseGpu;
+            _runningThorough = thorough;
             _task = Task.Run(async () =>
             {
                 if (previous is not null)
                     await previous.ContinueWith(_ => { }, TaskScheduler.Default); // let the last run let go of the models
-                await RunAsync(s.PrivacyScanUseGpu, cts.Token);
+                await RunAsync(s.PrivacyScanUseGpu, thorough, cts.Token);
             });
         }
     }
 
-    async Task RunAsync(bool useGpu, CancellationToken ct)
+    async Task RunAsync(bool useGpu, bool thorough, CancellationToken ct)
     {
         ReportRun(new PrivacyScanStatus(PrivacyScanState.Starting, 0, 0, Suggestions, false), ct);
-        NsfwClassifier? classifier = null;
-        PhotoTextReader? reader = null;
+        var version = thorough ? ChecksVersion + 1 : ChecksVersion;
+        Checks? checks = null;
         try
         {
-            classifier = new NsfwClassifier(useGpu);
-            reader = new PhotoTextReader(useGpu);
-            var onGpu = classifier.OnGpu;
+            checks = new Checks(useGpu, thorough);
+            var onGpu = checks.OnGpu;
             while (!ct.IsCancellationRequested)
             {
                 if (_account.Client is not { } client)
@@ -130,7 +139,7 @@ public sealed class PrivacyScanService : IDisposable
                 // Not even the photo list is fetched until it's allowed to run (e.g. on a home network).
                 await WaitUntilAllowedAsync(Status.Checked, Status.Total, onGpu, ct);
                 var library = await ListLibraryAsync(client, ct);
-                var done = await Task.Run(() => _db.GetPrivacyScanned(ChecksVersion), ct);
+                var done = await Task.Run(() => _db.GetPrivacyScanned(version), ct);
                 var todo = library.Where(id => !done.Contains(id)).ToList();
                 var checkedCount = library.Count - todo.Count;
                 var lastReport = DateTime.MinValue;
@@ -148,12 +157,12 @@ public sealed class PrivacyScanService : IDisposable
                     next = i + 1 < todo.Count && PauseReason() is null ? FetchAsync(client, todo[i + 1], ct) : null;
                     if (data is not null && _decode(data) is { } image)
                     {
-                        var (kinds, score) = Check(classifier, reader, image);
-                        _db.SavePrivacyScan(todo[i], ChecksVersion, (int)kinds, score);
+                        var (kinds, score) = Check(checks, image);
+                        _db.SavePrivacyScan(todo[i], version, (int)kinds, score);
                     }
                     else
                     {
-                        _db.SavePrivacyScan(todo[i], ChecksVersion, 0, 0); // no picture to check (e.g. a format we can't open)
+                        _db.SavePrivacyScan(todo[i], version, 0, 0); // no picture to check (e.g. a format we can't open)
                     }
                     checkedCount++;
                     recent.Enqueue(DateTime.UtcNow);
@@ -193,8 +202,7 @@ public sealed class PrivacyScanService : IDisposable
         }
         finally
         {
-            classifier?.Dispose();
-            reader?.Dispose();
+            checks?.Dispose();
         }
     }
 
@@ -211,23 +219,42 @@ public sealed class PrivacyScanService : IDisposable
         }
     }
 
+    /// <summary>The loaded models for one run.</summary>
+    public sealed class Checks(bool useGpu, bool thorough) : IDisposable
+    {
+        public NudeNetDetector Nudity { get; } = new(useGpu);
+        public ClipNsfwClassifier? Thorough { get; } = thorough ? new ClipNsfwClassifier(useGpu) : null;
+        public PhotoTextReader Text { get; } = new(useGpu);
+        public bool OnGpu => Nudity.OnGpu;
+
+        public void Dispose()
+        {
+            Nudity.Dispose();
+            Thorough?.Dispose();
+            Text.Dispose();
+        }
+    }
+
     /// <summary>What a picture shows, and how sure we are (0–1, for sorting suggestions).</summary>
-    public static (SensitiveKind Kinds, double Score) Check(NsfwClassifier classifier, PhotoTextReader reader, BgraImage image)
+    public static (SensitiveKind Kinds, double Score) Check(Checks checks, BgraImage image)
     {
         var kinds = SensitiveKind.None;
         double score = 0;
-        var nsfw = classifier.Classify(image);
-        if (nsfw.Explicit >= ExplicitThreshold)
+        var nudity = checks.Nudity.Detect(image);
+        var clip = checks.Thorough?.Classify(image) ?? 0;
+        var explicitScore = Math.Max(nudity.Explicit >= ExplicitThreshold ? nudity.Explicit : 0, clip >= ClipExplicitThreshold ? clip : 0);
+        var revealingScore = Math.Max(nudity.Revealing >= RevealingThreshold ? nudity.Revealing : 0, clip >= ClipRevealingThreshold ? clip : 0);
+        if (explicitScore > 0)
         {
             kinds |= SensitiveKind.Explicit;
-            score = nsfw.Explicit;
+            score = explicitScore;
         }
-        else if (nsfw.Sexy >= SuggestiveThreshold)
+        else if (revealingScore > 0)
         {
             kinds |= SensitiveKind.Suggestive;
-            score = nsfw.Sexy * 0.7;
+            score = revealingScore * 0.7;
         }
-        var text = SensitiveText.Find(reader.Read(image).Select(l => l.Text));
+        var text = SensitiveText.Find(checks.Text.Read(image).Select(l => l.Text));
         if (text != SensitiveKind.None)
         {
             kinds |= text;
@@ -305,6 +332,9 @@ public sealed class PrivacyScanService : IDisposable
             _once = true;
         Apply();
     }
+
+    /// <summary>Picks up a model that was just downloaded (or removed).</summary>
+    public void ModelsChanged() => Apply();
 
     /// <summary>Stops a one-time check.</summary>
     public void StopOnce()

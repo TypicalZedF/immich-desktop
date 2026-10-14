@@ -25,6 +25,17 @@
                       <ToggleSwitch IsChecked="{Binding UseGpu}" IsVisible="{Binding OffersGpu}" l:Tr.Content="Use the graphics card" Margin="0,0,24,0" />
                       <ToggleSwitch IsChecked="{Binding OnlyWhenIdle}" l:Tr.Content="Only when I'm not using the PC" />
                     </WrapPanel>
+                    <!-- Thorough check: CLIP, downloaded once when turned on -->
+                    <StackPanel Spacing="4">
+                      <ToggleSwitch IsChecked="{Binding Thorough}" IsEnabled="{Binding !IsDownloadingThorough}" l:Tr.Content="Thorough check" />
+                      <TextBlock Classes="caption" Text="{Binding ThoroughText}" TextWrapping="Wrap" />
+                      <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsDownloadingThorough}">
+                        <ProgressBar Value="{Binding DownloadProgress}" Minimum="0" Maximum="1" Width="240" Height="4" VerticalAlignment="Center" />
+                        <Button Classes="ghost" Padding="8,4" Command="{Binding CancelDownloadCommand}" l:Tr.Content="Cancel" />
+                      </StackPanel>
+                      <Button Classes="ghost" Padding="8,4" Margin="-8,0,0,0" HorizontalAlignment="Left" Command="{Binding RemoveThoroughCommand}"
+                              IsVisible="{Binding CanRemoveThorough}" l:Tr.Content="Remove the download" />
+                    </StackPanel>
                     <StackPanel Spacing="6">
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <mi:MaterialIcon Kind="Loading" Classes="spin" Width="14" Height="14" IsVisible="{Binding IsWorking}" />
@@ -73,7 +84,7 @@
                     <TextBlock Classes="h3" l:Tr.Text="Exactly what it does, step by step" />
                     <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="1. Asks your Immich server for the list of your photos and videos (the timeline and the archive; never the locked folder or the trash)." />
                     <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="2. For each one it hasn't checked yet, downloads its preview picture from your server into memory, the same picture you see when you scroll your photos. For videos, that's a still frame." />
-                    <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="3. Shrinks the picture and gives it to the nudity detector, which answers with five numbers: how much it looks like a drawing, hentai, an ordinary photo, porn or a revealing photo." />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="3. Shrinks the picture and gives it to the nudity detector, which looks for exposed body parts and says how sure it is. With the thorough check on, CLIP also describes the whole picture and LAION's detector scores that description, which catches drawings, art and game scenes." />
                     <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="4. Gives the picture to the text finder, then reads each line of text it found." />
                     <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="5. Checks that text against the rules below (card numbers, ID wording and so on)." />
                     <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="6. Writes down only the photo's ID, the kind of thing found and how sure it is, then throws the picture and the text away." />
@@ -92,7 +103,9 @@
                     <TextBlock TextWrapping="Wrap" l:Tr.Text="Nothing. The check only talks to your own Immich server:" />
                     <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding ServerHost, StringFormat='• {0}'}" FontWeight="Medium" />
                     <TextBlock Classes="secondary" TextWrapping="Wrap"
-                               l:Tr.Text="It lists your photos and fetches their previews, and when you click “Move to locked folder” it asks your server to move them. No other server, account, model download or analytics is involved." />
+                               l:Tr.Text="It lists your photos and fetches their previews, and when you click “Move to locked folder” it asks your server to move them. No other server, account or analytics is involved." />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               l:Tr.Text="The one exception is the optional thorough check: turning it on downloads its model once from huggingface.co (Immich's published copy of CLIP). Only the model file is downloaded; nothing about your photos is sent, and the file is checked against its published fingerprint." />
                     <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding TelemetryText}" />
                   </StackPanel>
                   <StackPanel Spacing="4">
@@ -110,7 +123,7 @@
                   <StackPanel Spacing="8">
                     <TextBlock Classes="h3" l:Tr.Text="The models" />
                     <TextBlock Classes="secondary" TextWrapping="Wrap"
-                               l:Tr.Text="Three small open-source models ship inside the app and run with ONNX Runtime. Their fingerprints (SHA-256) let anyone confirm they're the published files." />
+                               l:Tr.Text="Open-source models that run with ONNX Runtime. They ship inside the app, except the thorough check's CLIP, which is downloaded when you turn it on. Their fingerprints (SHA-256) let anyone confirm they're the published files." />
                     <ItemsControl ItemsSource="{Binding Models}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PrivacyModelViewModel">
