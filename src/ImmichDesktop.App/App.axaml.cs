@@ -27,7 +27,7 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        ScrollDiagnostics.Start();
+        LinuxTouchpadScroll.Start();
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _desktop = desktop;
@@ -70,7 +70,17 @@ public partial class App : Application
             if (_window is null)
                 DispatcherTimer.RunOnce(TrimIfHidden, TimeSpan.FromSeconds(15));
             desktop.ShutdownRequested += (_, _) => Log.Info("Shutdown requested by the OS");
-            desktop.Exit += (_, _) => AppServices.ShutdownAsync().Wait(TimeSpan.FromSeconds(3));
+            desktop.Exit += (_, _) =>
+            {
+                try
+                {
+                    AppServices.ShutdownAsync().Wait(TimeSpan.FromSeconds(3));
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn("Shutdown didn't finish cleanly", ex.InnerException ?? ex); // quitting anyway
+                }
+            };
         }
 
         base.OnFrameworkInitializationCompleted();
