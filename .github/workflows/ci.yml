@@ -55,10 +55,21 @@ jobs:
           if (Test-Path "$dir\ImmichDesktop.exe") { throw "Uninstall left the app behind" }
           Write-Host "Uninstalled OK"
 
+      - name: UI checks - render every screen against a demo server
+        # The harness drives the real pages headlessly and fails on broken behaviour (grouping, Select all, …).
+        shell: pwsh
+        run: dotnet run --project tools/ImmichDesktop.DevTools -c Release -- screens artifacts/screens
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
           path: artifacts/installer/*
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: artifacts/screens/*
 
   linux:
     runs-on: ubuntu-latest
