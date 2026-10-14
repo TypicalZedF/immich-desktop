@@ -47,6 +47,14 @@ public sealed class VideoPlayer : IDisposable
     int _framePending;
     bool _disposed;
 
+    /// <summary>
+    /// Decode on the graphics card. Switched off for the rest of the session if a video played without
+    /// ever delivering a picture (seen on Linux, where some drivers don't hand frames back to the app).
+    /// </summary>
+    public static bool UseHardwareDecoding { get; set; } = true;
+
+    static int _vlcLogLines;
+
     /// <summary>Why videos can't play in the app on this PC, if they can't (e.g. VLC isn't installed on Linux).</summary>
     public static string? Unavailable => Engine.Value is null
         ? OperatingSystem.IsLinux() ? Tr.T("Install VLC (libvlc) to play videos in the app.") : Tr.T("The video player couldn't start.")
@@ -56,7 +64,7 @@ public sealed class VideoPlayer : IDisposable
     {
         _media = media;
         _input = input;
-        _player = new MediaPlayer(engine) { EnableHardwareDecoding = true };
+        _player = new MediaPlayer(engine) { EnableHardwareDecoding = UseHardwareDecoding };
         _format = OnFormat;
         _cleanup = OnCleanup;
         _lock = OnLock;
@@ -88,6 +96,9 @@ public sealed class VideoPlayer : IDisposable
         }
         return new VideoPlayer(engine, new Media(engine, new StreamMediaInput(stream)), stream);
     }
+
+    /// <summary>At least one picture has arrived.</summary>
+    public bool HasFrame => _frame is not null;
 
     /// <summary>The latest frame. Redrawn in place, so watch <see cref="FrameReady"/> to repaint.</summary>
     public WriteableBitmap? Frame => _frame;
@@ -255,7 +266,13 @@ public sealed class VideoPlayer : IDisposable
             }
             var started = System.Diagnostics.Stopwatch.StartNew();
             LibVLCSharp.Shared.Core.Initialize();
-            var engine = new LibVLC("--no-video-title-show", "--no-snapshot-preview", "--no-stats", "--quiet");
+            var engine = new LibVLC("--no-video-title-show", "--no-snapshot-preview", "--no-stats");
+            // VLC's own warnings and errors go to the app's log (the first few), to see why a video won't play.
+            engine.Log += (_, e) =>
+            {
+                if (e.Level >= LogLevel.Warning && Interlocked.Increment(ref _vlcLogLines) <= 60)
+                    Log.Info($"VLC {e.Level} ({e.Module}): {e.Message}");
+            };
             Log.Info($"Video player ready in {started.ElapsedMilliseconds} ms");
             return engine;
         }

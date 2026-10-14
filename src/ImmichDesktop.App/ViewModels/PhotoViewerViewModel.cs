@@ -434,14 +434,36 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         IsVideoStarted = true;
         var fromServer = !(DevicePath is { } path && File.Exists(path));
         VideoLoadingText = fromServer ? Tr.T("Loading the video from your server…") : Tr.T("Opening the video…");
-        _ = SayWhenSlowAsync(player, fromServer);
+        _ = WatchStartAsync(player, fromServer);
         player.Play();
     }
 
-    /// <summary>If the first frame is slow to come, says why it might be.</summary>
-    async Task SayWhenSlowAsync(VideoPlayer player, bool fromServer)
+    /// <summary>
+    /// Watches the start: if the video is playing but no picture has come (the time moves, the screen
+    /// doesn't), tries again without the graphics card, then gives up clearly. If it's only slow, says why.
+    /// </summary>
+    async Task WatchStartAsync(VideoPlayer player, bool fromServer)
     {
-        await Task.Delay(TimeSpan.FromSeconds(6));
+        await Task.Delay(TimeSpan.FromSeconds(4));
+        if (!ReferenceEquals(_video, player) || player.HasFrame)
+            return;
+        if (player.IsPlaying && player.Time > TimeSpan.FromSeconds(1))
+        {
+            if (VideoPlayer.UseHardwareDecoding)
+            {
+                Log.Warn($"Video {Asset.Id} plays but shows no picture; trying again without the graphics card");
+                VideoPlayer.UseHardwareDecoding = false;
+                StartVideo();
+            }
+            else
+            {
+                Log.Warn($"Video {Asset.Id} plays but shows no picture, even without the graphics card");
+                StopVideo();
+                VideoError = Tr.T("This video plays, but its picture can't be shown here.");
+            }
+            return;
+        }
+        await Task.Delay(TimeSpan.FromSeconds(2));
         if (ReferenceEquals(_video, player) && VideoLoadingText is not null)
             VideoLoadingText = fromServer
                 ? Tr.T("Still loading… big videos or a slow connection to your server can take a moment.")

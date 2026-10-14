@@ -642,6 +642,7 @@
  "This is my home network ({0})": "Es mi red de casa ({0})",
  "This only unlocks Immich Desktop on this PC. It's stored as a secure hash, never as plain text.": "Solo desbloquea Immich Desktop en este PC. Se guarda como un hash seguro, nunca como texto.",
  "This video couldn't be played here.": "Este vídeo no se puede reproducir aquí.",
+ "This video plays, but its picture can't be shown here.": "Este vídeo se reproduce, pero su imagen no se puede mostrar aquí.",
  "Thorough check": "Revisión a fondo",
  "Thorough check ready": "Revisión a fondo lista",
  "Thorough check, part 1 (downloaded). CLIP ViT-B/32 by OpenAI, MIT license, the copy Immich's own smart search uses. Describes the whole picture, so it understands drawings, art and game scenes.": "Revisión a fondo, parte 1 (descargada). CLIP ViT-B/32 de OpenAI, licencia MIT, la misma copia que usa la búsqueda inteligente de Immich. Describe la imagen completa, así que entiende dibujos, arte y escenas de juegos.",
