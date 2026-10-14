@@ -431,9 +431,12 @@ public sealed class MapView : Control
         if (_base is null || _base.PixelSize != pixels)
         {
             _base?.Dispose();
-            _base = new RenderTargetBitmap(pixels, new Vector(96 * scaling, 96 * scaling));
+            // Plain pixels with the display scale applied below, rather than the bitmap's DPI: on Linux the
+            // renderer drew such a bitmap at the wrong size, so the land drifted away from the photos.
+            _base = new RenderTargetBitmap(pixels, new Vector(96, 96));
         }
         using (var ctx = _base.CreateDrawingContext())
+        using (ctx.PushTransform(Matrix.CreateScale(pixels.Width / width, pixels.Height / height)))
         {
             ctx.FillRectangle(dark ? WaterDark : Water, new Rect(0, 0, width, height));
             DrawWorld(ctx, dark, width, height);
