@@ -33,9 +33,14 @@ public static class WindowsHello
 #endif
     }
 
+    /// <summary>Replaces the real prompt (the screenshot harness shows the lock screen without asking Windows).</summary>
+    public static Func<Task<HelloResult>>? FakePrompt { get; set; }
+
     /// <param name="window">Native window handle, so the prompt appears on top of our window.</param>
     public static async Task<HelloResult> VerifyAsync(IntPtr window, string message)
     {
+        if (FakePrompt is { } fake)
+            return await fake();
 #if WINDOWS
         try
         {

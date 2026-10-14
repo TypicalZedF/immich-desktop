@@ -369,7 +369,8 @@ sealed class DemoServer : HttpMessageHandler
         var id = path.Split('/')[3];
         if (PrivateDemo.TryGetValue(id, out var kind))
             return Bytes(_images[(query.Contains("preview") ? "p-" : "t-") + kind]);
-        var index = Math.Abs(id.GetHashCode()) % 12;
+        var index = id.Sum(ch => ch) % 12; // stable across runs (string.GetHashCode isn't), so screenshots can be compared
+
         return Bytes(_images[(query.Contains("preview") ? "p" : "t") + index]);
     }
 

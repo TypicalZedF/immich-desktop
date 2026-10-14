@@ -528,6 +528,7 @@ static class Screens
             AppServices.Settings.Update(s => s.AppLock = AppLockMode.Password);
             main.Lock();
             Shot(main, outDir, $"50-locked-password-{suffix}");
+            WindowsHello.FakePrompt = () => Task.FromResult(HelloResult.Canceled); // never pop up the real Windows Hello
             AppServices.Settings.Update(s => s.AppLock = AppLockMode.WindowsHello);
             main.ShowShell();
             main.Lock();
