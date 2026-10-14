@@ -20,6 +20,16 @@ public sealed class VideoPlayer : IDisposable
 
     static readonly Lazy<LibVLC?> Engine = new(CreateEngine);
 
+    // Starting VLC loads its native libraries and plugins, which takes seconds the first time:
+    // done on a background thread so the window never freezes (see Prepare).
+    static readonly Lazy<Task> EngineLoading = new(() => Task.Run(() => _ = Engine.Value));
+
+    /// <summary>Starts VLC's engine in the background, if it isn't already. Completes when it's ready (or failed).</summary>
+    public static Task Prepare() => EngineLoading.Value;
+
+    /// <summary>The engine has finished starting, so creating a player won't block.</summary>
+    public static bool IsReady => Engine.IsValueCreated;
+
     // Kept here so the garbage collector can't free them while VLC still calls them.
     readonly MediaPlayer.LibVLCVideoFormatCb _format;
     readonly MediaPlayer.LibVLCVideoCleanupCb _cleanup;
@@ -241,8 +251,11 @@ public sealed class VideoPlayer : IDisposable
                         ? handle
                         : IntPtr.Zero);
             }
+            var started = System.Diagnostics.Stopwatch.StartNew();
             LibVLCSharp.Shared.Core.Initialize();
-            return new LibVLC("--no-video-title-show", "--no-snapshot-preview", "--no-stats", "--quiet");
+            var engine = new LibVLC("--no-video-title-show", "--no-snapshot-preview", "--no-stats", "--quiet");
+            Log.Info($"Video player ready in {started.ElapsedMilliseconds} ms");
+            return engine;
         }
         catch (Exception ex)
         {

@@ -283,6 +283,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     // ---- Videos: played right here in the viewer ----
 
     VideoPlayer? _video;
+    bool _waitingForPlayer, _wantVideo;
     bool _updatingPosition;
 
     /// <summary>The playing video's picture (null until the first frame, while the photo preview shows).</summary>
@@ -375,6 +376,13 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         if (Asset.IsImage)
             return;
         VideoError = null;
+        if (!VideoPlayer.IsReady)
+        {
+            _wantVideo = true; // starts by itself once the player is ready
+            if (!_waitingForPlayer)
+                _ = StartWhenPlayerReadyAsync();
+            return;
+        }
         VideoPlayer? player;
         if (DevicePath is { } local && File.Exists(local))
             player = VideoPlayer.ForFile(local);
@@ -406,6 +414,23 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         player.Play();
     }
 
+    /// <summary>The first video waits for VLC to start in the background instead of freezing the window.</summary>
+    async Task StartWhenPlayerReadyAsync()
+    {
+        _waitingForPlayer = true;
+        try
+        {
+            await VideoPlayer.Prepare();
+        }
+        finally
+        {
+            _waitingForPlayer = false;
+        }
+        // Still wanted? (Moving to another photo or closing the viewer stops it.)
+        if (_wantVideo)
+            StartVideo();
+    }
+
     void UpdateVideoTime(VideoPlayer player)
     {
         var length = player.Length;
@@ -419,6 +444,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
 
     void StopVideo()
     {
+        _wantVideo = false;
         var video = _video;
         _video = null;
         video?.Dispose();
