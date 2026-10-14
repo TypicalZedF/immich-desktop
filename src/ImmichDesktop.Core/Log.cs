@@ -18,7 +18,12 @@ public static class Log
         var now = DateTime.Now;
         var line = $"{now:yyyy-MM-dd HH:mm:ss.fff} [{level}] {message}";
         if (ex is not null)
+        {
             line += $" | {ex.GetType().Name}: {ex.Message}";
+            // Errors are rare: keep where they came from, so they can be fixed.
+            if (level == "ERR" && (ex.InnerException ?? ex).StackTrace is { } trace)
+                line += Environment.NewLine + trace;
+        }
 
         Debug.WriteLine(line);
 
