@@ -40,7 +40,7 @@ public class RedirectAuthTests
                 }
                 context.Response.Close();
             }
-        });
+        }, TestContext.Current.CancellationToken);
 
         using var client = new ImmichClient(new Uri($"http://localhost:{port}/api/"), new AuthCredential(AuthKind.AccessToken, "token-1"));
         var bytes = await client.GetAssetImageAsync("a1", AssetImageSize.Fullsize, CancellationToken.None);

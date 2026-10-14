@@ -358,7 +358,9 @@ sealed class DemoServer : HttpMessageHandler
             isFavorite = ids.Select((_, i) => i % 9 == 2).ToList(),
             ratio = ids.Select(_ => 1.5).ToList(),
             duration = ids.Select((_, i) => i % 7 == 3 ? (long?)(12_000 + i * 3_100) : null).ToList(),
-            fileCreatedAt = ids.Select((_, i) => month.AddDays(27 - i % 27).AddHours(-i).ToString("o")).ToList(),
+            // Local wall-clock times, so photos fall on the same days in every time zone (the harness checks them).
+            fileCreatedAt = ids.Select((_, i) => DateTime.SpecifyKind(month.AddDays(27 - i % 27).AddHours(-i), DateTimeKind.Local)
+                .ToUniversalTime().ToString("o")).ToList(),
         });
     }
 
