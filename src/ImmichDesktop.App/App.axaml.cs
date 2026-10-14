@@ -27,6 +27,7 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        ScrollDiagnostics.Start();
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _desktop = desktop;
