@@ -1,0 +1,106 @@
+<!-- Review duplicates. Part of PhotosView. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichDesktop.App.Services"
+             xmlns:vm="using:ImmichDesktop.App.ViewModels"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichDesktop.App.Views.Photos.DuplicatesSection"
+             x:DataType="vm:PhotosViewModel">
+  <Panel>
+    <ContentControl Content="{Binding Duplicates}">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:DuplicatesViewModel">
+          <Panel>
+            <DockPanel IsVisible="{Binding HasGroups}">
+              <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="28,0,24,12">
+                <TextBlock Classes="secondary" Text="{Binding Summary}" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="secondary" Command="{Binding KeepAllSuggestedCommand}" IsEnabled="{Binding !IsBusy}"
+                        l:Tr.Tip="Keeps the suggested photo of every group; the others go to the trash">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <mi:MaterialIcon Kind="AutoFix" Width="16" Height="16" />
+                    <TextBlock l:Tr.Text="Keep the best of each" />
+                  </StackPanel>
+                </Button>
+              </Grid>
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="28,0,12,24">
+                <ItemsControl ItemsSource="{Binding Groups}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DuplicateGroupViewModel">
+                      <Border Classes="card" Padding="16" Margin="0,0,0,14" CornerRadius="18">
+                        <StackPanel Spacing="12">
+                          <ItemsControl ItemsSource="{Binding Items}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:DuplicateItemViewModel">
+                                <StackPanel Width="190" Margin="0,0,12,4" Spacing="6">
+                                  <Button Classes="tile dupe" Classes.trashed="{Binding IsTrashed}" Width="190" Height="190" Command="{Binding ToggleKeepCommand}"
+                                          l:Tr.Tip="Click to keep or trash">
+                                    <Panel>
+                                      <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                      <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="8,3" CornerRadius="8"
+                                              Background="{DynamicResource AppPrimaryBrush}" IsVisible="{Binding IsKept}">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                          <mi:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="White" />
+                                          <TextBlock l:Tr.Text="Keep" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                      </Border>
+                                      <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="8,3" CornerRadius="8"
+                                              Background="#D0B42318" IsVisible="{Binding IsTrashed}">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                          <mi:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14" Foreground="White" />
+                                          <TextBlock l:Tr.Text="Trash" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                      </Border>
+                                      <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" Padding="6,2" CornerRadius="6"
+                                              Background="#99000000" IsVisible="{Binding IsSuggested}">
+                                        <TextBlock l:Tr.Text="Suggested" Foreground="White" FontSize="11" />
+                                      </Border>
+                                      <Button Classes="ghost icon" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
+                                              Command="{Binding OpenCommand}" l:Tr.Tip="View" Background="#66000000">
+                                        <mi:MaterialIcon Kind="ArrowExpand" Width="16" Height="16" Foreground="White" />
+                                      </Button>
+                                    </Panel>
+                                  </Button>
+                                  <StackPanel Spacing="1" Margin="2,0">
+                                    <TextBlock Text="{Binding FileName}" FontSize="12.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Classes="caption" Text="{Binding Details}" />
+                                    <TextBlock Classes="caption tertiary" Text="{Binding DateText}" />
+                                  </StackPanel>
+                                </StackPanel>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                            <Button Classes="ghost" l:Tr.Content="Not duplicates" Command="{Binding NotDuplicatesCommand}" />
+                            <Button Classes="primary" Content="{Binding TrashText}" Command="{Binding ResolveCommand}" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+            <StackPanel Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsLoading}">
+              <mi:MaterialIcon Kind="Loading" Classes="spin" Width="28" Height="28" Foreground="{DynamicResource AppPrimaryBrush}" />
+              <TextBlock Classes="secondary" l:Tr.Text="Looking for duplicates…" />
+            </StackPanel>
+            <StackPanel Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowEmpty}" MaxWidth="420">
+              <mi:MaterialIcon Kind="CheckCircleOutline" Width="36" Height="36" Foreground="{DynamicResource AppPrimaryBrush}" />
+              <TextBlock Classes="h3" l:Tr.Text="No duplicates" HorizontalAlignment="Center" />
+              <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
+                         l:Tr.Text="Immich finds look-alike photos with machine learning on your server. Nothing to review right now." />
+            </StackPanel>
+            <Border Classes="card" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <StackPanel Spacing="12">
+                <TextBlock Text="{Binding Error}" TextWrapping="Wrap" TextAlignment="Center" />
+                <Button Classes="primary" HorizontalAlignment="Center" l:Tr.Content="Try again" Command="{Binding RefreshCommand}" />
+              </StackPanel>
+            </Border>
+          </Panel>
+        </DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+  </Panel>
+</UserControl>

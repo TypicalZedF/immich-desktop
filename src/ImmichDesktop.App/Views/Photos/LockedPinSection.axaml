@@ -1,0 +1,34 @@
+<!-- The locked folder's PIN prompt. Part of PhotosView. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichDesktop.App.Services"
+             xmlns:vm="using:ImmichDesktop.App.ViewModels"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichDesktop.App.Views.Photos.LockedPinSection"
+             x:DataType="vm:PhotosViewModel">
+  <Border Classes="card" Width="400" Padding="28,26" HorizontalAlignment="Center" VerticalAlignment="Center"
+          IsVisible="{Binding ShowLockedPrompt}">
+    <StackPanel Spacing="14">
+      <Border Width="56" Height="56" CornerRadius="28" Background="{DynamicResource AppPrimarySoftBrush}" HorizontalAlignment="Center">
+        <mi:MaterialIcon Kind="Lock" Width="26" Height="26" Foreground="{DynamicResource AppPrimaryBrush}" />
+      </Border>
+      <TextBlock Classes="h2" l:Tr.Text="Locked folder" HorizontalAlignment="Center" />
+      <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
+                 l:Tr.Text="Photos here are hidden from your timeline, albums and search. Enter your Immich PIN to see them." />
+      <StackPanel Spacing="10" IsVisible="{Binding CanEnterPin}">
+        <TextBox Text="{Binding Pin}" PasswordChar="●" l:Tr.Watermark="PIN code" HorizontalContentAlignment="Center">
+          <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding UnlockCommand}" /></TextBox.KeyBindings>
+        </TextBox>
+        <Button Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding UnlockCommand}"
+                IsEnabled="{Binding !IsUnlocking}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <mi:MaterialIcon Kind="Loading" Classes="spin" Width="16" Height="16" IsVisible="{Binding IsUnlocking}" />
+            <TextBlock l:Tr.Text="Unlock" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+      <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding LockedMessage}" TextWrapping="Wrap"
+                 TextAlignment="Center" IsVisible="{Binding LockedMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </StackPanel>
+  </Border>
+</UserControl>
