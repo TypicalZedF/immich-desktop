@@ -17,7 +17,9 @@ public sealed class SingleInstance : IDisposable
     }
 
     static string Suffix => $"{AppInfo.Id}-{Environment.UserName}";
-    static string MutexName => $@"Local\{Suffix}";
+    // On Linux, .NET scopes "Local\" names to the login session, and an app started by a browser opening a
+    // link can be in a different session than the one in the tray, so the name is per user, machine-wide.
+    static string MutexName => OperatingSystem.IsWindows() ? $@"Local\{Suffix}" : $@"Global\{Suffix}";
     static string PipeName => $"{Suffix}-commands";
 
     readonly Mutex _mutex;
@@ -38,19 +40,21 @@ public sealed class SingleInstance : IDisposable
         return null;
     }
 
-    public static bool Send(Command command, string? argument = null)
+    /// <param name="quiet">Don't log a failure (when nobody listening is a normal answer).</param>
+    public static bool Send(Command command, string? argument = null, int timeoutMs = 3000, bool quiet = false)
     {
         try
         {
             using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out, PipeOptions.CurrentUserOnly);
-            client.Connect(3000);
+            client.Connect(timeoutMs);
             using var writer = new StreamWriter(client) { AutoFlush = true };
             writer.WriteLine(argument is null ? command.ToString() : $"{command} {argument}");
             return true;
         }
         catch (Exception ex)
         {
-            Log.Warn($"Could not send {command} to the running instance", ex);
+            if (!quiet)
+                Log.Warn($"Could not send {command} to the running instance", ex);
             return false;
         }
     }

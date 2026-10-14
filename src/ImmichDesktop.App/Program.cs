@@ -43,6 +43,13 @@ internal static class Program
                 SingleInstance.Send(SingleInstance.Command.Activate);
             return 0;
         }
+        // A sign-in link should never start a second app: if one is already listening (say the lock above
+        // couldn't see it), hand the link over and stop.
+        if (link is not null && SingleInstance.Send(SingleInstance.Command.OpenLink, link, timeoutMs: 500, quiet: true))
+        {
+            Instance.Dispose();
+            return 0;
+        }
         StartupLink = link;
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Error("Unhandled exception", e.ExceptionObject as Exception);
