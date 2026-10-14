@@ -40,22 +40,35 @@ public sealed class SingleInstance : IDisposable
         return null;
     }
 
-    /// <param name="quiet">Don't log a failure (when nobody listening is a normal answer).</param>
-    public static bool Send(Command command, string? argument = null, int timeoutMs = 3000, bool quiet = false)
+    public static bool Send(Command command, string? argument = null)
     {
         try
         {
             using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out, PipeOptions.CurrentUserOnly);
-            client.Connect(timeoutMs);
+            client.Connect(3000);
             using var writer = new StreamWriter(client) { AutoFlush = true };
             writer.WriteLine(argument is null ? command.ToString() : $"{command} {argument}");
             return true;
         }
         catch (Exception ex)
         {
-            if (!quiet)
-                Log.Warn($"Could not send {command} to the running instance", ex);
+            Log.Warn($"Could not send {command} to the running instance", ex);
             return false;
+        }
+    }
+
+    /// <summary>Whether another copy is listening for commands (it then gets an empty line, which it ignores).</summary>
+    public static bool IsAnotherListening()
+    {
+        try
+        {
+            using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out, PipeOptions.CurrentUserOnly);
+            client.Connect(300);
+            return true;
+        }
+        catch
+        {
+            return false; // nobody there
         }
     }
 

@@ -163,6 +163,12 @@ public sealed class AppSettings
     public bool PrivacyScanOnlyWhenIdle { get; set; }
 
     /// <summary>
+    /// Networks (by name) you've said are your home network, so the privacy check may run there. Needed
+    /// on Linux, which has no private/public network setting, and wherever Windows calls home Public.
+    /// </summary>
+    public List<string> PrivacyHomeNetworks { get; set; } = [];
+
+    /// <summary>
     /// Also use the thorough nudity check (CLIP, downloaded once), which understands drawings, art and
     /// game screenshots. Slower; best with a graphics card.
     /// </summary>

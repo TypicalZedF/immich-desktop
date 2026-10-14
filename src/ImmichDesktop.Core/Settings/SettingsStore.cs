@@ -94,6 +94,7 @@ public sealed class SettingsStore
         s.UploadLimitKBps = Math.Max(0, s.UploadLimitKBps);
         s.RescanIntervalMinutes = Math.Clamp(s.RescanIntervalMinutes, 5, 24 * 60);
         s.Folders ??= [];
+        s.PrivacyHomeNetworks ??= [];
         foreach (var folder in s.Folders)
         {
             folder.ExcludePatterns ??= [];

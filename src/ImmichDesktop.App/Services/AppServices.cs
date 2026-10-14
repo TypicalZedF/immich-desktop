@@ -48,10 +48,17 @@ public static class AppServices
     }
 
     /// <summary>
-    /// A home network, for the privacy check: one set to Private in Windows, or the one where the
-    /// app reaches your server at its home (local) address.
+    /// A home network, for the privacy check: one set to Private in Windows, the one where the app
+    /// reaches your server at its home (local) address, or one you've marked as home (by its name).
     /// </summary>
-    public static bool IsPrivateNetwork() => Network.IsUsingLocal || Network.Network.IsPrivate == true;
+    public static bool IsPrivateNetwork()
+    {
+        if (Network.IsUsingLocal || Network.Network.IsPrivate == true)
+            return true;
+        var settings = Settings.Current;
+        return Network.Network.Name is { } name &&
+               (name == settings.LocalNetworkName || settings.PrivacyHomeNetworks.Contains(name));
+    }
 
     /// <summary>Decodes a preview for the on-device privacy check (upright, at most 1280 pixels).</summary>
     static BgraImage? DecodeForPrivacyCheck(byte[] data)

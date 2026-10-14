@@ -370,6 +370,32 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial bool IsWorking { get; set; }
 
+    /// <summary>The network it's waiting on, which you can mark as home (null when that's not why it waits).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HomeNetworkButtonText))]
+    public partial string? HomeNetworkOffer { get; set; }
+
+    public string HomeNetworkButtonText => Tr.T("This is my home network ({0})", HomeNetworkOffer ?? "");
+
+    /// <summary>Lets the check run on the current network from now on.</summary>
+    [RelayCommand]
+    async Task MarkHomeNetworkAsync()
+    {
+        if (HomeNetworkOffer is not { } name)
+            return;
+        if (!await _owner.ConfirmAsync(Tr.T("Treat “{0}” as your home network?", name),
+                Tr.T("The privacy check will run whenever you're on “{0}”. Only do this for a network you trust, like your own Wi-Fi at home, not a café or hotel network with the same name.", name),
+                Tr.T("It's my home network"), danger: false))
+            return;
+        AppServices.Settings.Update(s =>
+        {
+            if (!s.PrivacyHomeNetworks.Contains(name))
+                s.PrivacyHomeNetworks.Add(name);
+        });
+        HomeNetworkOffer = null;
+        _owner.ShowNotice(Tr.T("Checking will start shortly"));
+    }
+
     /// <summary>A one-time check is under way (starting, checking or paused).</summary>
     [ObservableProperty]
     public partial bool IsOneTimeRunning { get; set; }
@@ -399,6 +425,9 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
         ShowProgress = status.State is PrivacyScanState.Scanning or PrivacyScanState.Paused && status.Total > 0;
         Progress = status.Total > 0 ? status.Checked / (double)status.Total : 0;
         IsWorking = status.State is PrivacyScanState.Starting or PrivacyScanState.Scanning;
+        HomeNetworkOffer = status.State == PrivacyScanState.Paused && !AppServices.IsPrivateNetwork()
+            ? AppServices.Network.Network.Name
+            : null;
         IsOneTimeRunning = status.OneTime && status.State is PrivacyScanState.Starting or PrivacyScanState.Scanning or PrivacyScanState.Paused or PrivacyScanState.Error;
     }
 

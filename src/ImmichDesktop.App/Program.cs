@@ -43,10 +43,15 @@ internal static class Program
                 SingleInstance.Send(SingleInstance.Command.Activate);
             return 0;
         }
-        // A sign-in link should never start a second app: if one is already listening (say the lock above
-        // couldn't see it), hand the link over and stop.
-        if (link is not null && SingleInstance.Send(SingleInstance.Command.OpenLink, link, timeoutMs: 500, quiet: true))
+        // Safety net on Linux, where the lock above has missed a running copy before (each launch in its
+        // own session): if one is already listening, hand over to it and stop.
+        if (!OperatingSystem.IsWindows() && SingleInstance.IsAnotherListening())
         {
+            Log.Info("Another copy is already running; handing over to it");
+            if (link is not null)
+                SingleInstance.Send(SingleInstance.Command.OpenLink, link);
+            else if (!args.Contains(Autostart.BackgroundArgument))
+                SingleInstance.Send(SingleInstance.Command.Activate);
             Instance.Dispose();
             return 0;
         }
