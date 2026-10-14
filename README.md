@@ -133,4 +133,4 @@ The code is cross-platform: Windows-only pieces (DPAPI, registry, Windows Hello)
 
 ## Credits
 
-Immich and the Immich logo are © FUTO / the Immich contributors. This is an unofficial companion app. Check Immich's brand guidelines before distributing it publicly under this name. Google Sans is licensed under the SIL Open Font License (`src/ImmichDesktop.App/Assets/Fonts/OFL.txt`).
+Immich and the Immich logo are © FUTO / the Immich contributors. They are used here only to show that this app works with Immich. This is an unofficial, community-made companion app and is not affiliated with or endorsed by the Immich project or FUTO. Google Sans is licensed under the SIL Open Font License (`src/ImmichDesktop.App/Assets/Fonts/OFL.txt`).
