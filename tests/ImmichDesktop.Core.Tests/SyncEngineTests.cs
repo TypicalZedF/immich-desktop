@@ -150,7 +150,7 @@ public class SyncEngineTests
         var events = h.Server.Events.ToList();
         var firstAlbum = events.IndexOf("album");
         var lastUpload = events.LastIndexOf("upload");
-        Assert.True(firstAlbum >= 0, "album was never filled");
+        Assert.True(firstAlbum >= 0, $"album was never filled (engine: {h.Engine.Status.State} {h.Engine.Status.Detail}; server saw: {string.Join(",", events.Distinct())})");
         Assert.True(firstAlbum < lastUpload, "album only filled after every upload finished");
         Assert.Equal(120, Assert.Single(h.Server.Albums.Values).Assets.Count);
         Assert.Equal(120, h.Server.UploadedFileNames.Count);
