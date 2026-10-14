@@ -210,10 +210,12 @@ static class Screens
                 PhotosViewModel.Today = () => new DateTime(2026, 9, 28, 12, 0, 0);
                 timeline.RefreshCommand.Execute(null);
                 Pump(TimeSpan.FromSeconds(2));
-                var headers = timeline.Rows.OfType<MonthHeaderViewModel>().Select(h => h.Title).Take(9).ToList();
+                var headers = timeline.Rows.OfType<MonthHeaderViewModel>().Select(h => h.Title).Take(10).ToList();
                 Console.WriteLine($"Recent days: {string.Join(" | ", headers)}");
                 Shot(main, outDir, "15d-photos-recent-days", height: 860, settle: TimeSpan.FromSeconds(2));
-                if (headers.Count < 4 || headers[0] != "Today" || headers[1] != "Yesterday" || headers[2] != "Saturday")
+                // (The demo has a later month first, and no photos dated the 27th, so no "Yesterday".)
+                var recent = headers.SkipWhile(h => h == "October").ToList();
+                if (recent.Count < 4 || recent[0] != "Today" || recent[1] != "Saturday" || !recent.Contains("Mon, Sep 21"))
                     throw new InvalidOperationException("Recent days aren't grouped by day");
                 // Select all: one photo, then everything shown.
                 var firstRow = timeline.Rows.OfType<AssetRowViewModel>().First();
