@@ -6,7 +6,7 @@ using Avalonia.Platform;
 
 namespace ImmichDesktop.App.Controls;
 
-/// <summary>The app's own logo (a folder with paint drops, Assets/logo.png), in colour or greyscale.</summary>
+/// <summary>The app's own logo (a splash of paint drops, Assets/logo.png from logo.svg), in colour or greyscale.</summary>
 public sealed class AppLogo : Image
 {
     public static readonly StyledProperty<bool> MonochromeProperty =

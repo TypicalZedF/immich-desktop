@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 256 256">
+<defs><path id="dr" d="M0 -64 C14 -42 34 -20 34 6 A34 34 0 0 1 -34 6 C-34 -20 -14 -42 0 -64 Z"/></defs>
+<g transform="translate(128 128) scale(1.19) translate(-133.5 -146.5)">
+<use href="#dr" xlink:href="#dr" fill="#FA2921" transform="translate(71 150) rotate(170) scale(0.66)"/>
+<use href="#dr" xlink:href="#dr" fill="#1E83F7" transform="translate(146 124) rotate(216) scale(1.25)"/>
+<use href="#dr" xlink:href="#dr" fill="#18C249" transform="translate(184 196) rotate(252) scale(0.62 0.82)"/>
+<circle cx="52" cy="204" r="11" fill="#FFB400"/>
+<circle cx="216" cy="146" r="10" fill="#ED79B5"/>
+</g>
+</svg>
