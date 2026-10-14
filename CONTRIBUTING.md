@@ -27,7 +27,11 @@ Note that the upstream Immich project has its own, stricter policy on LLM-genera
 
 ## Machine learning and third-party assets
 
-Immich Desktop does not bundle or run any machine learning models. Smart search, face recognition, and similar features are performed by your Immich server, not by this app. If you propose adding a model, library, icon, or other third-party asset, state its license in the PR and make sure it is compatible with AGPL-3.0 and, for models, that its terms allow redistribution.
+Smart search, face recognition, duplicate detection, and similar features are performed by your Immich server, not by this app.
+
+The one exception is the optional **Suggest for the locked folder** utility, which is off until you turn it on. It bundles three small models and runs them entirely on your PC with [ONNX Runtime](https://onnxruntime.ai) (MIT): the [NSFWJS](https://github.com/infinitered/nsfwjs) MobileNetV2 nudity classifier (MIT) and the [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) PP-OCRv4 text detection and recognition models (Apache 2.0). Nothing it sees or finds leaves your PC; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for details. Changes to this feature must keep it fully on-device.
+
+If you propose adding a model, library, icon, or other third-party asset, state its license in the PR and make sure it is compatible with AGPL-3.0 and, for models, that its terms allow redistribution.
 
 ## Branding
 
