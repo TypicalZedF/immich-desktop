@@ -56,6 +56,8 @@ WizardImageFile=installer\wizard-large-100.bmp,installer\wizard-large-150.bmp,in
 WizardSmallImageFile=installer\wizard-small-100.bmp,installer\wizard-small-150.bmp,installer\wizard-small-200.bmp
 SetupIconFile=..\src\ImmichDesktop.App\Assets\app.ico
 UninstallDisplayIcon={app}\{#AppExe}
+; Tell Windows to re-read icons when done, so shortcuts and pinned taskbar icons show a new logo.
+ChangesAssociations=yes
 UninstallDisplayName={#AppName}
 
 ; Output
@@ -94,6 +96,8 @@ Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
+; Refresh this user's icon cache (Windows otherwise keeps showing the old logo on shortcuts).
+Filename: "{sys}\ie4uinit.exe"; Parameters: "-show"; Flags: runhidden nowait skipifdoesntexist runasoriginaluser
 ; Interactive install: offer to launch at the end.
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 ; Silent update from inside the app: start it again in the tray.
