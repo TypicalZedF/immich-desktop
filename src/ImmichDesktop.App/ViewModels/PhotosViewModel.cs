@@ -1028,11 +1028,6 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         var buckets = _buckets;
         if (IsPicker || IsSelectingAll || buckets.Count == 0)
             return;
-        if (_selected.Count >= buckets.Sum(b => b.Count))
-        {
-            ClearSelection();
-            return;
-        }
         IsSelectingAll = true;
         try
         {
@@ -1041,9 +1036,14 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             foreach (var chunk in buckets.Chunk(6))
             {
                 foreach (var assets in await Task.WhenAll(chunk.Select(b => b.GetAssetsAsync(_lifetime.Token))))
-                    ids.AddRange(assets.Select(a => a.Id));
+                    ids.AddRange(assets.Where(a => !a.IsLocalOnly).Select(a => a.Id)); // not backed up yet: can't be selected
                 if (!ReferenceEquals(buckets, _buckets))
                     return; // the page changed meanwhile
+            }
+            if (_selected.IsSupersetOf(ids))
+            {
+                ClearSelection(); // everything was already selected: the button clears instead
+                return;
             }
             _selected.UnionWith(ids);
             SelectionCount = _selected.Count;

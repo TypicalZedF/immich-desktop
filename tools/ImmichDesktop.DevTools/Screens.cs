@@ -226,9 +226,11 @@ static class Screens
                     Pump(TimeSpan.FromMilliseconds(200));
                 Pump(TimeSpan.FromMilliseconds(300));
                 Shot(main, outDir, "15e-photos-select-all", height: 860, settle: TimeSpan.FromSeconds(1));
-                var everything = timeline.Rows.OfType<AssetRowViewModel>().Sum(r => r.Cells.Count);
-                Console.WriteLine($"Select all: {timeline.SelectionCount} of {everything}");
-                if (timeline.SelectionCount != everything)
+                var everything = timeline.Rows.OfType<AssetRowViewModel>().Select(r => r.Bucket).Distinct()
+                    .Sum(b => b.GetAssetsAsync(CancellationToken.None).Result.Count(a => !a.IsLocalOnly)); // all loaded by now
+                var shownUnticked = timeline.Rows.OfType<AssetRowViewModel>().SelectMany(r => r.Cells).Count(c => c.Asset is not null && c.CanSelect && !c.IsSelected);
+                Console.WriteLine($"Select all: {timeline.SelectionCount} of {everything} backed-up photos; shown but not ticked: {shownUnticked}");
+                if (timeline.SelectionCount != everything || shownUnticked != 0)
                     throw new InvalidOperationException("Select all didn't select everything");
                 timeline.ClearSelectionCommand.Execute(null);
                 PhotosViewModel.Today = () => DateTime.Now;
@@ -516,7 +518,7 @@ static class Screens
             var photo = new ProfilePhotoViewModel(main);
             main.ShowOverlay(photo);
             Shot(main, outDir, $"42-profile-pick-{suffix}", height: 760, settle: TimeSpan.FromSeconds(3));
-            var pick = photo.Library.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).First(c => c.Asset is { IsImage: true } && c.Index == 2);
+            var pick = photo.Library.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).Where(c => c.Asset is { IsImage: true }).Skip(2).First();
             photo.Library.OpenViewer(pick);
             Pump(TimeSpan.FromSeconds(2));
             photo.Cropper?.ZoomAt(1.6, 200, 150);
