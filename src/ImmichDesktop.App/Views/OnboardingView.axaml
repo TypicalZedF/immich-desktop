@@ -22,7 +22,7 @@
 
           <!-- ===== Step 1: server ===== -->
           <StackPanel Spacing="20" IsVisible="{Binding IsServerStep}">
-            <c:ImmichLogo Width="84" Height="84" HorizontalAlignment="Center" />
+            <c:AppLogo Width="84" Height="84" HorizontalAlignment="Center" />
             <StackPanel Spacing="8">
               <TextBlock Classes="display" l:Tr.Text="Welcome to Immich Desktop" TextAlignment="Center" TextWrapping="Wrap" />
               <TextBlock Classes="secondary" TextAlignment="Center" TextWrapping="Wrap" LineHeight="21"

@@ -387,7 +387,7 @@
         <StackPanel>
           <TextBlock Classes="section" l:Tr.Text="UPDATES" Margin="0,4,0,6" />
           <Grid Classes="row" ColumnDefinitions="Auto,*,Auto">
-            <c:ImmichLogo Width="40" Height="40" Margin="0,0,14,0" />
+            <c:AppLogo Width="40" Height="40" Margin="0,0,14,0" />
             <StackPanel Grid.Column="1">
               <TextBlock Classes="title" Text="{Binding Version}" />
               <TextBlock Classes="caption" Text="{Binding UpdateStatus}" TextWrapping="Wrap" IsVisible="{Binding HasUpdateStatus}" />

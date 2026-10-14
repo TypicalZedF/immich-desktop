@@ -28,7 +28,6 @@
       <SolidColorBrush x:Key="AppDangerSoftBrush" Color="#FEE2E2" />
       <SolidColorBrush x:Key="AppNeutralSoftBrush" Color="#F3F4F6" />
       <SolidColorBrush x:Key="AppOverlayBrush" Color="#66000000" />
-      <SolidColorBrush x:Key="ImmichWordmarkBrush" Color="#4251B0" />
     </ResourceDictionary>
 
     <ResourceDictionary x:Key="Dark">
@@ -55,7 +54,6 @@
       <SolidColorBrush x:Key="AppDangerSoftBrush" Color="#3A1616" />
       <SolidColorBrush x:Key="AppNeutralSoftBrush" Color="#262626" />
       <SolidColorBrush x:Key="AppOverlayBrush" Color="#A6000000" />
-      <SolidColorBrush x:Key="ImmichWordmarkBrush" Color="#ACCBFA" />
     </ResourceDictionary>
 
   </ResourceDictionary.ThemeDictionaries>

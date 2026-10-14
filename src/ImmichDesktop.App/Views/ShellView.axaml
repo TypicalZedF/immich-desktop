@@ -12,10 +12,8 @@
     <!-- ===== Top bar ===== -->
     <Grid ColumnDefinitions="256,*,Auto" Background="{DynamicResource AppPageBrush}">
       <StackPanel Orientation="Horizontal" Spacing="10" Margin="24,0,0,0" VerticalAlignment="Center">
-        <c:ImmichWordmark Height="34" />
-        <Border Classes="chip" Padding="8,2" Background="{DynamicResource AppPrimarySoftBrush}" VerticalAlignment="Center" Margin="0,4,0,0">
-          <TextBlock l:Tr.Text="DESKTOP" FontSize="10" FontWeight="Medium" LetterSpacing="1" Foreground="{DynamicResource AppPrimaryBrush}" />
-        </Border>
+        <c:AppLogo Width="36" Height="36" />
+        <TextBlock Text="Immich Desktop" FontSize="19" FontWeight="Medium" VerticalAlignment="Center" />
       </StackPanel>
 
       <!-- Search, like the web app's top bar -->

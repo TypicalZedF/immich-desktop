@@ -15,7 +15,7 @@ namespace ImmichDesktop.DevTools;
 
 /// <summary>
 /// Developer utilities that render the real UI headlessly.
-///   icons &lt;assetsDir&gt;     regenerate app.ico, tray-*.ico and logo PNGs from the Immich logo
+///   icons &lt;assetsDir&gt;     regenerate app.ico, tray-*.ico and logo PNGs from the app logo (Assets/logo.png)
 ///   installer &lt;dir&gt;       regenerate the installer wizard images (BMP)
 ///   screens &lt;outDir&gt;      render screenshots of every screen in light and dark mode
 /// </summary>
@@ -169,7 +169,7 @@ static class Icons
     static void Ico(string path, int[] sizes, Func<int, Control> build) =>
         Render.WriteIco(path, sizes.Select(s => (s, Render.ToPng(build(s), s))).ToList());
 
-    static Control Logo(int size, bool mono = false) => new ImmichLogo { Width = size, Height = size, Monochrome = mono };
+    static Control Logo(int size, bool mono = false) => new AppLogo { Width = size, Height = size, Monochrome = mono };
 
     /// <summary>Status badge in the bottom-right corner, like the badges on cloud-drive tray icons.</summary>
     static Control WithBadge(Control logo, int size, string color, MaterialIconKind glyph, double angle)
@@ -229,8 +229,8 @@ static class InstallerArt
                 },
                 Children =
                 {
-                    new ImmichLogo { Width = W(96), Height = W(96), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 0, W(40)) },
-                    new ImmichWordmark { Width = W(124), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, W(28)) },
+                    new AppLogo { Width = W(96), Height = W(96), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 0, W(40)) },
+                    new TextBlock { Text = "Immich Desktop", FontSize = W(15), FontWeight = FontWeight.Medium, Foreground = new SolidColorBrush(Color.Parse("#1F2430")), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, W(30)) },
                 },
             };
             Render.SaveBmp(large, W(164), W(314), Path.Combine(dir, $"wizard-large-{suffix}.bmp"));
@@ -241,7 +241,7 @@ static class InstallerArt
                 Width = W(55),
                 Height = W(55),
                 Background = Brushes.White,
-                Children = { new ImmichLogo { Width = W(46), Height = W(46) } },
+                Children = { new AppLogo { Width = W(46), Height = W(46) } },
             };
             Render.SaveBmp(small, W(55), W(55), Path.Combine(dir, $"wizard-small-{suffix}.bmp"));
         }

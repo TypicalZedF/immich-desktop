@@ -35,7 +35,7 @@ If you propose adding a model, library, icon, or other third-party asset, state 
 
 ## Branding
 
-Immich is a trademark of its respective owners. Please do not use the Immich logo in a way that suggests this app is official.
+Immich is a trademark of its respective owners. Don't use the Immich logo or wordmark anywhere in this app (the Immich team asked for that); it has its own logo, `src/ImmichDesktop.App/Assets/logo.png`.
 
 ## Security
 

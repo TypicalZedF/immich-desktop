@@ -15,7 +15,7 @@
 
 ## Features
 
-- **Looks like Immich.** Official Immich logo, Google Sans, Immich's colors and layout (top bar, sidebar, storage meter and server status).
+- **Feels at home next to Immich.** Google Sans, Immich's colors and a familiar layout (top bar, sidebar, storage meter and server status), with its own logo so it's never mistaken for an official app.
 - **Light, dark or follow Windows.** One click on the sun/moon in the top bar, or choose in Settings.
 - **Your library, like the web and mobile apps.** A sidebar with Photos (with a date rail to jump through the years), Explore (people and places), Map, Sharing (shared albums, your links, partners) and Albums, plus a Library group: Favorites, Archive, Locked Folder (unlocked with your PIN) and Trash. Search from the top bar, with suggestions and recent searches. A sharp full-screen viewer with zoom, favorite, copy, download, add to album, trash and photo info, and videos play right in the app.
 - **Offline map.** A built-in world map with country and state lines, photo thumbnails, a heat map and a side panel with the photos of the area you're looking at; online street detail is optional.
@@ -133,4 +133,4 @@ The code is cross-platform: Windows-only pieces (DPAPI, registry, Windows Hello)
 
 ## Credits
 
-Immich and the Immich logo are © FUTO / the Immich contributors. They are used here only to show that this app works with Immich. This is an unofficial, community-made companion app and is not affiliated with or endorsed by the Immich project or FUTO. Google Sans is licensed under the SIL Open Font License (`src/ImmichDesktop.App/Assets/Fonts/OFL.txt`).
+Immich is © FUTO / the Immich contributors; the name is used here only to say what this app works with. The app's logo is its own. This is an unofficial, community-made companion app and is not affiliated with or endorsed by the Immich project or FUTO. Google Sans is licensed under the SIL Open Font License (`src/ImmichDesktop.App/Assets/Fonts/OFL.txt`).
