@@ -437,6 +437,11 @@ static class Screens
             ((PhotosViewModel)Page(shell, ShellPage.Albums)).CreateAlbumCommand.Execute(null);
             Shot(main, outDir, $"19a2-create-album-{suffix}", height: 760, settle: TimeSpan.FromMilliseconds(600));
             main.CloseOverlay(main.Overlay);
+            // Toasts: small messages over the page.
+            var toastPage = (PhotosViewModel)Page(shell, ShellPage.Albums);
+            toastPage.ShowNotice(Tr.T("Copied to clipboard"));
+            toastPage.ShowNotice(Tr.T("Couldn't copy the picture. {0}", "No connection."));
+            Shot(main, outDir, $"19a3-toasts-{suffix}", height: 760, settle: TimeSpan.FromMilliseconds(400));
             if (suffix == "light")
             {
                 // An open album: its header has Download, Share and Delete.

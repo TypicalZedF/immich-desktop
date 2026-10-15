@@ -187,6 +187,17 @@
     <Style Selector="Button.videoControl:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="#33FFFFFF" />
     </Style>
+    <Style Selector="Button.toast">
+      <Setter Property="Background" Value="{DynamicResource AppTextBrush}" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="14,10" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.toast:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppTextBrush}" />
+      <Setter Property="Opacity" Value="0.92" />
+    </Style>
     <Style Selector="Slider.videoSeek">
       <Setter Property="Foreground" Value="White" />
     </Style>
@@ -574,13 +585,6 @@
       </Panel>
     </DockPanel>
 
-    <!-- Notice (e.g. "Link copied") -->
-    <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24" Padding="16,10" CornerRadius="12"
-            Background="{DynamicResource AppTextBrush}" IsHitTestVisible="False"
-            IsVisible="{Binding Notice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-      <TextBlock Text="{Binding Notice}" Foreground="{DynamicResource AppPageBrush}" FontWeight="Medium" />
-    </Border>
-
     <!-- Viewer -->
     <Panel Name="ViewerLayer" IsVisible="{Binding Viewer, Converter={x:Static ObjectConverters.IsNotNull}}" Background="Black" Focusable="True">
       <DockPanel DataContext="{Binding Viewer}" x:DataType="vm:PhotoViewerViewModel">
@@ -795,5 +799,21 @@
 
     <!-- Share / add to album panel -->
     <p:SharePanel IsVisible="{Binding Panel, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    <!-- Toasts: over everything, including the viewer -->
+    <ItemsControl ItemsSource="{Binding Toasts}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,24" ZIndex="50"
+                  Focusable="False">
+      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:ToastViewModel">
+          <Button Classes="toast" Command="{Binding $parent[ItemsControl].((vm:PhotosViewModel)DataContext).DismissToastCommand}" CommandParameter="{Binding}"
+                  HorizontalAlignment="Right" AutomationProperties.Name="{Binding Text}">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <mi:MaterialIcon Kind="{Binding Icon}" Width="20" Height="20" Classes.spin="{Binding Spins}" Foreground="{DynamicResource AppPageBrush}" />
+              <TextBlock Text="{Binding Text}" Foreground="{DynamicResource AppPageBrush}" FontWeight="Medium" TextWrapping="Wrap" MaxWidth="360" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
   </Panel>
 </UserControl>

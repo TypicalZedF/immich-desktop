@@ -20,6 +20,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="ImmichSplash.DevTools" />
+  </ItemGroup>
+
+  <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
     <!-- The logo as a plain file, for desktop notifications (Windows and Linux need a path). -->
     <None Include="Assets\logo-256.png" Link="notification-icon.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

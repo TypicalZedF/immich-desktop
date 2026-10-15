@@ -53,7 +53,6 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     readonly Action<AssetCellViewModel>? _pick;
     readonly HashSet<string> _selected = [];
     CancellationTokenSource? _gridLoad;
-    CancellationTokenSource? _noticeTimer;
     List<BucketState> _buckets = [];
     int _columns;
     double _width;
@@ -591,26 +590,60 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         }
     }
 
-    // ---- Notices ----
+    // ---- Notices: small toasts over the page (also over the photo viewer) ----
 
+    public ObservableCollection<ToastViewModel> Toasts { get; } = [];
+
+    /// <summary>The last message shown (kept for anything that wants to read it).</summary>
     [ObservableProperty]
     public partial string? Notice { get; set; }
 
+    ToastViewModel? _progressToast;
+
+    /// <summary>
+    /// Shows a message for a few seconds. "Couldn't…" messages are errors (and stay a little longer).
+    /// <paramref name="sticky"/>: a step of something still going on; the next step replaces it, and the
+    /// next ordinary message ends it.
+    /// </summary>
     internal async void ShowNotice(string text, bool sticky = false)
     {
-        _noticeTimer?.Cancel();
         Notice = text;
+        var kind = text.Contains("couldn't", StringComparison.OrdinalIgnoreCase) || text.Contains("can't", StringComparison.OrdinalIgnoreCase)
+            ? ToastKind.Error : ToastKind.Success;
+        if (_progressToast is { } step)
+        {
+            if (sticky)
+            {
+                step.Text = text; // the next step of the same job
+                return;
+            }
+            Toasts.Remove(step);
+            _progressToast = null;
+        }
+        var toast = new ToastViewModel(text, sticky ? ToastKind.Info : kind, sticky);
+        if (sticky)
+            _progressToast = toast;
+        Toasts.Add(toast);
+        while (Toasts.Count > 4)
+            Toasts.RemoveAt(0);
         if (sticky)
             return;
-        var cts = _noticeTimer = new CancellationTokenSource();
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(4), cts.Token);
-            Notice = null;
+            await Task.Delay(TimeSpan.FromSeconds(kind == ToastKind.Error ? 7 : 3.5), _lifetime.Token);
+            Toasts.Remove(toast);
         }
         catch (OperationCanceledException)
         {
         }
+    }
+
+    [RelayCommand]
+    void DismissToast(ToastViewModel toast)
+    {
+        Toasts.Remove(toast);
+        if (ReferenceEquals(toast, _progressToast))
+            _progressToast = null;
     }
 
     // ---- Viewer ----
@@ -665,7 +698,6 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _lifetime.Cancel();
-        _noticeTimer?.Cancel();
         ReleaseRows();
         foreach (var card in Albums.Cast<LibraryCardViewModel>().Concat(People).Concat(Places))
             card.Dispose();
