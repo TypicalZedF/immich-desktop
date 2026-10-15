@@ -59,6 +59,21 @@ public static class DesktopNotifications
     /// </summary>
     static async Task ShowOnLinuxAsync(Notice notice)
     {
+        if (Core.Platform.Flatpak.AppId is { } appId)
+        {
+            // Through gdbus: the Flatpak's bus filter cuts the app's own session-bus connection. No click action this way.
+            try
+            {
+                await LinuxDBus.GdbusAsync("org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.freedesktop.Notifications.Notify",
+                    LinuxDBus.Text(AppInfo.Name), "uint32 0", LinuxDBus.Text(appId), LinuxDBus.Text(notice.Title), LinuxDBus.Text(notice.Body),
+                    "@as []", $"{{'desktop-entry': <{LinuxDBus.Text(appId)}>}}", "int32 -1");
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Could not show a desktop notification", ex);
+            }
+            return;
+        }
         // A connection that was cut (the desktop restarted, say) is replaced once.
         for (var attempt = 0; ; attempt++)
         {

@@ -36,24 +36,14 @@ public static partial class DesktopWallpaper
         if (OperatingSystem.IsLinux())
         {
             var uri = new Uri(imagePath).AbsoluteUri;
+            if (Flatpak.IsRunning)
+            {
+                LinuxDBus.Wait(SetFromFlatpakAsync(uri));
+                return;
+            }
             if (IsKde)
             {
-                try
-                {
-                    LinuxDBus.Wait(LinuxDBus.UseAsync(system: false, bus => SetOnPlasmaAsync(bus, uri)));
-                    return;
-                }
-                catch (Exception ex) when (Flatpak.IsRunning)
-                {
-                    // Plasma's scripting can be locked down; its desktop portal can set the background too.
-                    Log.Info($"Plasma didn't take the background ({ex.Message}); asking the desktop portal");
-                    LinuxDBus.Wait(LinuxDBus.UseAsync(system: false, bus => SetThroughPortalAsync(bus, uri)));
-                    return;
-                }
-            }
-            if (Flatpak.IsRunning) // gsettings in the sandbox only changes the sandbox's own copy
-            {
-                LinuxDBus.Wait(LinuxDBus.UseAsync(system: false, bus => SetThroughPortalAsync(bus, uri)));
+                LinuxDBus.Wait(LinuxDBus.UseAsync(system: false, bus => SetOnPlasmaAsync(bus, uri)));
                 return;
             }
             Gsettings("picture-options", "zoom");
@@ -64,17 +54,38 @@ public static partial class DesktopWallpaper
         throw new PlatformNotSupportedException();
     }
 
+    /// <summary>
+    /// From the Flatpak, through gdbus (see <see cref="LinuxDBus.GdbusAsync"/>): Plasma's scripting on KDE, else (or if
+    /// Plasma refuses) the desktop portal.
+    /// </summary>
+    static async Task<bool> SetFromFlatpakAsync(string uri)
+    {
+        if (IsKde)
+        {
+            try
+            {
+                await LinuxDBus.GdbusAsync("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", LinuxDBus.Text(PlasmaScript(uri)));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Info($"Plasma didn't take the background ({ex.Message}); asking the desktop portal");
+            }
+        }
+        await LinuxDBus.GdbusAsync("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop", "org.freedesktop.portal.Wallpaper.SetWallpaperURI",
+            "''", LinuxDBus.Text(uri), "{'show-preview': <false>, 'set-on': <'background'>}");
+        return true;
+    }
+
+    static string PlasmaScript(string uri) =>
+        "desktops().forEach(function (d) { d.wallpaperPlugin = \"org.kde.image\"; " +
+        "d.currentConfigGroup = [\"Wallpaper\", \"org.kde.image\", \"General\"]; " +
+        $"d.writeConfig(\"Image\", {JsonSerializer.Serialize(uri)}); d.writeConfig(\"FillMode\", 2); }});";
+
     /// <summary>Every desktop (screen and activity) shows the picture, filling it (FillMode 2: scaled and cropped).</summary>
     static Task<bool> SetOnPlasmaAsync(Tmds.DBus.Protocol.Connection bus, string uri)
     {
-        var script = $$"""
-            desktops().forEach(function (d) {
-                d.wallpaperPlugin = "org.kde.image";
-                d.currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
-                d.writeConfig("Image", {{JsonSerializer.Serialize(uri)}});
-                d.writeConfig("FillMode", 2);
-            });
-            """;
+        var script = PlasmaScript(uri);
         return LinuxDBus.CallAsync(bus, "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "evaluateScript", "s",
             w => w.WriteString(script), static (_, _) => true);
     }
