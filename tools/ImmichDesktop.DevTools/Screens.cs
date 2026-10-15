@@ -517,7 +517,7 @@ static class Screens
             });
             NetworkStatus.Override = new NetworkSnapshot("Morgan Home", false);
             shell.Navigate(ShellPage.Settings);
-            Shot(main, outDir, $"40-settings-{suffix}", height: 2300, settle: TimeSpan.FromSeconds(1));
+            Shot(main, outDir, $"40-settings-{suffix}", height: 2600, settle: TimeSpan.FromSeconds(1));
             AppServices.Settings.Update(s => { s.WallpaperEnabled = false; s.AutoSwitchServer = false; });
 
             // Profile picture: choose from the library, then crop.

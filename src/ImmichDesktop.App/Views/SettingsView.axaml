@@ -451,6 +451,29 @@
             </StackPanel>
             <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoInstallUpdates}" IsEnabled="{Binding CheckForUpdates}" />
           </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row">
+          <StackPanel Spacing="10">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Where updates come from" />
+              <TextBlock Classes="caption" Text="{Binding UpdateSourceText}" TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="secondary" Command="{Binding OpenReleaseNotesCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="TextBoxOutline" Width="16" Height="16" />
+                  <TextBlock l:Tr.Text="Release notes" />
+                </StackPanel>
+              </Button>
+              <Button Classes="secondary" Command="{Binding OpenProjectPageCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="Github" Width="16" Height="16" />
+                  <TextBlock l:Tr.Text="View on GitHub" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </StackPanel>
+          </Grid>
         </StackPanel>
       </Border>
 
