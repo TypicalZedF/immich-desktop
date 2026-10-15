@@ -23,7 +23,11 @@ public partial class App : Application
     bool _wasBusy;
     bool _checkForUpdates;
 
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+        Services.AccessibleNames.Start();
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {

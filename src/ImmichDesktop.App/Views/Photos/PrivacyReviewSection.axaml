@@ -228,7 +228,7 @@
                   <DataTemplate x:DataType="vm:PrivacySuggestionViewModel">
                     <StackPanel Width="176" Margin="0,0,10,12" Spacing="5">
                       <Button Classes="tile privacyTile" Classes.selected="{Binding IsSelected}" Classes.reveal="{Binding Revealed}"
-                              Width="176" Height="176" Command="{Binding ToggleSelectCommand}">
+                              Width="176" Height="176" Command="{Binding ToggleSelectCommand}" AutomationProperties.Name="{Binding Reason}">
                         <Panel>
                           <!-- Blurred unless "Show pictures" is on or the pointer is over it -->
                           <Image Classes="sharp" Source="{Binding Thumbnail}" Stretch="UniformToFill" />

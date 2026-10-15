@@ -57,6 +57,7 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:AssetCellViewModel">
             <Button Classes="tile" Classes.selected="{Binding IsSelected}" Width="{Binding TileSize}" Height="{Binding TileSize}" VerticalAlignment="Top"
+                    AutomationProperties.Name="{Binding AccessibleName}"
                     Command="{Binding OpenCommand}" IsVisible="{Binding !IsMissing}" IsEnabled="{Binding CanOpen}">
               <Panel>
                 <Image Classes="thumb" Source="{Binding Thumbnail}" Stretch="UniformToFill" />

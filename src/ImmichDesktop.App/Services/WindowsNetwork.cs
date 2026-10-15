@@ -45,16 +45,27 @@ public static class WindowsNetwork
                 return null;
             foreach (var id in profiles.GetSubKeyNames())
             {
-                using var key = profiles.OpenSubKey(id);
-                if (key?.GetValue("ProfileName") is string name && name == profile.ProfileName && key.GetValue("Category") is int category)
-                    return category is 1 or 2; // 0 Public, 1 Private, 2 Domain
+                try
+                {
+                    using var key = profiles.OpenSubKey(id);
+                    if (key?.GetValue("ProfileName") is string name && name == profile.ProfileName && key.GetValue("Category") is int category)
+                        return category is 1 or 2; // 0 Public, 1 Private, 2 Domain
+                }
+                catch (System.Security.SecurityException)
+                {
+                    // Some profiles (e.g. VPNs) can't be read without admin rights; skip them.
+                }
             }
         }
         catch (Exception ex)
         {
-            ImmichDesktop.Core.Log.Info($"Couldn't read the network category: {ex.Message}");
+            if (!_categoryWarned)
+                ImmichDesktop.Core.Log.Info($"Couldn't read the network category: {ex.Message}");
+            _categoryWarned = true;
         }
         return null;
     }
+
+    static bool _categoryWarned;
 #endif
 }

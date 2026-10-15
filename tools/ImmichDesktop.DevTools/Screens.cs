@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using ImmichDesktop.App.Services;
 using ImmichDesktop.App.ViewModels;
 using ImmichDesktop.App.Views;
@@ -251,6 +252,12 @@ static class Screens
                 w.MouseUp(at, Avalonia.Input.MouseButton.Left);
                 Pump(TimeSpan.FromSeconds(1.5));
                 w.MouseMove(new Avalonia.Point(700, 500));
+            });
+            // Keyboard: a focused tile shows a ring; every button has a name a screen reader can read.
+            Shot(main, outDir, $"15f-keyboard-focus-{suffix}", height: 860, settle: TimeSpan.FromSeconds(1), interact: w =>
+            {
+                var tile = w.GetVisualDescendants().OfType<Avalonia.Controls.Button>().First(b => b.Classes.Contains("tile") && b.IsEffectivelyVisible);
+                tile.Focus(Avalonia.Input.NavigationMethod.Tab);
             });
             var photos = (PhotosViewModel)Page(shell, ShellPage.Photos);
             var cell = photos.Rows.OfType<AssetRowViewModel>().SelectMany(row => row.Cells).First(c => c.Asset is not null && c.Index == 4);
@@ -631,6 +638,22 @@ static class Screens
         }
     }
 
+    /// <summary>Lists visible buttons a screen reader would announce without a name.</summary>
+    static void ReportUnnamedButtons(Avalonia.Controls.Window window, string page)
+    {
+        var unnamed = window.GetVisualDescendants().OfType<Avalonia.Controls.Button>()
+            .Where(b => b.IsEffectivelyVisible && b.TemplatedParent is null)
+            .Where(b => Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(b).GetName() is not { Length: > 0 } name
+                || name.StartsWith("Avalonia.", StringComparison.Ordinal) || name.StartsWith("Material.", StringComparison.Ordinal))
+            .Select(b => $"[{string.Join('.', b.Classes)}] {b.Content?.GetType().Name} cmd={(b.Command as object)?.GetType().Name} in {b.FindAncestorOfType<Avalonia.Controls.UserControl>()?.GetType().Name}")
+            .ToList();
+        if (unnamed.Count == 0)
+            return;
+        Console.WriteLine($"Unnamed buttons on {page}: {unnamed.Count}");
+        foreach (var group in unnamed.GroupBy(u => u).OrderByDescending(g => g.Count()).Take(15))
+            Console.WriteLine($"  {group.Count()} x {group.Key}");
+    }
+
     static void Shot(MainWindowViewModel vm, string dir, string name, int width = 1060, int height = 720, TimeSpan? settle = null,
         Action<MainWindow>? interact = null)
     {
@@ -650,6 +673,7 @@ static class Screens
         }
         var frame = window.CaptureRenderedFrame();
         frame?.Save(Path.Combine(dir, name + ".png"));
+        ReportUnnamedButtons(window, name);
         window.DataContext = null;
         window.Close();
     }

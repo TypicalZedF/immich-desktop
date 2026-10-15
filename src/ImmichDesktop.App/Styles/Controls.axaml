@@ -157,6 +157,29 @@
     </Style.Animations>
   </Style>
 
+  <!-- ===== Keyboard focus: an Immich-blue ring around whatever Tab moved to ===== -->
+  <Style Selector=":is(Control)">
+    <Setter Property="FocusAdorner">
+      <FocusAdornerTemplate>
+        <Border BorderThickness="2" BorderBrush="{DynamicResource AppPrimaryBrush}" CornerRadius="8" Margin="-3" />
+      </FocusAdornerTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button, ToggleButton">
+    <Setter Property="FocusAdorner">
+      <FocusAdornerTemplate>
+        <Border BorderThickness="2" BorderBrush="{DynamicResource AppPrimaryBrush}" CornerRadius="999" Margin="-3" />
+      </FocusAdornerTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.tile, Button.cover, Button.utility">
+    <Setter Property="FocusAdorner">
+      <FocusAdornerTemplate>
+        <Border BorderThickness="3" BorderBrush="{DynamicResource AppPrimaryBrush}" CornerRadius="4" />
+      </FocusAdornerTemplate>
+    </Setter>
+  </Style>
+
   <!-- ===== Buttons ===== -->
   <Style Selector="Button">
     <Setter Property="CornerRadius" Value="999" />

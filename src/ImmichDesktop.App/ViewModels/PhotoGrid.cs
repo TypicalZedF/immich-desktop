@@ -228,7 +228,7 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsVideo), nameof(IsFavorite), nameof(DurationText), nameof(IsMissing), nameof(CanOpen),
         nameof(CanSelect), nameof(SyncIcon), nameof(SyncText), nameof(HasSyncIcon), nameof(SyncFailed), nameof(IsLocalOnly), nameof(SizeText), nameof(HasSizeText), nameof(ShowLocalPlaceholder),
-        nameof(IsLivePhoto), nameof(IsStack), nameof(StackText))]
+        nameof(IsLivePhoto), nameof(IsStack), nameof(StackText), nameof(AccessibleName))]
     public partial TimelineAsset? Asset { get; set; }
 
     [ObservableProperty]
@@ -245,6 +245,33 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
     public bool IsFavorite => Asset?.IsFavorite == true;
     public string DurationText => Asset?.DurationMs is { } ms and > 0 ? FormatDuration(ms) : "";
     public bool IsLivePhoto => Asset is { IsLivePhoto: true, IsImage: true };
+
+    /// <summary>What a screen reader says for this tile: the kind of item and when it was taken.</summary>
+    public string AccessibleName
+    {
+        get
+        {
+            if (Asset is not { } a)
+                return "";
+            var kind = a switch
+            {
+                { IsImage: false } => Tr.T("Video"),
+                { IsStack: true } => Tr.T("Stack of {0}", a.StackCount),
+                { IsLivePhoto: true } => Tr.T("Live photo"),
+                _ => Tr.T("Photo"),
+            };
+            var parts = new List<string> { kind };
+            if (DateTimeOffset.TryParse(a.FileCreatedAt, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date))
+                parts.Add(date.ToLocalTime().ToString("D", System.Globalization.CultureInfo.CurrentCulture));
+            if (DurationText.Length > 0)
+                parts.Add(DurationText);
+            if (a.IsFavorite)
+                parts.Add(Tr.T("Favorite"));
+            if (SyncText.Length > 0)
+                parts.Add(SyncText);
+            return string.Join(", ", parts);
+        }
+    }
     public bool IsStack => Asset is { IsStack: true };
     public string StackText => Asset is { IsStack: true } a ? a.StackCount.ToString(System.Globalization.CultureInfo.CurrentCulture) : "";
 
