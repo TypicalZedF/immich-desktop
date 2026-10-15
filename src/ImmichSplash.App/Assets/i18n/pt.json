@@ -1037,7 +1037,6 @@
  "Fingerprint or password": "Digital ou senha",
  "Unlock with your Linux login": "Desbloquear com seu login do Linux",
  "Require your Linux login (fingerprint or password) or an app password to open this window. Backup keeps running while locked.": "Exigir seu login do Linux (digital ou senha) ou uma senha do app para abrir esta janela. O backup continua enquanto está bloqueado.",
- "Immich Splash (to unlock it)": "Immich Splash (para desbloqueá-lo)",
  "Use your Linux login to unlock. Backup keeps running in the background.": "Use seu login do Linux para desbloquear. O backup continua em segundo plano.",
  "Your Linux login can't be checked right now. Use “Forgot how to unlock?” below.": "Não é possível verificar seu login do Linux agora. Use “Esqueceu como desbloquear?” abaixo.",
  "Your Linux login couldn't verify you. Try again.": "Seu login do Linux não conseguiu verificar você. Tente de novo.",

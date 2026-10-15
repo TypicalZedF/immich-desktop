@@ -10,8 +10,33 @@ public static class LinuxDBus
 {
     static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
-    public static Connection System => Connection.System;
-    public static Connection Session => Connection.Session;
+    /// <summary>
+    /// A connection of its own (not the library's shared one, which can't tell its own bus name and, once cut,
+    /// stays cut for everything that uses it). The caller disposes it.
+    /// </summary>
+    public static async Task<Connection> OpenAsync(bool system)
+    {
+        var address = (system ? Address.System : Address.Session)
+            ?? throw new InvalidOperationException(system ? "No system bus." : "No session bus.");
+        var connection = new Connection(address);
+        try
+        {
+            await connection.ConnectAsync().AsTask().WaitAsync(Timeout);
+            return connection;
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>Does <paramref name="work"/> on a connection opened for it.</summary>
+    public static async Task<T> UseAsync<T>(bool system, Func<Connection, Task<T>> work)
+    {
+        using var connection = await OpenAsync(system);
+        return await work(connection);
+    }
 
     /// <summary>Reads a property (org.freedesktop.DBus.Properties.Get).</summary>
     public static async Task<VariantValue> GetPropertyAsync(Connection bus, string destination, string path, string @interface, string property)

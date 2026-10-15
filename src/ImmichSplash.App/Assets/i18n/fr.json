@@ -1037,7 +1037,6 @@
  "Fingerprint or password": "Empreinte ou mot de passe",
  "Unlock with your Linux login": "Déverrouiller avec votre connexion Linux",
  "Require your Linux login (fingerprint or password) or an app password to open this window. Backup keeps running while locked.": "Demander votre connexion Linux (empreinte ou mot de passe) ou un mot de passe de l’app pour ouvrir cette fenêtre. La sauvegarde continue pendant le verrouillage.",
- "Immich Splash (to unlock it)": "Immich Splash (pour le déverrouiller)",
  "Use your Linux login to unlock. Backup keeps running in the background.": "Utilisez votre connexion Linux pour déverrouiller. La sauvegarde continue en arrière-plan.",
  "Your Linux login can't be checked right now. Use “Forgot how to unlock?” below.": "Votre connexion Linux ne peut pas être vérifiée pour le moment. Utilisez « Vous ne savez plus déverrouiller ? » ci-dessous.",
  "Your Linux login couldn't verify you. Try again.": "Votre connexion Linux n’a pas pu vous vérifier. Réessayez.",

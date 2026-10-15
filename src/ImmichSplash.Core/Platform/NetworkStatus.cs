@@ -41,12 +41,11 @@ public static class NetworkStatus
         return NetworkSnapshot.Unknown;
     }
 
-    static NetworkSnapshot FromNetworkManager() => LinuxDBus.Wait(FromNetworkManagerAsync());
+    static NetworkSnapshot FromNetworkManager() => LinuxDBus.Wait(LinuxDBus.UseAsync(system: true, FromNetworkManagerAsync));
 
-    static async Task<NetworkSnapshot> FromNetworkManagerAsync()
+    static async Task<NetworkSnapshot> FromNetworkManagerAsync(Connection bus)
     {
         const string nm = "org.freedesktop.NetworkManager", root = "/org/freedesktop/NetworkManager";
-        var bus = LinuxDBus.System;
         // The connection that carries the default route, unless that's a VPN: then the network underneath it.
         var connections = new List<string> { (await LinuxDBus.GetPropertyAsync(bus, nm, root, nm, "PrimaryConnection")).GetObjectPathAsString() };
         connections.AddRange((await LinuxDBus.GetPropertyAsync(bus, nm, root, nm, "ActiveConnections")).GetArray<ObjectPath>().Select(p => p.ToString()));

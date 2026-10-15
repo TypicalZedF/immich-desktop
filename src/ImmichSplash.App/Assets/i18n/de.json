@@ -1037,7 +1037,6 @@
  "Fingerprint or password": "Fingerabdruck oder Passwort",
  "Unlock with your Linux login": "Mit deiner Linux-Anmeldung entsperren",
  "Require your Linux login (fingerprint or password) or an app password to open this window. Backup keeps running while locked.": "Zum Öffnen dieses Fensters deine Linux-Anmeldung (Fingerabdruck oder Passwort) oder ein App-Passwort verlangen. Die Sicherung läuft im gesperrten Zustand weiter.",
- "Immich Splash (to unlock it)": "Immich Splash (zum Entsperren)",
  "Use your Linux login to unlock. Backup keeps running in the background.": "Entsperre mit deiner Linux-Anmeldung. Die Sicherung läuft im Hintergrund weiter.",
  "Your Linux login can't be checked right now. Use “Forgot how to unlock?” below.": "Deine Linux-Anmeldung kann gerade nicht geprüft werden. Nutze unten „Entsperren vergessen?“.",
  "Your Linux login couldn't verify you. Try again.": "Deine Linux-Anmeldung konnte dich nicht bestätigen. Versuche es noch einmal.",

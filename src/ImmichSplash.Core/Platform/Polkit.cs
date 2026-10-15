@@ -27,8 +27,11 @@ public static class Polkit
             return false;
         try
         {
-            await LinuxDBus.GetPropertyAsync(LinuxDBus.System, Service, Path, Interface, "BackendName");
-            return true;
+            return await LinuxDBus.UseAsync(system: true, async bus =>
+            {
+                await LinuxDBus.GetPropertyAsync(bus, Service, Path, Interface, "BackendName");
+                return true;
+            });
         }
         catch (Exception ex)
         {
@@ -37,14 +40,13 @@ public static class Polkit
         }
     }
 
-    /// <param name="program">Shown in the prompt ("…to run ‘program’…").</param>
-    public static async Task<PolkitResult> AuthenticateAsync(string program)
+    public static async Task<PolkitResult> AuthenticateAsync()
     {
-        if (!await IsAvailableAsync()) // also connects, so the bus name below is known
+        if (!await IsAvailableAsync())
             return PolkitResult.Unavailable;
         try
         {
-            var bus = LinuxDBus.System;
+            using var bus = await LinuxDBus.OpenAsync(system: true);
             var (authorized, dismissed) = await LinuxDBus.CallAsync(bus, Service, Path, Interface, "CheckAuthorization", "(sa{sv})sa{ss}us", w =>
             {
                 // The subject is this app's bus connection: polkit finds the session from it, also from inside the Flatpak.
@@ -56,10 +58,8 @@ public static class Polkit
                 w.WriteVariantString(bus.UniqueName!);
                 w.WriteDictionaryEnd(subject);
                 w.WriteString(Action);
+                // No details: polkit only accepts them from privileged callers ("Only trusted callers … can pass details").
                 var details = w.WriteDictionaryStart();
-                w.WriteDictionaryEntryStart();
-                w.WriteString("program");
-                w.WriteString(program);
                 w.WriteDictionaryEnd(details);
                 w.WriteUInt32(1); // AllowUserInteraction: show the prompt
                 w.WriteString("");

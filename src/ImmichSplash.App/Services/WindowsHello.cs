@@ -59,7 +59,7 @@ public static class WindowsHello
             return await fake();
         if (OperatingSystem.IsLinux())
         {
-            return await Core.Platform.Polkit.AuthenticateAsync(Tr.T("Immich Splash (to unlock it)")) switch
+            return await Core.Platform.Polkit.AuthenticateAsync() switch
             {
                 Core.Platform.PolkitResult.Verified => HelloResult.Verified,
                 Core.Platform.PolkitResult.Canceled => HelloResult.Canceled,

@@ -38,12 +38,22 @@ public static partial class DesktopWallpaper
             var uri = new Uri(imagePath).AbsoluteUri;
             if (IsKde)
             {
-                LinuxDBus.Wait(SetOnPlasmaAsync(uri));
-                return;
+                try
+                {
+                    LinuxDBus.Wait(LinuxDBus.UseAsync(system: false, bus => SetOnPlasmaAsync(bus, uri)));
+                    return;
+                }
+                catch (Exception ex) when (Flatpak.IsRunning)
+                {
+                    // Plasma's scripting can be locked down; its desktop portal can set the background too.
+                    Log.Info($"Plasma didn't take the background ({ex.Message}); asking the desktop portal");
+                    LinuxDBus.Wait(LinuxDBus.UseAsync(system: false, bus => SetThroughPortalAsync(bus, uri)));
+                    return;
+                }
             }
             if (Flatpak.IsRunning) // gsettings in the sandbox only changes the sandbox's own copy
             {
-                LinuxDBus.Wait(SetThroughPortalAsync(uri));
+                LinuxDBus.Wait(LinuxDBus.UseAsync(system: false, bus => SetThroughPortalAsync(bus, uri)));
                 return;
             }
             Gsettings("picture-options", "zoom");
@@ -55,7 +65,7 @@ public static partial class DesktopWallpaper
     }
 
     /// <summary>Every desktop (screen and activity) shows the picture, filling it (FillMode 2: scaled and cropped).</summary>
-    static Task<bool> SetOnPlasmaAsync(string uri)
+    static Task<bool> SetOnPlasmaAsync(Tmds.DBus.Protocol.Connection bus, string uri)
     {
         var script = $$"""
             desktops().forEach(function (d) {
@@ -65,7 +75,7 @@ public static partial class DesktopWallpaper
                 d.writeConfig("FillMode", 2);
             });
             """;
-        return LinuxDBus.CallAsync(LinuxDBus.Session, "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "evaluateScript", "s",
+        return LinuxDBus.CallAsync(bus, "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "evaluateScript", "s",
             w => w.WriteString(script), static (_, _) => true);
     }
 
@@ -73,8 +83,8 @@ public static partial class DesktopWallpaper
     /// The desktop portal's wallpaper service (GNOME and others). It may ask once whether the app can change the background.
     /// The picture is in the app's data folder, which the desktop can read (~/.var/app/…).
     /// </summary>
-    static Task<bool> SetThroughPortalAsync(string uri) =>
-        LinuxDBus.CallAsync(LinuxDBus.Session, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+    static Task<bool> SetThroughPortalAsync(Tmds.DBus.Protocol.Connection bus, string uri) =>
+        LinuxDBus.CallAsync(bus, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
             "org.freedesktop.portal.Wallpaper", "SetWallpaperURI", "ssa{sv}", w =>
             {
                 w.WriteString(""); // no parent window
