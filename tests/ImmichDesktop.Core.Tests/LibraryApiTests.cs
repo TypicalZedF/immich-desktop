@@ -27,6 +27,29 @@ public class LibraryApiTests
         new(new Uri("https://photos.example.com/api/"), new AuthCredential(AuthKind.ApiKey, "k"), handler);
 
     [Fact]
+    public async Task Timeline_reads_live_photos_and_stacks()
+    {
+        var handler = new Recorder((_, _) => new
+        {
+            id = new[] { "a", "b", "c" },
+            isImage = new[] { true, true, true },
+            livePhotoVideoId = new[] { "motion", null, null },
+            stack = new[] { null, new[] { "s1", "3" }, null },
+        });
+        using var client = Client(handler);
+
+        var assets = await client.GetTimeBucketAsync("2026-10-01T00:00:00.000Z", CancellationToken.None);
+
+        Assert.Equal("motion", assets[0].LivePhotoVideoId);
+        Assert.True(assets[0].IsLivePhoto);
+        Assert.False(assets[0].IsStack);
+        Assert.Equal(("s1", 3), (assets[1].StackId, assets[1].StackCount));
+        Assert.True(assets[1].IsStack);
+        Assert.False(assets[2].IsLivePhoto || assets[2].IsStack);
+        Assert.Contains("withStacked=true", handler.Requests[0].PathAndQuery);
+    }
+
+    [Fact]
     public async Task Album_and_person_timelines_use_the_timeline_filters()
     {
         var handler = new Recorder((_, _) => new[] { new { timeBucket = "2026-10-01T00:00:00.000Z", count = 3 } });
@@ -38,8 +61,8 @@ public class LibraryApiTests
 
         // Albums include archived photos (no visibility filter), like the web app.
         Assert.Equal("/api/timeline/buckets?order=desc&albumId=album%201", handler.Requests[0].PathAndQuery);
-        Assert.Equal("/api/timeline/buckets?visibility=timeline&order=desc&personId=p1", handler.Requests[1].PathAndQuery);
-        Assert.Equal("/api/timeline/buckets?visibility=timeline&order=desc&isFavorite=true", handler.Requests[2].PathAndQuery);
+        Assert.Equal("/api/timeline/buckets?visibility=timeline&order=desc&withStacked=true&personId=p1", handler.Requests[1].PathAndQuery);
+        Assert.Equal("/api/timeline/buckets?visibility=timeline&order=desc&withStacked=true&isFavorite=true", handler.Requests[2].PathAndQuery);
     }
 
     [Fact]

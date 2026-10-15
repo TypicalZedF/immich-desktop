@@ -20,6 +20,9 @@ sealed class FakeImmichServer : HttpMessageHandler
     public ConcurrentDictionary<string, string> AssetsByChecksum { get; } = new();
     public ConcurrentQueue<string> UploadedFileNames { get; } = new();
     public ConcurrentDictionary<string, (string Name, HashSet<string> Assets)> Albums { get; } = new();
+
+    /// <summary>Stacks made, each as its asset ids (the main photo first).</summary>
+    public ConcurrentQueue<string[]> Stacks { get; } = new();
     public bool RejectAuth { get; set; }
 
     /// <summary>Order of uploads and album additions, to check albums fill during a long upload.</summary>
@@ -105,6 +108,15 @@ sealed class FakeImmichServer : HttpMessageHandler
                     Albums[albumId].Assets.Add(id.GetString()!);
                 Events.Enqueue("album");
                 return Json(HttpStatusCode.OK, Array.Empty<object>());
+            }
+            case ("POST", "/api/stacks"):
+            {
+                using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+                var ids = doc.RootElement.GetProperty("assetIds").EnumerateArray().Select(e => e.GetString()!).ToArray();
+                if (ids.Length < 2 || ids.Any(id => !AssetsByChecksum.Values.Contains(id)))
+                    return Json(HttpStatusCode.BadRequest, new { message = "Validation failed", statusCode = 400 });
+                Stacks.Enqueue(ids);
+                return Json(HttpStatusCode.Created, new { id = Guid.NewGuid().ToString(), primaryAssetId = ids[0], assets = Array.Empty<object>() });
             }
             default:
                 return Json(HttpStatusCode.NotFound, new { message = $"No route for {method} {path}" });

@@ -410,6 +410,14 @@
           <Border Classes="divider" />
           <Grid Classes="row" ColumnDefinitions="*,Auto">
             <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Stack RAW photos with their JPEG" />
+              <TextBlock Classes="caption" l:Tr.Text="When a camera saves a shot twice (like IMG_1.CR2 and IMG_1.JPG), show it once in Immich." TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding StackRawWithJpeg}" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
               <TextBlock Classes="title" l:Tr.Text="Full folder check" />
               <TextBlock Classes="caption" TextWrapping="Wrap"
                          l:Tr.Text="New files are noticed instantly. A full check also runs periodically to catch anything missed." />

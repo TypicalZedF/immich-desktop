@@ -103,6 +103,9 @@ public sealed class AppSettings
 
     public bool PauseOnBattery { get; set; }
 
+    /// <summary>After backing up, stack a RAW photo with the JPEG (or HEIC) of the same name, like a camera shot both.</summary>
+    public bool StackRawWithJpeg { get; set; }
+
     /// <summary>Only upload between these times (minutes after midnight; the window may cross midnight).</summary>
     public bool BackupWindowEnabled { get; set; }
     public int BackupWindowStartMinutes { get; set; } = 60;

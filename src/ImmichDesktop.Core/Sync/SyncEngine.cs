@@ -466,6 +466,7 @@ public sealed partial class SyncEngine : IAsyncDisposable
             await ScanAsync(settings, ct);
             await UploadAsync(client, settings, ct);
             await SyncAlbumsAsync(client, ct);
+            await StackRawPairsAsync(client, settings, ct);
 
             _lastSync = DateTimeOffset.Now;
             RefreshCounts(settings);

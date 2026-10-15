@@ -227,7 +227,8 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsVideo), nameof(IsFavorite), nameof(DurationText), nameof(IsMissing), nameof(CanOpen),
-        nameof(CanSelect), nameof(SyncIcon), nameof(SyncText), nameof(HasSyncIcon), nameof(SyncFailed), nameof(IsLocalOnly), nameof(SizeText), nameof(HasSizeText), nameof(ShowLocalPlaceholder))]
+        nameof(CanSelect), nameof(SyncIcon), nameof(SyncText), nameof(HasSyncIcon), nameof(SyncFailed), nameof(IsLocalOnly), nameof(SizeText), nameof(HasSizeText), nameof(ShowLocalPlaceholder),
+        nameof(IsLivePhoto), nameof(IsStack), nameof(StackText))]
     public partial TimelineAsset? Asset { get; set; }
 
     [ObservableProperty]
@@ -243,6 +244,9 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
     public bool IsVideo => Asset is { IsImage: false };
     public bool IsFavorite => Asset?.IsFavorite == true;
     public string DurationText => Asset?.DurationMs is { } ms and > 0 ? FormatDuration(ms) : "";
+    public bool IsLivePhoto => Asset is { IsLivePhoto: true, IsImage: true };
+    public bool IsStack => Asset is { IsStack: true };
+    public string StackText => Asset is { IsStack: true } a ? a.StackCount.ToString(System.Globalization.CultureInfo.CurrentCulture) : "";
 
     /// <summary>Videos can't be picked as a profile picture.</summary>
     public bool CanOpen => !(owner.IsPicker && IsVideo);

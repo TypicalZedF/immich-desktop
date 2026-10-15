@@ -9,7 +9,7 @@ namespace ImmichDesktop.Core.Storage;
 /// </summary>
 public sealed class StateDatabase
 {
-    const int SchemaVersion = 2; // 2: privacy_scan
+    const int SchemaVersion = 3; // 2: privacy_scan, 3: stacked
     const int ActivityKeep = 1000;
 
     readonly string _connectionString;
@@ -72,6 +72,8 @@ public sealed class StateDatabase
                 scanned_at INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS ix_privacy_open ON privacy_scan(decision, kinds);
+            -- Files already put in a RAW+JPEG stack (or found not to need one).
+            CREATE TABLE IF NOT EXISTS stacked (path TEXT NOT NULL PRIMARY KEY);
             PRAGMA user_version = {SchemaVersion};
             """);
     }
@@ -512,6 +514,37 @@ public sealed class StateDatabase
                 total += c;
         }
         return total;
+    }
+
+    // ---- RAW+JPEG stacks --------------------------------------------------------------------------
+
+    /// <summary>Backed-up files that aren't in a RAW+JPEG stack yet.</summary>
+    public List<(string Path, string AssetId)> GetUnstackedUploads()
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT path, asset_id FROM files WHERE status IN (1, 2) AND asset_id IS NOT NULL AND path NOT IN (SELECT path FROM stacked)";
+        var result = new List<(string, string)>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            result.Add((reader.GetString(0), reader.GetString(1)));
+        return result;
+    }
+
+    public void MarkStacked(IEnumerable<string> paths)
+    {
+        using var db = Open();
+        using var tx = db.BeginTransaction();
+        using var cmd = db.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = "INSERT OR IGNORE INTO stacked (path) VALUES ($path)";
+        var p = cmd.Parameters.Add("$path", SqliteType.Text);
+        foreach (var path in paths)
+        {
+            p.Value = path;
+            cmd.ExecuteNonQuery();
+        }
+        tx.Commit();
     }
 
     // ---- Albums ---------------------------------------------------------------------------------

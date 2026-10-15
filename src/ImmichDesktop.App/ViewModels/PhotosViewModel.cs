@@ -529,6 +529,15 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
 
     internal void CloseViewer() => Viewer = null;
 
+    /// <summary>Opens the photos of a stack (RAW+JPEG, a burst…) as their own page.</summary>
+    internal void OpenStack(TimelineAsset asset)
+    {
+        if (asset.StackId is not { } id)
+            return;
+        OpenDrill(new GridQuery(Tr.T("Stack of {0}", asset.StackCount),
+            async (client, ct) => BucketState.FromAssets(await client.GetStackAsync(id, ct))));
+    }
+
     /// <summary>Finds the asset before/after a position, crossing into neighbouring groups.</summary>
     internal async Task<(BucketState Bucket, int Index, TimelineAsset Asset)?> StepAsync(BucketState bucket, int index, int delta, CancellationToken ct)
     {

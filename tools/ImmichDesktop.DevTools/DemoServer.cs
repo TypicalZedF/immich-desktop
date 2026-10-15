@@ -371,6 +371,8 @@ sealed class DemoServer : HttpMessageHandler
             // Local wall-clock times, so photos fall on the same days in every time zone (the harness checks them).
             fileCreatedAt = ids.Select((_, i) => DateTime.SpecifyKind(month.AddDays(27 - i % 27).AddHours(-i), DateTimeKind.Local)
                 .ToUniversalTime().ToString("o")).ToList(),
+            livePhotoVideoId = ids.Select((id, i) => i % 11 == 5 ? $"{id}-motion" : null).ToList(),
+            stack = ids.Select((id, i) => i % 13 == 1 ? new[] { $"stack-{id}", "2" } : null).ToList(),
         });
     }
 

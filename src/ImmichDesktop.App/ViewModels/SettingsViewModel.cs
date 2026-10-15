@@ -44,6 +44,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         SelectedSpeedLimit = SpeedLimits.FirstOrDefault(o => o.Value == s.UploadLimitKBps) ?? SpeedLimits[0];
         SelectedRescan = RescanIntervals.FirstOrDefault(o => o.Value == s.RescanIntervalMinutes) ?? RescanIntervals[2];
         PauseOnBattery = s.PauseOnBattery;
+        StackRawWithJpeg = s.StackRawWithJpeg;
         BackupWindowEnabled = s.BackupWindowEnabled;
         BackupWindowStart = TimeChoices.FirstOrDefault(o => o.Value == s.BackupWindowStartMinutes) ?? TimeChoices[2];
         BackupWindowEnd = TimeChoices.FirstOrDefault(o => o.Value == s.BackupWindowEndMinutes) ?? TimeChoices[12];
@@ -687,6 +688,15 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     {
         if (_loading) return;
         AppServices.Settings.Update(s => s.PauseOnBattery = value);
+    }
+
+    [ObservableProperty]
+    public partial bool StackRawWithJpeg { get; set; }
+
+    partial void OnStackRawWithJpegChanged(bool value)
+    {
+        if (_loading) return;
+        AppServices.Settings.Update(s => s.StackRawWithJpeg = value);
     }
 
     // ---- Troubleshooting ----

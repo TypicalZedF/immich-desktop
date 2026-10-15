@@ -160,10 +160,16 @@ public sealed record TimeBucket(string Key, int Count);
 /// <param name="LocalPath">For a file on this PC that isn't in Immich yet: where it is.</param>
 /// <param name="LocalFailed">That file couldn't be uploaded (it will be retried).</param>
 /// <param name="FileSize">Size of the original, when the server said (search results, large files).</param>
+/// <param name="LivePhotoVideoId">For a live photo: the short video that goes with it.</param>
+/// <param name="StackId">The stack this photo leads (RAW+JPEG, bursts…), shown as one photo in the timeline.</param>
+/// <param name="StackCount">How many photos are in that stack.</param>
 public sealed record TimelineAsset(string Id, bool IsImage, bool IsFavorite, double Ratio, long? DurationMs, string? FileCreatedAt,
-    string? LocalPath = null, bool LocalFailed = false, long? FileSize = null)
+    string? LocalPath = null, bool LocalFailed = false, long? FileSize = null, string? LivePhotoVideoId = null,
+    string? StackId = null, int StackCount = 0)
 {
     public bool IsLocalOnly => LocalPath is not null;
+    public bool IsLivePhoto => LivePhotoVideoId is not null;
+    public bool IsStack => StackId is not null && StackCount > 1;
 }
 
 /// <summary>Which photos the map shows (Map settings).</summary>
@@ -214,7 +220,9 @@ internal sealed record TimeBucketAssetsDto(
     List<bool>? IsFavorite,
     List<double>? Ratio,
     List<System.Text.Json.JsonElement>? Duration,
-    List<string>? FileCreatedAt);
+    List<string>? FileCreatedAt,
+    List<string?>? LivePhotoVideoId = null,
+    List<List<string>?>? Stack = null);
 internal sealed record WellKnownDto(WellKnownApiDto? Api);
 internal sealed record PeopleResponseDto(List<PersonDto>? People, bool? HasNextPage);
 internal sealed record PersonDto(string Id, string? Name, bool IsHidden);
@@ -233,7 +241,10 @@ internal sealed record MemoryDto(string Id, string Type, MemoryDataDto? Data, Li
 
 internal sealed record AssetDto(
     string Id, string? Type, string? OriginalFileName, string? FileCreatedAt, bool IsFavorite, System.Text.Json.JsonElement Duration,
-    ExifDto? ExifInfo, List<AssetPersonDto>? People);
+    ExifDto? ExifInfo, List<AssetPersonDto>? People, string? LivePhotoVideoId = null, AssetStackDto? Stack = null);
+internal sealed record AssetStackDto(string Id, string? PrimaryAssetId, int AssetCount);
+internal sealed record StackDto(string Id, string? PrimaryAssetId, List<AssetDto> Assets);
+internal sealed record CreateStackRequestDto(IReadOnlyList<string> AssetIds);
 internal sealed record SearchAssetsDto(List<AssetDto> Items, string? NextPage);
 internal sealed record SearchResponseDto(SearchAssetsDto Assets);
 internal sealed record SmartSearchRequestDto(string Query, int Page, int Size);

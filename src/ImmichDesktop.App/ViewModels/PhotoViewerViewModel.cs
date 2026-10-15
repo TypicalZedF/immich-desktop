@@ -40,7 +40,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsVideo), nameof(ShowBigPlay), nameof(DurationText), nameof(IsLocalOnly), nameof(IsInImmich), nameof(CanEdit),
-        nameof(DevicePath), nameof(IsOnDevice), nameof(CanCopy), nameof(LocalStatus), nameof(FileName))]
+        nameof(DevicePath), nameof(IsOnDevice), nameof(CanCopy), nameof(LocalStatus), nameof(FileName), nameof(CanPlayLive), nameof(IsStack), nameof(StackTip))]
     public partial TimelineAsset Asset { get; set; }
 
     [ObservableProperty]
@@ -69,6 +69,38 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     public partial int Generation { get; set; }
 
     public bool IsVideo => !Asset.IsImage;
+
+    /// <summary>A live photo: its short video can be played over the photo.</summary>
+    public bool CanPlayLive => Asset is { IsImage: true, IsLivePhoto: true, IsLocalOnly: false };
+
+    public bool IsStack => Asset.IsStack;
+    public string StackTip => Tr.T("Show the {0} photos in this stack", Asset.StackCount);
+
+    /// <summary>The live photo's video is playing (no controls; back to the photo when it ends).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowVideoControls))]
+    public partial bool IsLiveMotion { get; set; }
+
+    public bool ShowVideoControls => IsVideoStarted && !IsLiveMotion;
+
+    [RelayCommand]
+    void PlayLivePhoto()
+    {
+        if (IsLiveMotion)
+            StopVideo();
+        else if (CanPlayLive)
+            StartVideo(Asset.LivePhotoVideoId);
+    }
+
+    [RelayCommand]
+    void OpenStack()
+    {
+        if (!Asset.IsStack)
+            return;
+        var asset = Asset;
+        Close();
+        _owner.OpenStack(asset);
+    }
     public string DurationText => Asset.DurationMs is { } ms and > 0 ? AssetCellViewModel.FormatDuration(ms) : "";
     public bool CanEdit => !_readOnly && !_owner.IsPicker && _owner.CanUseNormalActions && !Asset.IsLocalOnly;
 
@@ -310,7 +342,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
 
     /// <summary>A player is open for this video (controls show).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowBigPlay))]
+    [NotifyPropertyChangedFor(nameof(ShowBigPlay), nameof(ShowVideoControls))]
     public partial bool IsVideoStarted { get; set; }
 
     public bool ShowBigPlay => IsVideo && !IsVideoPlaying && !IsVideoLoading;
@@ -385,10 +417,11 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     [RelayCommand]
     void SkipForward() => _video?.SeekBy(TimeSpan.FromSeconds(10));
 
-    void StartVideo()
+    /// <param name="motionId">For a live photo: its video, played over the photo.</param>
+    void StartVideo(string? motionId = null)
     {
         StopVideo();
-        if (Asset.IsImage)
+        if (Asset.IsImage && motionId is null)
             return;
         VideoError = null;
         if (!Services.Mpv.MpvPlayer.IsAvailable)
@@ -402,11 +435,11 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         var fromServer = false;
         try
         {
-            if (DevicePath is { } local && File.Exists(local))
+            if (motionId is null && DevicePath is { } local && File.Exists(local))
                 player = Services.Mpv.MpvPlayer.ForFile(local, software);
             else if (AppServices.Account.Client is { } client)
             {
-                var (url, headers) = client.VideoPlaybackRequest(Asset.Id);
+                var (url, headers) = client.VideoPlaybackRequest(motionId ?? Asset.Id);
                 player = Services.Mpv.MpvPlayer.ForUrl(url, headers, software);
                 fromServer = true;
             }
@@ -438,8 +471,9 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         else
             MpvVideo = player;
         Hook(player, asset);
+        IsLiveMotion = motionId is not null;
         IsVideoStarted = true;
-        VideoLoadingText = fromServer ? Tr.T("Loading the video from your server…") : Tr.T("Opening the video…");
+        VideoLoadingText = IsLiveMotion ? null : fromServer ? Tr.T("Loading the video from your server…") : Tr.T("Opening the video…");
         _ = WatchStartAsync(player, fromServer);
         player.Play();
     }
@@ -454,6 +488,8 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
             IsVideoPlaying = player.IsPlaying;
             if (player.Ended)
                 VideoLoadingText = null;
+            if (player.Ended && IsLiveMotion)
+                StopVideo(); // back to the photo
         };
         player.TimeChanged += () => { if (ReferenceEquals(_video, player)) UpdateVideoTime(player); };
         player.Failed += () =>
@@ -461,8 +497,12 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
             if (!ReferenceEquals(_video, player))
                 return;
             Log.Warn($"Video {asset.Id} couldn't be played in the app");
+            var live = IsLiveMotion;
             StopVideo();
-            VideoError = Tr.T("This video couldn't be played here.");
+            if (live)
+                Error = Tr.T("The live photo's video couldn't be played.");
+            else
+                VideoError = Tr.T("This video couldn't be played here.");
         };
     }
 
@@ -512,6 +552,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasVideoFrame));
         IsVideoPlaying = false;
         IsVideoStarted = false;
+        IsLiveMotion = false;
         _updatingPosition = true;
         VideoPosition = 0;
         _updatingPosition = false;

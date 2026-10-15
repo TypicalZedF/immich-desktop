@@ -337,4 +337,42 @@ public class SyncEngineTests
         await h.RunAsync();
         Assert.Equal(["a.jpg"], h.Server.UploadedFileNames);
     }
+
+    [Fact]
+    public async Task Stacks_raw_photos_with_their_jpeg_when_chosen()
+    {
+        await using var h = new Harness();
+        h.Temp.File("Photos/IMG_1.CR2");
+        h.Temp.File("Photos/IMG_1.jpg");
+        h.Temp.File("Photos/IMG_2.cr2"); // no JPEG
+        h.Temp.File("Photos/other/IMG_1.jpg"); // same name, other folder
+        await h.RunAsync();
+        Assert.Empty(h.Server.Stacks); // off by default
+
+        h.Settings.Update(s => s.StackRawWithJpeg = true);
+        h.Engine.OnSettingsChanged(h.Settings.Current);
+        h.Engine.SyncNow();
+        await h.RunAsync();
+        var stack = Assert.Single(h.Server.Stacks);
+        Assert.Equal(2, stack.Length);
+
+        // A pair is stacked only once.
+        h.Engine.SyncNow();
+        await h.RunAsync();
+        Assert.Single(h.Server.Stacks);
+    }
+
+    [Fact]
+    public void Raw_pairs_need_one_viewable_photo_and_a_raw_of_the_same_name()
+    {
+        var (pairs, skip) = RawPairs.Find([
+            (Path.Combine("a", "x.NEF"), "1"), (Path.Combine("a", "x.JPG"), "2"),
+            (Path.Combine("a", "y.dng"), "3"),
+            (Path.Combine("a", "z.dng"), "4"), (Path.Combine("a", "z.jpg"), "5"), (Path.Combine("a", "z.heic"), "6"),
+            (Path.Combine("a", "v.mp4"), "7"),
+        ]);
+        var pair = Assert.Single(pairs);
+        Assert.Equal(["2", "1"], pair.AssetIds);
+        Assert.Equal([Path.Combine("a", "v.mp4")], skip);
+    }
 }

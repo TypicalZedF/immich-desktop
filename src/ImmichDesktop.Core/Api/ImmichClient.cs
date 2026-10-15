@@ -308,7 +308,10 @@ public sealed class ImmichClient : IDisposable
                 dto.IsFavorite is { } fav && i < fav.Count && fav[i],
                 dto.Ratio is { } ratio && i < ratio.Count && ratio[i] > 0 ? ratio[i] : 1,
                 dto.Duration is { } duration && i < duration.Count ? ParseDuration(duration[i]) : null,
-                dto.FileCreatedAt is { } created && i < created.Count ? created[i] : null));
+                dto.FileCreatedAt is { } created && i < created.Count ? created[i] : null,
+                LivePhotoVideoId: dto.LivePhotoVideoId is { } live && i < live.Count ? live[i] : null,
+                StackId: dto.Stack is { } stack && i < stack.Count && stack[i] is [var stackId, _] ? stackId : null,
+                StackCount: dto.Stack is { } counts && i < counts.Count && counts[i] is [_, var n] && int.TryParse(n, out var count) ? count : 0));
         }
         return assets;
     }
@@ -319,7 +322,7 @@ public sealed class ImmichClient : IDisposable
         // whatever was trashed.
         var query = filter.AlbumId is { } album ? $"order=desc&albumId={Uri.EscapeDataString(album)}"
             : filter.Trashed ? "isTrashed=true&order=desc"
-            : $"visibility={Uri.EscapeDataString(filter.Visibility ?? "timeline")}&order=desc";
+            : $"visibility={Uri.EscapeDataString(filter.Visibility ?? "timeline")}&order=desc&withStacked=true"; // a stack shows as its main photo
         if (filter.UserId is { } user)
             query += $"&userId={Uri.EscapeDataString(user)}";
         if (filter.PersonId is { } person)
@@ -551,8 +554,23 @@ public sealed class ImmichClient : IDisposable
         var ratio = a.ExifInfo is { ExifImageWidth: > 0, ExifImageHeight: > 0 } e ? e.ExifImageWidth!.Value / (double)e.ExifImageHeight!.Value : 1;
         long? duration = ParseDuration(a.Duration) is > 0 and var ms ? ms : null;
         return new TimelineAsset(a.Id, !string.Equals(a.Type, "VIDEO", StringComparison.OrdinalIgnoreCase), a.IsFavorite, ratio, duration, a.FileCreatedAt,
-            FileSize: a.ExifInfo?.FileSizeInByte);
+            FileSize: a.ExifInfo?.FileSizeInByte, LivePhotoVideoId: a.LivePhotoVideoId,
+            StackId: a.Stack?.Id, StackCount: a.Stack?.AssetCount ?? 0);
     }
+
+    // ---- Stacks ------------------------------------------------------------------------------
+
+    /// <summary>The photos in a stack, its main photo first.</summary>
+    public async Task<List<TimelineAsset>> GetStackAsync(string stackId, CancellationToken ct)
+    {
+        var stack = await SendAsync<StackDto>(HttpMethod.Get, $"stacks/{Uri.EscapeDataString(stackId)}", null, ct);
+        return stack.Assets.Select(ToTimelineAsset).Select(a => a with { StackId = null, StackCount = 0 })
+            .OrderBy(a => a.Id == stack.PrimaryAssetId ? 0 : 1).ToList();
+    }
+
+    /// <summary>Stacks photos together; the first one is shown in the timeline.</summary>
+    public Task CreateStackAsync(IReadOnlyList<string> assetIds, CancellationToken ct) =>
+        SendAsync(HttpMethod.Post, "stacks", new CreateStackRequestDto(assetIds), ct);
 
     // ---- Utilities ---------------------------------------------------------------------------
 
