@@ -1,6 +1,6 @@
 namespace ImmichDesktop.App.Services;
 
-/// <summary>A video playing in the viewer, whichever engine plays it (libmpv, or VLC as the fallback).</summary>
+/// <summary>A video playing in the viewer (libmpv; see Services/Mpv). Kept as an interface so tests and other engines can stand in.</summary>
 public interface IVideoPlayback : IDisposable
 {
     /// <summary>Playing, paused or ended changed. Raised on the UI thread, like the others.</summary>

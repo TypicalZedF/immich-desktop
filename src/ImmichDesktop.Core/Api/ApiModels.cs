@@ -179,11 +179,6 @@ public sealed record DuplicateAsset(TimelineAsset Asset, string FileName, int Wi
 /// <summary>Photos the server thinks are the same picture (Utilities → Review duplicates).</summary>
 public sealed record DuplicateGroup(string Id, IReadOnlyList<DuplicateAsset> Assets);
 
-/// <summary>
-/// Bytes of a video starting at <paramref name="Offset"/>, and its total size when known.
-/// <paramref name="Partial"/> is false when the server ignored the range and sent the whole video.
-/// </summary>
-public sealed record VideoChunk(byte[] Data, long? Total, long Offset, bool Partial = true);
 
 /// <summary>Image sizes the server can render for an asset.</summary>
 public enum AssetImageSize

@@ -10,9 +10,6 @@
     <PackageVersion Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageVersion Include="Material.Icons.Avalonia" Version="2.4.1" />
-    <!-- Video playback in the viewer (VLC's engine; on Linux the system's libvlc is used) -->
-    <PackageVersion Include="LibVLCSharp" Version="3.10.2" />
-    <PackageVersion Include="VideoLAN.LibVLC.Windows" Version="3.0.24" />
     <!-- Core -->
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.12" />

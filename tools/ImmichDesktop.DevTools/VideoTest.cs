@@ -9,7 +9,8 @@ using ImmichDesktop.App.Services.Mpv;
 namespace ImmichDesktop.DevTools;
 
 /// <summary>
-/// video-test [source]: plays a video with libmpv in a real window (the GPU path can't run headless).
+/// video-test [software] [source]: plays a video with libmpv in a real window, on the graphics card or
+/// (with "software") drawn into memory as the app does with graphics acceleration off.
 /// Without a source it plays mpv's built-in test pattern. Prints when the first frame arrives and how
 /// far playback got, then closes after 8 seconds. The window title is "mpv video test".
 /// </summary>
@@ -20,8 +21,10 @@ static class VideoTest
         public override void Initialize() => Styles.Add(new FluentTheme());
     }
 
-    public static int Run(string? source)
+    public static int Run(string[] args)
     {
+        var software = args.Contains("software");
+        var source = args.FirstOrDefault(a => a != "software");
         Console.WriteLine($"libmpv available: {MpvPlayer.IsAvailable}");
         if (!MpvPlayer.IsAvailable)
             return 2;
@@ -29,16 +32,21 @@ static class VideoTest
             .UsePlatformDetect()
             .With(new Win32PlatformOptions { RenderingMode = [Win32RenderingMode.AngleEgl, Win32RenderingMode.Wgl] })
             .With(new X11PlatformOptions { RenderingMode = [X11RenderingMode.Glx, X11RenderingMode.Egl] })
-            .AfterSetup(_ => Start(source ?? "av://lavfi:testsrc2=size=1280x720:rate=30"))
+            .AfterSetup(_ => Start(source ?? "av://lavfi:testsrc2=size=1280x720:rate=30", software))
             .StartWithClassicDesktopLifetime([]);
     }
 
-    static void Start(string source)
+    static void Start(string source, bool software)
     {
         var lifetime = (IClassicDesktopStyleApplicationLifetime)Application.Current!.ApplicationLifetime!;
         var started = System.Diagnostics.Stopwatch.StartNew();
-        var player = MpvPlayer.ForFile(source);
-        var view = new MpvVideoView { Player = player };
+        var player = MpvPlayer.ForFile(source, software);
+        Control view = software ? new Image { Stretch = Avalonia.Media.Stretch.Uniform } : new MpvVideoView { Player = player };
+        if (view is Image image)
+        {
+            player.FrameChanged += () => image.Source = player.Frame;
+            player.FrameReady += image.InvalidateVisual;
+        }
         var window = new Window
         {
             Title = "mpv video test",
@@ -56,7 +64,8 @@ static class VideoTest
             Console.WriteLine($"After 5 s: playing={player.IsPlaying} frame={player.HasFrame} time={player.Time.TotalSeconds:0.0}s"), TimeSpan.FromSeconds(5));
         DispatcherTimer.RunOnce(() =>
         {
-            view.Player = null;
+            if (view is MpvVideoView mpvView)
+                mpvView.Player = null;
             player.Dispose();
             window.Close();
             lifetime.Shutdown();

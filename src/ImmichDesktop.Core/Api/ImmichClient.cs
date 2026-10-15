@@ -431,20 +431,6 @@ public sealed class ImmichClient : IDisposable
         return (url, headers);
     }
 
-    public async Task<VideoChunk> GetVideoChunkAsync(string assetId, long offset, int count, CancellationToken ct)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"assets/{Uri.EscapeDataString(assetId)}/video/playback");
-        request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, offset + count - 1);
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromSeconds(60));
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-        await EnsureSuccessAsync(response, cts.Token);
-        var data = await response.Content.ReadAsByteArrayAsync(cts.Token);
-        if (response.StatusCode == HttpStatusCode.PartialContent)
-            return new VideoChunk(data, response.Content.Headers.ContentRange?.Length, response.Content.Headers.ContentRange?.From ?? offset);
-        return new VideoChunk(data, data.Length, 0, Partial: false);
-    }
-
     /// <summary>Saves the original file of an asset to <paramref name="destination"/>.</summary>
     public async Task DownloadOriginalAsync(string assetId, Stream destination, CancellationToken ct)
     {

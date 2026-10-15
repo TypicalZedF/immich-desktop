@@ -34,17 +34,6 @@
     <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Material.Icons.Avalonia" />
-    <PackageReference Include="LibVLCSharp" />
-    <PackageReference Include="VideoLAN.LibVLC.Windows" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
-  </ItemGroup>
-
-  <!-- Video playback: only 64-bit VLC, without parts the viewer never uses (streaming out, skins, scripting…) -->
-  <PropertyGroup>
-    <VlcWindowsX86Enabled>false</VlcWindowsX86Enabled>
-    <VlcWindowsArm64Enabled>false</VlcWindowsArm64Enabled>
-  </PropertyGroup>
-  <ItemGroup>
-    <VlcWindowsX64ExcludeFiles Include="plugins\gui\%2A;plugins\lua\%2A;lua\%2A%2A;plugins\visualization\%2A;plugins\services_discovery\%2A;plugins\stream_out\%2A;plugins\access_output\%2A;plugins\control\%2A" />
   </ItemGroup>
 
   <ItemGroup>

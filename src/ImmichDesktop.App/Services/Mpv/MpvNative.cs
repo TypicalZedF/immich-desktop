@@ -14,12 +14,15 @@ static class MpvNative
     // Events (mpv_event_id) and formats (mpv_format) used here.
     public const int EventShutdown = 1, EventLogMessage = 2, EventEndFile = 7, EventFileLoaded = 8, EventVideoReconfig = 17,
         EventPlaybackRestart = 21, EventPropertyChange = 22;
-    public const int FormatFlag = 3, FormatDouble = 5;
+    public const int FormatFlag = 3, FormatInt64 = 4, FormatDouble = 5;
     public const int EndFileError = 4;
 
     // Render parameters (mpv_render_param_type).
     public const int RenderParamInvalid = 0, RenderParamApiType = 1, RenderParamOpenGlInitParams = 2, RenderParamOpenGlFbo = 3,
-        RenderParamFlipY = 4;
+        RenderParamFlipY = 4, RenderParamSwSize = 17, RenderParamSwFormat = 18, RenderParamSwStride = 19, RenderParamSwPointer = 20;
+
+    /// <summary>mpv_render_context_update flag: a new frame should be drawn.</summary>
+    public const ulong RenderUpdateFrame = 1;
 
     [StructLayout(LayoutKind.Sequential)]
     public struct Event
@@ -122,6 +125,8 @@ static class MpvNative
     public static extern int mpv_set_property_string(IntPtr handle, [MarshalAs(UnmanagedType.LPUTF8Str)] string name, [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     public static extern int mpv_get_property(IntPtr handle, [MarshalAs(UnmanagedType.LPUTF8Str)] string name, int format, out double data);
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mpv_get_property")]
+    public static extern int mpv_get_property_long(IntPtr handle, [MarshalAs(UnmanagedType.LPUTF8Str)] string name, int format, out long data);
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     public static extern int mpv_observe_property(IntPtr handle, ulong userdata, [MarshalAs(UnmanagedType.LPUTF8Str)] string name, int format);
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]

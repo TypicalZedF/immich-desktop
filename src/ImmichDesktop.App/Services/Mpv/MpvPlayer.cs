@@ -1,5 +1,8 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using ImmichDesktop.Core;
 using static ImmichDesktop.App.Services.Mpv.MpvNative;
@@ -7,48 +10,75 @@ using static ImmichDesktop.App.Services.Mpv.MpvNative;
 namespace ImmichDesktop.App.Services.Mpv;
 
 /// <summary>
-/// A video played by libmpv, drawn straight onto the graphics card by <see cref="Controls.MpvVideoView"/>.
-/// Videos from Immich are streamed by mpv itself (with the account's sign-in header), so seeking and
-/// buffering work like in any video player.
+/// A video played by libmpv. Normally mpv draws straight onto the graphics card in
+/// <see cref="Controls.MpvVideoView"/>; with graphics acceleration off it draws into memory instead and
+/// <see cref="Frame"/> shows the picture. Videos from Immich are streamed by mpv itself (with the
+/// account's sign-in header), so seeking and buffering work like in any video player.
 /// </summary>
 public sealed class MpvPlayer : IVideoPlayback
 {
+    /// <summary>Bigger videos are drawn smaller in memory (software drawing only).</summary>
+    const int MaxSoftwareWidth = 1920, MaxSoftwareHeight = 1080;
+
     static readonly Lazy<bool> Available = new(MpvNative.IsAvailable);
     static int _logLines;
 
     readonly IntPtr _mpv;
     readonly string _target;
-    readonly Thread _events;
+    readonly bool _software;
     readonly Lock _gate = new();
     readonly UpdateFn _onUpdate;
     readonly GetProcAddressFn _getProc;
+    readonly AutoResetEvent _redraw = new(false);
     Func<string, IntPtr>? _glProc;
     IntPtr _render;
-    volatile bool _loaded, _paused, _eof, _hasFrame;
-    bool _playWanted; // asked to play before the view had set up drawing
-    bool _muted, _quit;
+    volatile bool _loaded, _paused, _eof, _hasFrame, _quit;
+    bool _muted, _playWanted;
     double _time, _duration;
+
+    // Software drawing: mpv draws into _buffer, which is copied into _frame on the UI thread.
+    IntPtr _buffer;
+    int _width, _height;
+    WriteableBitmap? _frame;
+    int _framePending;
 
     /// <summary>libmpv is installed (Linux) or shipped with the app (Windows).</summary>
     public static bool IsAvailable => Available.Value;
 
-    /// <summary>The engine asks to draw again (any thread): a new frame is ready.</summary>
+    /// <summary>Why videos can't play in the app on this PC, if libmpv is missing.</summary>
+    public static string Unavailable => OperatingSystem.IsLinux()
+        ? Tr.T("To play videos here, install mpv's library (for example: sudo dnf install mpv-libs, or sudo apt install libmpv2).")
+        : Tr.T("The video player couldn't start.");
+
+    /// <summary>The engine asks to draw again (any thread): a new frame is ready (graphics card drawing).</summary>
     public event Action? NeedsRedraw;
     /// <summary>The first picture is ready (UI thread).</summary>
     public event Action? FirstFrame;
+    /// <summary>Software drawing: a new bitmap (size changed). UI thread.</summary>
+    public event Action? FrameChanged;
+    /// <summary>Software drawing: the bitmap was redrawn in place. UI thread.</summary>
+    public event Action? FrameReady;
     public event Action? StateChanged;
     public event Action? TimeChanged;
     public event Action? Failed;
 
-    public static MpvPlayer ForFile(string path) => new(path, []);
+    /// <param name="software">Draw into memory (<see cref="Frame"/>) instead of on the graphics card.</param>
+    public static MpvPlayer ForFile(string path, bool software = false) => new(path, [], software);
 
     /// <summary>A video on the server; <paramref name="headers"/> carry the sign-in ("name: value").</summary>
-    public static MpvPlayer ForUrl(Uri url, IReadOnlyList<string> headers) => new(url.AbsoluteUri, headers);
+    public static MpvPlayer ForUrl(Uri url, IReadOnlyList<string> headers, bool software = false) => new(url.AbsoluteUri, headers, software);
 
-    MpvPlayer(string target, IReadOnlyList<string> headers)
+    MpvPlayer(string target, IReadOnlyList<string> headers, bool software)
     {
         _target = target;
-        _onUpdate = _ => NeedsRedraw?.Invoke();
+        _software = software;
+        _onUpdate = _ =>
+        {
+            if (_software)
+                _redraw.Set(); // no mpv calls allowed inside this callback
+            else
+                NeedsRedraw?.Invoke();
+        };
         _getProc = (_, name) => _glProc?.Invoke(Marshal.PtrToStringUTF8(name) ?? "") ?? IntPtr.Zero;
         _mpv = mpv_create();
         if (_mpv == IntPtr.Zero)
@@ -60,7 +90,7 @@ public sealed class MpvPlayer : IVideoPlayback
                 Log.Info($"mpv option {name} not set: {ErrorText(error)}");
         }
         Option("vo", "libmpv");
-        Option("hwdec", "auto-safe");
+        Option("hwdec", software ? "no" : "auto-safe");
         Option("keep-open", "yes"); // stay on the last frame at the end
         Option("idle", "yes");
         Option("terminal", "no");
@@ -85,8 +115,12 @@ public sealed class MpvPlayer : IVideoPlayback
         mpv_observe_property(_mpv, 2, "duration", FormatDouble);
         mpv_observe_property(_mpv, 3, "pause", FormatFlag);
         mpv_observe_property(_mpv, 4, "eof-reached", FormatFlag);
-        _events = new Thread(EventLoop) { IsBackground = true, Name = "mpv events" };
-        _events.Start();
+        new Thread(EventLoop) { IsBackground = true, Name = "mpv events" }.Start();
+        if (software)
+        {
+            CreateRenderContext("sw", null);
+            new Thread(SoftwareLoop) { IsBackground = true, Name = "mpv drawing" }.Start();
+        }
     }
 
     public bool IsPlaying => _loaded && !_paused && !_eof;
@@ -94,6 +128,9 @@ public sealed class MpvPlayer : IVideoPlayback
     public bool HasFrame => _hasFrame;
     public TimeSpan Time => TimeSpan.FromSeconds(Math.Max(0, _time));
     public TimeSpan Length => TimeSpan.FromSeconds(Math.Max(0, _duration));
+
+    /// <summary>Software drawing: the latest picture (redrawn in place; see <see cref="FrameReady"/>).</summary>
+    public WriteableBitmap? Frame => _frame;
 
     public bool IsMuted
     {
@@ -140,30 +177,25 @@ public sealed class MpvPlayer : IVideoPlayback
     public void SeekBy(TimeSpan delta) =>
         Command(_mpv, "seek", delta.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture), "relative");
 
-    // ---- Drawing (called by MpvVideoView on its OpenGL thread) ----
-
-    internal unsafe void InitGl(Func<string, IntPtr> getProcAddress)
+    unsafe void CreateRenderContext(string api, Func<string, IntPtr>? getProcAddress)
     {
         lock (_gate)
         {
             if (_render != IntPtr.Zero || _quit)
                 return;
             _glProc = getProcAddress;
-            var api = Marshal.StringToCoTaskMemUTF8("opengl");
+            var apiName = Marshal.StringToCoTaskMemUTF8(api);
             var init = new OpenGlInitParams { GetProcAddress = Marshal.GetFunctionPointerForDelegate(_getProc) };
             try
             {
-                RenderParam[] parameters =
-                [
-                    new() { Type = RenderParamApiType, Data = api },
-                    new() { Type = RenderParamOpenGlInitParams, Data = (IntPtr)(&init) },
-                    new() { Type = RenderParamInvalid },
-                ];
+                RenderParam[] parameters = getProcAddress is null
+                    ? [new() { Type = RenderParamApiType, Data = apiName }, new() { Type = RenderParamInvalid }]
+                    : [new() { Type = RenderParamApiType, Data = apiName }, new() { Type = RenderParamOpenGlInitParams, Data = (IntPtr)(&init) }, new() { Type = RenderParamInvalid }];
                 var error = mpv_render_context_create(out _render, _mpv, parameters);
                 if (error < 0)
                 {
                     _render = IntPtr.Zero;
-                    Log.Warn($"mpv couldn't draw with OpenGL: {ErrorText(error)}");
+                    Log.Warn($"mpv couldn't set up drawing ({api}): {ErrorText(error)}");
                     Post(() => Failed?.Invoke());
                     return;
                 }
@@ -171,7 +203,7 @@ public sealed class MpvPlayer : IVideoPlayback
             }
             finally
             {
-                Marshal.FreeCoTaskMem(api);
+                Marshal.FreeCoTaskMem(apiName);
             }
         }
         if (_playWanted)
@@ -180,6 +212,10 @@ public sealed class MpvPlayer : IVideoPlayback
             Post(Play);
         }
     }
+
+    // ---- Graphics card drawing (called by MpvVideoView on its OpenGL thread) ----
+
+    internal void InitGl(Func<string, IntPtr> getProcAddress) => CreateRenderContext("opengl", getProcAddress);
 
     internal unsafe void RenderGl(int framebuffer, int width, int height)
     {
@@ -201,7 +237,9 @@ public sealed class MpvPlayer : IVideoPlayback
     }
 
     /// <summary>Frees the drawing context (on the OpenGL thread). The player can then shut down.</summary>
-    internal void ReleaseGl()
+    internal void ReleaseGl() => FreeRenderContext();
+
+    void FreeRenderContext()
     {
         lock (_gate)
         {
@@ -215,25 +253,102 @@ public sealed class MpvPlayer : IVideoPlayback
         mpv_wakeup(_mpv); // lets a pending shutdown go ahead
     }
 
+    // ---- Software drawing (own thread) ----
+
+    unsafe void SoftwareLoop()
+    {
+        var size = stackalloc int[2];
+        while (!_quit)
+        {
+            _redraw.WaitOne(250);
+            lock (_gate)
+            {
+                if (_quit || _render == IntPtr.Zero || (mpv_render_context_update(_render) & RenderUpdateFrame) == 0)
+                    continue;
+                if (mpv_get_property_long(_mpv, "dwidth", FormatInt64, out var w) < 0 || mpv_get_property_long(_mpv, "dheight", FormatInt64, out var h) < 0 || w <= 0 || h <= 0)
+                    continue;
+                var scale = Math.Min(1.0, Math.Min(MaxSoftwareWidth / (double)w, MaxSoftwareHeight / (double)h));
+                var width = Math.Max(2, (int)(w * scale)) & ~1;
+                var height = Math.Max(2, (int)(h * scale)) & ~1;
+                if (width != _width || height != _height)
+                {
+                    if (_buffer != IntPtr.Zero)
+                        Marshal.FreeHGlobal(_buffer);
+                    _buffer = Marshal.AllocHGlobal(width * height * 4);
+                    (_width, _height) = (width, height);
+                }
+                size[0] = width;
+                size[1] = height;
+                var stride = (nuint)(width * 4);
+                var format = Marshal.StringToCoTaskMemUTF8("bgr0"); // BGRA in memory, alpha unused
+                try
+                {
+                    RenderParam[] parameters =
+                    [
+                        new() { Type = RenderParamSwSize, Data = (IntPtr)size },
+                        new() { Type = RenderParamSwFormat, Data = format },
+                        new() { Type = RenderParamSwStride, Data = (IntPtr)(&stride) },
+                        new() { Type = RenderParamSwPointer, Data = _buffer },
+                        new() { Type = RenderParamInvalid },
+                    ];
+                    if (mpv_render_context_render(_render, parameters) < 0)
+                        continue;
+                }
+                finally
+                {
+                    Marshal.FreeCoTaskMem(format);
+                }
+            }
+            // Show it at most once per UI frame; if the UI is behind, the newest picture wins.
+            if (Interlocked.Exchange(ref _framePending, 1) == 0)
+                Post(CopyFrame);
+        }
+        FreeRenderContext();
+    }
+
+    unsafe void CopyFrame()
+    {
+        Interlocked.Exchange(ref _framePending, 0);
+        lock (_gate)
+        {
+            if (_quit || _buffer == IntPtr.Zero)
+                return;
+            if (_frame is not { } frame || frame.PixelSize.Width != _width || frame.PixelSize.Height != _height)
+            {
+                var old = _frame;
+                _frame = frame = new WriteableBitmap(new PixelSize(_width, _height), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
+                FrameChanged?.Invoke();
+                old?.Dispose();
+            }
+            using var target = frame.Lock();
+            for (var y = 0; y < _height; y++)
+                Buffer.MemoryCopy((byte*)_buffer + y * _width * 4, (byte*)target.Address + y * target.RowBytes, target.RowBytes, _width * 4);
+        }
+        FrameReady?.Invoke();
+    }
+
     // ---- Events (own thread) ----
 
     void EventLoop()
     {
         while (true)
         {
-            bool quit, drawing;
+            bool drawing;
             lock (_gate)
-            {
-                quit = _quit;
                 drawing = _render != IntPtr.Zero;
-            }
-            if (quit && !drawing)
+            if (_quit && !drawing)
             {
                 // libmpv's rule: the drawing context goes first, then the player.
                 mpv_terminate_destroy(_mpv);
+                lock (_gate)
+                {
+                    if (_buffer != IntPtr.Zero)
+                        Marshal.FreeHGlobal(_buffer);
+                    _buffer = IntPtr.Zero;
+                }
                 return;
             }
-            var e = Marshal.PtrToStructure<Event>(mpv_wait_event(_mpv, quit ? 0.1 : -1));
+            var e = Marshal.PtrToStructure<Event>(mpv_wait_event(_mpv, _quit ? 0.1 : -1));
             switch (e.EventId)
             {
                 case EventPropertyChange:
@@ -284,8 +399,8 @@ public sealed class MpvPlayer : IVideoPlayback
 
     public void Dispose()
     {
-        lock (_gate)
-            _quit = true;
+        _quit = true;
+        _redraw.Set(); // software drawing frees its context on its own thread
         mpv_wakeup(_mpv);
     }
 }

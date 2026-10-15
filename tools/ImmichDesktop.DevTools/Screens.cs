@@ -137,6 +137,8 @@ static class Screens
 
     public static void Generate(string outDir)
     {
+        // Headless has no graphics card: videos are drawn into memory by mpv.
+        ImmichDesktop.App.Program.GpuRequested = false;
         AppServices.Initialize();
         Seed();
 
@@ -265,10 +267,6 @@ static class Screens
                 photos.OpenViewer(videoCell);
                 Console.WriteLine($"Video opening: {photos.Viewer?.VideoLoadingText}");
                 Shot(main, outDir, $"16d0-viewer-video-loading-{suffix}", height: 760, settle: TimeSpan.FromSeconds(0.2));
-                var waited = System.Diagnostics.Stopwatch.StartNew();
-                while (!VideoPlayer.IsReady && waited.Elapsed < TimeSpan.FromSeconds(60))
-                    Pump(TimeSpan.FromMilliseconds(200));
-                Console.WriteLine($"Video player ready after {waited.ElapsedMilliseconds} ms more");
                 Shot(main, outDir, $"16d-viewer-video-{suffix}", height: 760, settle: TimeSpan.FromSeconds(3));
                 var viewer = photos.Viewer!;
                 var frames = 0;

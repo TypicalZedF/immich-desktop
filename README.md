@@ -52,7 +52,7 @@ No-install option: **`ImmichDesktop-Portable.zip`**: unzip anywhere and run `Imm
 
 Uninstall from **Settings → Apps → Installed apps → Immich Desktop**. You'll be asked whether to keep your settings; nothing is ever removed from your Immich server.
 
-**Linux:** download **`ImmichDesktop-linux-x64.tar.gz`**, extract it and run `./install.sh`. It installs to `~/.local/opt/immich-desktop` and adds a menu entry; `./install.sh --uninstall` removes it. For videos to play in the app, install VLC (`sudo apt install vlc`, `sudo dnf install vlc`, …). Linux installs don't update themselves yet: download the new tarball and run `./install.sh` again.
+**Linux:** download **`ImmichDesktop-linux-x64.tar.gz`**, extract it and run `./install.sh`. It installs to `~/.local/opt/immich-desktop` and adds a menu entry; `./install.sh --uninstall` removes it. For videos to play in the app, install mpv's library (`sudo dnf install mpv-libs`, `sudo apt install libmpv2`, …). Linux installs don't update themselves yet: download the new tarball and run `./install.sh` again.
 
 > Until the installer is code-signed, Windows SmartScreen shows "Windows protected your PC". Click **More info → Run anyway**.
 

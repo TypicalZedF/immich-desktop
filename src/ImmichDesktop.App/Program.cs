@@ -7,7 +7,7 @@ using ImmichDesktop.Core.Services;
 
 namespace ImmichDesktop.App;
 
-internal static class Program
+public static class Program
 {
     /// <summary>Held for the lifetime of the process; null in design/preview tools.</summary>
     public static SingleInstance? Instance { get; private set; }
@@ -89,7 +89,8 @@ internal static class Program
     }
 
     /// <summary>Whether this run draws with the graphics card (Settings → Graphics acceleration; read at startup).</summary>
-    public static bool GpuRequested { get; private set; } = true;
+    /// <summary>The app draws with the graphics card (set at start from the settings; the screenshot tool turns it off).</summary>
+    public static bool GpuRequested { get; set; } = true;
 
     // Also used by the visual designer.
     public static AppBuilder BuildAvaloniaApp()
