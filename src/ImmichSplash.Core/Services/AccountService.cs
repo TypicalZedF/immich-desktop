@@ -6,7 +6,8 @@ using ImmichSplash.Core.Storage;
 namespace ImmichSplash.Core.Services;
 
 /// <summary>Owns the signed-in session: credentials, the API client and the account identity.</summary>
-public sealed class AccountService(SettingsStore settings, StateDatabase db) : IDisposable
+/// <param name="credentialsPath">Where the sign-in is stored (tests use their own file).</param>
+public sealed class AccountService(SettingsStore settings, StateDatabase db, string? credentialsPath = null) : IDisposable
 {
     const string AccountMetaKey = "account";
 
@@ -31,13 +32,37 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
     /// <summary>Raised once (on any thread) when the server stops accepting the sign-in.</summary>
     public event Action? SessionRejected;
 
+    /// <summary>For tests: what the clients made here talk through.</summary>
+    internal HttpMessageHandler? Handler { get; init; }
+
+    readonly Lock _gate = new();
+
     void OnSignedOut()
     {
-        if (IsRejected)
-            return;
-        IsRejected = true;
+        lock (_gate)
+        {
+            if (IsRejected)
+                return;
+            // Another copy of the app (an older one still in the tray, or the one the browser started for the SSO
+            // link) shares the stored sign-in. When it signs in again it logs out the old session, which this copy
+            // still uses: take the new sign-in over instead of calling this one signed out.
+            if (TryAdoptStoredSignIn())
+                return;
+            IsRejected = true;
+        }
         Log.Warn("The server no longer accepts this sign-in (logged out, expired or revoked)");
         SessionRejected?.Invoke();
+    }
+
+    bool TryAdoptStoredSignIn()
+    {
+        if (Client is not { } current || CredentialStore.Load(credentialsPath) is not { } stored || stored == current.Credential)
+            return false;
+        Client = new ImmichClient(current.ApiUrl, stored, Handler) { ServerVersion = current.ServerVersion, DeviceId = current.DeviceId };
+        Log.Info("The server dropped this sign-in; using the newer one signed in elsewhere in the app");
+        SessionChanged?.Invoke();
+        _ = Task.Delay(TimeSpan.FromMinutes(1)).ContinueWith(_ => current.Dispose(), TaskScheduler.Default);
+        return true;
     }
 
     public bool IsSignedIn => Client is not null;
@@ -52,11 +77,11 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
         if (!s.IsConfigured || !Uri.TryCreate(s.ServerUrl, UriKind.Absolute, out var apiUrl))
             return;
 
-        var credential = CredentialStore.Load();
+        var credential = CredentialStore.Load(credentialsPath);
         if (credential is null)
             return;
 
-        Client = new ImmichClient(apiUrl, credential) { DeviceId = Environment.MachineName };
+        Client = new ImmichClient(apiUrl, credential, Handler) { DeviceId = Environment.MachineName };
         Log.Info($"Restored session for {s.UserEmail} on {apiUrl.Host}");
     }
 
@@ -95,7 +120,7 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
 
     async Task<UserInfo> CompleteSignInAsync(ServerInfo server, AuthCredential credential, CancellationToken ct)
     {
-        var client = new ImmichClient(server.ApiUrl, credential) { ServerVersion = server.Version, DeviceId = Environment.MachineName };
+        var client = new ImmichClient(server.ApiUrl, credential, Handler) { ServerVersion = server.Version, DeviceId = Environment.MachineName };
         try
         {
             var me = await client.GetMeAsync(ct);
@@ -108,7 +133,7 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
                 db.SetMeta(AccountMetaKey, accountKey);
             }
 
-            CredentialStore.Save(credential);
+            CredentialStore.Save(credential, credentialsPath);
             settings.Update(s =>
             {
                 s.ServerUrl = server.ApiUrl.ToString();
@@ -162,7 +187,10 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
             client.Dispose();
         }
 
-        CredentialStore.Delete();
+        // Only our own sign-in: another copy of the app may have stored a newer one since.
+        var stored = CredentialStore.Load(credentialsPath);
+        if (stored is null || stored == client?.Credential)
+            CredentialStore.Delete(credentialsPath);
         settings.Update(s =>
         {
             s.UserId = null;
@@ -188,7 +216,7 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
     {
         if (Client is not { } current || current.ApiUrl == apiUrl)
             return;
-        Client = new ImmichClient(apiUrl, current.Credential) { ServerVersion = current.ServerVersion, DeviceId = current.DeviceId };
+        Client = new ImmichClient(apiUrl, current.Credential, Handler) { ServerVersion = current.ServerVersion, DeviceId = current.DeviceId };
         Log.Info($"Now connecting through {apiUrl.Host}");
         EndpointChanged?.Invoke();
         _ = Task.Delay(TimeSpan.FromMinutes(10)).ContinueWith(_ => current.Dispose(), TaskScheduler.Default);

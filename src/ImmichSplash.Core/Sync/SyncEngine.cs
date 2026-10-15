@@ -529,6 +529,12 @@ public sealed partial class SyncEngine : IAsyncDisposable
             SetState(SyncState.WaitingForNetwork);
             return TimeSpan.FromMinutes(1);
         }
+        catch (ImmichApiException ex) when (ex.IsSignedOut && !_account.IsRejected)
+        {
+            // Another copy of the app signed in again and this one has taken that sign-in over: run again with it.
+            Log.Info("Run stopped by a sign-in taken over from another copy of the app; trying again");
+            return TimeSpan.FromSeconds(1);
+        }
         catch (ImmichApiException ex) when (ex.IsUnauthorized)
         {
             Log.Warn("Server rejected our credentials", ex);
