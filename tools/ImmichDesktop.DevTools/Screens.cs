@@ -20,6 +20,33 @@ static class Screens
 {
     static string _root = "";
 
+    /// <summary>Screens to save (name contains any of these); empty = all. The others still run, unsaved.</summary>
+    public static string[] Only = [];
+    /// <summary>Only the "light" or "dark" pass; empty = both.</summary>
+    public static string Theme = "";
+    /// <summary>Saved size relative to the window (0.5 = a quarter of the pixels, cheaper to review).</summary>
+    public static double Scale = 1;
+
+    static bool Wanted(string name) => Only.Length == 0 || Only.Any(o => name.Contains(o, StringComparison.OrdinalIgnoreCase));
+
+    static void Save(Avalonia.Media.Imaging.Bitmap? frame, string dir, string name)
+    {
+        if (frame is null)
+            return;
+        if (Scale is > 0 and < 1)
+        {
+            var size = new PixelSize(Math.Max(1, (int)(frame.PixelSize.Width * Scale)), Math.Max(1, (int)(frame.PixelSize.Height * Scale)));
+            // Headless frames can't be scaled directly; re-decode the PNG at the smaller width instead.
+            using var png = new MemoryStream();
+            frame.Save(png);
+            png.Position = 0;
+            using var scaled = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(png, size.Width, Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality);
+            scaled.Save(Path.Combine(dir, name + ".png"));
+        }
+        else
+            frame.Save(Path.Combine(dir, name + ".png"));
+    }
+
     public static void PrepareData()
     {
         // Demo folders live at a neutral path (never the real user profile) so screenshots don't reveal names.
@@ -152,6 +179,8 @@ static class Screens
 
         foreach (var (variant, suffix) in new[] { (ThemeVariant.Light, "light"), (ThemeVariant.Dark, "dark") })
         {
+            if (Theme.Length > 0 && Theme != suffix)
+                continue;
             Application.Current!.RequestedThemeVariant = variant;
 
             // Onboarding: server, sign in, folders
@@ -597,7 +626,8 @@ static class Screens
             Console.WriteLine($"Settings opens: ok; after switching language the page is {rebuilt.CurrentPage?.GetType().Name ?? "nothing"}");
             if (rebuilt.CurrentPage is not SettingsViewModel)
                 throw new InvalidOperationException("Settings went blank after switching the language");
-            live.CaptureRenderedFrame()?.Save(Path.Combine(outDir, "93-language-switched.png"));
+            if (Wanted("93-language-switched"))
+                Save(live.CaptureRenderedFrame(), outDir, "93-language-switched");
             Tr.SetLanguage("en");
             live.DataContext = null;
             live.Close();
@@ -672,8 +702,12 @@ static class Screens
             Pump(TimeSpan.FromMilliseconds(300));
         }
         var frame = window.CaptureRenderedFrame();
-        frame?.Save(Path.Combine(dir, name + ".png"));
-        ReportUnnamedButtons(window, name);
+        // Unwanted screens are still shown (later screens depend on it), just not saved.
+        if (Wanted(name))
+        {
+            Save(frame, dir, name);
+            ReportUnnamedButtons(window, name);
+        }
         window.DataContext = null;
         window.Close();
     }

@@ -17,7 +17,8 @@ namespace ImmichDesktop.DevTools;
 /// Developer utilities that render the real UI headlessly.
 ///   icons &lt;assetsDir&gt;     regenerate app.ico, tray-*.ico and logo PNGs from the app logo (Assets/logo.png)
 ///   installer &lt;dir&gt;       regenerate the installer wizard images (BMP)
-///   screens &lt;outDir&gt;      render screenshots of every screen in light and dark mode
+///   screens &lt;outDir&gt; [--only a,b] [--theme light|dark] [--scale 0.5]
+///                         render screenshots of every screen in light and dark mode (or just the named ones)
 ///   video-test [software] [source]   play a video with libmpv in a real window
 /// </summary>
 static class Program
@@ -28,12 +29,22 @@ static class Program
             return VideoTest.Run(args[1..]);
         if (args.Length < 2 || args[0] is not ("icons" or "installer" or "screens"))
         {
-            Console.Error.WriteLine("usage: devtools icons <assetsDir> | installer <dir> | screens <outDir>");
+            Console.Error.WriteLine("usage: devtools icons <assetsDir> | installer <dir> | screens <outDir> [--only a,b] [--theme light|dark] [--scale 0.5]");
             return 1;
         }
 
         if (args[0] == "screens")
-            Screens.PrepareData(); // must run before anything touches AppPaths
+        {
+            for (var i = 2; i + 1 < args.Length; i += 2)
+                switch (args[i])
+                {
+                    case "--only": Screens.Only = args[i + 1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries); break;
+                    case "--theme": Screens.Theme = args[i + 1].ToLowerInvariant(); break;
+                    case "--scale": Screens.Scale = double.Parse(args[i + 1], System.Globalization.CultureInfo.InvariantCulture); break;
+                    default: Console.Error.WriteLine($"unknown option {args[i]}"); return 1;
+                }
+            Screens.PrepareData();
+        } // must run before anything touches AppPaths
 
         AppBuilder.Configure<ImmichDesktop.App.App>()
             .UseSkia()
