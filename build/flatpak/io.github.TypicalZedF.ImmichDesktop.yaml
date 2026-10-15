@@ -23,7 +23,7 @@ finish-args:
   - --filesystem=xdg-config/autostart:create
   # Tray icon and desktop notifications.
   - --talk-name=org.kde.StatusNotifierWatcher
-  - --own-name=org.kde.StatusNotifierItem-*
+  - --own-name=org.kde.* # the tray icon registers org.kde.StatusNotifierItem-<pid>-<n>; Flatpak only allows a whole-word wildcard
   - --talk-name=com.canonical.AppMenu.Registrar
   - --talk-name=org.freedesktop.Notifications
   # Network status (metered connections, home network) from NetworkManager.

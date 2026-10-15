@@ -40,6 +40,22 @@ public sealed partial class PhotosViewModel
     [RelayCommand]
     Task DeleteOpenAlbumAsync() => Drill?.Album is { } album ? DeleteAlbumAsync(album) : Task.CompletedTask;
 
+    /// <summary>Saves the whole open album (originals) into a folder named after it.</summary>
+    [RelayCommand]
+    async Task DownloadOpenAlbumAsync()
+    {
+        if (Drill?.Album is not { } album || _main is null)
+            return;
+        var parent = await _main.PickFolderAsync(Tr.T("Save the album “{0}” to…", album.AlbumName));
+        if (parent is null)
+            return;
+        var ids = new List<string>();
+        foreach (var bucket in _buckets)
+            ids.AddRange((await bucket.GetAssetsAsync(_lifetime.Token)).Where(a => a.LocalPath is null).Select(a => a.Id));
+        var folder = Directory.CreateDirectory(Path.Combine(parent, string.Concat(album.AlbumName.Split(Path.GetInvalidFileNameChars())).Trim() is { Length: > 0 } name ? name : "Album")).FullName;
+        await DownloadToFolderAsync(ids.Distinct().ToList(), folder);
+    }
+
     /// <summary>
     /// Deletes an album (its photos stay). If a backed-up folder adds its photos to this album, the
     /// next backup would just create it again, so deleting it also stops that folder's album.
@@ -136,22 +152,41 @@ public sealed partial class PhotosViewModel
             var folder = await _main.PickFolderAsync(Tr.T("Save {0} photos to…", ids.Count));
             if (folder is null)
                 return;
-            var done = 0;
-            foreach (var id in ids)
-            {
-                ShowNotice(Tr.T("Downloading {0} of {1}…", done + 1, ids.Count), sticky: true);
-                var details = await client.GetAssetAsync(id, CancellationToken.None);
-                var path = UniquePath(folder, details.OriginalFileName ?? $"{id}.jpg");
-                await using (var file = File.Create(path))
-                    await client.DownloadOriginalAsync(id, file, CancellationToken.None);
-                done++;
-            }
-            ShowNotice(Tr.T("Saved {0} to {1}", Format.Plural(done, "photo"), Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar))));
+            await DownloadToFolderAsync(ids, folder);
         }
         catch (Exception ex)
         {
             Log.Warn("Download failed", ex);
             ShowNotice(Tr.T("Couldn't download. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
+
+    /// <summary>Saves originals into a folder (names kept; a number is added if one is taken).</summary>
+    async Task DownloadToFolderAsync(IReadOnlyList<string> ids, string folder)
+    {
+        if (Client is not { } client || ids.Count == 0)
+            return;
+        var done = 0;
+        try
+        {
+            foreach (var id in ids)
+            {
+                ShowNotice(Tr.T("Downloading {0} of {1}…", done + 1, ids.Count), sticky: true);
+                var details = await client.GetAssetAsync(id, _lifetime.Token);
+                var path = UniquePath(folder, details.OriginalFileName ?? $"{id}.jpg");
+                await using (var file = File.Create(path))
+                    await client.DownloadOriginalAsync(id, file, _lifetime.Token);
+                done++;
+            }
+            ShowNotice(Tr.T("Saved {0} to {1}", Format.Plural(done, "photo"), Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar))));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Download failed", ex);
+            ShowNotice(Tr.T("Couldn't download ({0} of {1} saved). {2}", done, ids.Count, NetworkErrors.Describe(ex)));
         }
     }
 

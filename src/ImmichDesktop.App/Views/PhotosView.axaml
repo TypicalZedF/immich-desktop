@@ -386,6 +386,9 @@
           <Button Classes="secondary" Command="{Binding LockCommand}" IsVisible="{Binding ShowLockAction}">
             <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="LockOutline" /><TextBlock l:Tr.Text="Lock" /></StackPanel>
           </Button>
+          <Button Classes="ghost icon" Command="{Binding DownloadOpenAlbumCommand}" IsVisible="{Binding CanShareAlbum}" l:Tr.Tip="Download album">
+            <mi:MaterialIcon Kind="DownloadOutline" Width="20" Height="20" />
+          </Button>
           <Button Classes="ghost icon" Command="{Binding ShareAlbumCommand}" IsVisible="{Binding CanShareAlbum}" l:Tr.Tip="Share album">
             <mi:MaterialIcon Kind="ShareVariantOutline" Width="20" Height="20" />
           </Button>

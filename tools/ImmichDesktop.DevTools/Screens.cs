@@ -406,6 +406,14 @@ static class Screens
             Shot(main, outDir, $"19a-albums-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
             if (suffix == "light")
             {
+                // An open album: its header has Download, Share and Delete.
+                var openPage = (PhotosViewModel)Page(shell, ShellPage.Albums);
+                openPage.Albums.Cast<LibraryCardViewModel>().First().OpenCommand.Execute(null);
+                Pump(TimeSpan.FromSeconds(1.5));
+                Shot(main, outDir, "19a1-album-open", height: 760, settle: TimeSpan.FromSeconds(1));
+                openPage.BackCommand.Execute(null);
+                Pump(TimeSpan.FromSeconds(1));
+
                 // Deleting an album that a backed-up folder fills: warns, then stops the folder's album too.
                 var albumsPage = (PhotosViewModel)Page(shell, ShellPage.Albums);
                 var phone = albumsPage.Albums.First(a => a.Title == "Phone");
