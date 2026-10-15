@@ -88,13 +88,6 @@ public class NetworkTests
     }
 
     [Fact]
-    public void Gdbus_text_is_quoted_and_escaped()
-    {
-        Assert.Equal("'Sign in to Immich again'", LinuxDBus.Text("Sign in to Immich again"));
-        Assert.Equal(@"'It\'s done\nC:\\photos'", LinuxDBus.Text("It's done\nC:\\photos"));
-    }
-
-    [Fact]
     public void Looks_for_servers_on_the_home_network_only()
     {
         var hosts = LocalServerFinder.CandidateHosts([

@@ -67,34 +67,6 @@ public static class LinuxDBus
         return bus.CallMethodAsync(message, read, null).WaitAsync(timeout ?? Timeout);
     }
 
-    /// <summary>
-    /// A session-bus call through gdbus (part of GLib, in the Flatpak runtime). Inside the Flatpak the bus filter cuts
-    /// this app's own session-bus connection on its first call; gdbus gets through, and says why when it can't.
-    /// Arguments are GVariant text (see <see cref="Text"/>). Returns gdbus's output.
-    /// </summary>
-    public static async Task<string> GdbusAsync(string destination, string path, string method, params string[] args)
-    {
-        var start = new System.Diagnostics.ProcessStartInfo("gdbus")
-        {
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-        foreach (var arg in new[] { "call", "--session", "--dest", destination, "--object-path", path, "--method", method, "--" }.Concat(args))
-            start.ArgumentList.Add(arg);
-        using var process = System.Diagnostics.Process.Start(start) ?? throw new InvalidOperationException("gdbus didn't start.");
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync().WaitAsync(Timeout);
-        if (process.ExitCode != 0)
-            throw new InvalidOperationException((await error).Trim() is { Length: > 0 } message ? message : $"gdbus failed ({process.ExitCode}).");
-        return await output;
-    }
-
-    /// <summary>A GVariant text string: 'text', escaped.</summary>
-    public static string Text(string value) =>
-        "'" + value.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n") + "'";
-
     /// <summary>Runs async D-Bus work from synchronous code (called off the UI thread).</summary>
     public static T Wait<T>(Task<T> task) => task.WaitAsync(Timeout).GetAwaiter().GetResult();
 }
