@@ -1,0 +1,41 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ImmichSplash.App.ViewModels"
+             xmlns:views="using:ImmichSplash.App.Views"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichSplash.App.App"
+             Name="Immich Splash"
+             RequestedThemeVariant="Default">
+
+  <Application.DataTemplates>
+    <DataTemplate DataType="vm:OnboardingViewModel"><views:OnboardingView /></DataTemplate>
+    <DataTemplate DataType="vm:ShellViewModel"><views:ShellView /></DataTemplate>
+    <DataTemplate DataType="vm:LockViewModel"><views:LockView /></DataTemplate>
+    <DataTemplate DataType="vm:OverviewViewModel"><views:OverviewView /></DataTemplate>
+    <DataTemplate DataType="vm:PhotosViewModel"><views:PhotosView /></DataTemplate>
+    <DataTemplate DataType="vm:FoldersViewModel"><views:FoldersView /></DataTemplate>
+    <DataTemplate DataType="vm:ActivityViewModel"><views:ActivityView /></DataTemplate>
+    <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>
+    <DataTemplate DataType="vm:ProfilePhotoViewModel"><views:ProfilePhotoView /></DataTemplate>
+    <DataTemplate DataType="vm:DropUploadViewModel"><views:DropUploadView /></DataTemplate>
+  </Application.DataTemplates>
+
+  <Application.Styles>
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Light" Accent="#4250AF" RegionColor="#F4F5F9" ErrorText="#C62828" />
+        <ColorPaletteResources x:Key="Dark" Accent="#ADCBFA" RegionColor="#0E0F12" ErrorText="#FF8A80" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
+    <mi:MaterialIconStyles />
+    <StyleInclude Source="/Styles/Controls.axaml" />
+  </Application.Styles>
+
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="/Styles/Colors.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

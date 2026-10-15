@@ -1,0 +1,186 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichSplash.App.Services"
+             xmlns:vm="using:ImmichSplash.App.ViewModels"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichSplash.App.Views.OverviewView"
+             x:DataType="vm:OverviewViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="36,30,36,36" Spacing="20" MaxWidth="1000">
+
+      <!-- Header -->
+      <StackPanel Spacing="4">
+        <TextBlock Classes="h1" Text="{Binding Greeting}" />
+        <TextBlock Classes="secondary" l:Tr.Text="Here's how your backup is doing." />
+      </StackPanel>
+
+      <!-- Update available -->
+      <Border Classes="banner" IsVisible="{Binding UpdateAvailable}">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <mi:MaterialIcon Kind="Update" Width="20" Height="20" Foreground="{DynamicResource AppPrimaryBrush}" />
+          <TextBlock Grid.Column="1" Margin="10,0" VerticalAlignment="Center" Text="{Binding UpdateText}" />
+          <Button Grid.Column="2" Classes="primary" l:Tr.Content="Restart to update" Command="{Binding InstallUpdateCommand}" />
+        </Grid>
+      </Border>
+
+      <!-- Status hero -->
+      <Border Classes="card" Padding="26">
+        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+          <Border Classes="tone" Width="60" Height="60" CornerRadius="30" VerticalAlignment="Center"
+                  Classes.busy="{Binding Status.IsBusy}" Classes.paused="{Binding Status.IsPaused}"
+                  Classes.warning="{Binding Status.IsWarning}" Classes.error="{Binding Status.IsError}">
+            <mi:MaterialIcon Kind="{Binding Status.Icon}" Width="30" Height="30" Classes.spin="{Binding Status.Spin}" />
+          </Border>
+
+          <StackPanel Grid.Column="1" Margin="18,0" VerticalAlignment="Center" Spacing="4">
+            <TextBlock Classes="h2" FontSize="20" Text="{Binding Status.Title}" TextWrapping="Wrap" />
+            <TextBlock Classes="secondary" Text="{Binding Status.Detail}" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+            <Button Classes="primary" Command="{Binding SignInCommand}" IsVisible="{Binding NeedsSignIn}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="Login" />
+                <TextBlock l:Tr.Text="Sign in" />
+              </StackPanel>
+            </Button>
+            <Button Classes="secondary" Command="{Binding TogglePauseCommand}" IsVisible="{Binding !NeedsSignIn}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="{Binding PauseIcon}" />
+                <TextBlock Text="{Binding PauseText}" />
+              </StackPanel>
+            </Button>
+            <Button Classes="primary" Command="{Binding SyncNowCommand}" IsVisible="{Binding !NeedsSignIn}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="Sync" />
+                <TextBlock l:Tr.Text="Sync now" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+
+          <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Margin="0,22,0,0" Spacing="10" IsVisible="{Binding ShowProgress}">
+            <ProgressBar Value="{Binding ProgressPercent}" Maximum="100" IsIndeterminate="{Binding IsIndeterminate}" />
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <TextBlock Classes="caption" Text="{Binding ProgressText}" />
+              <TextBlock Grid.Column="1" Classes="caption" Text="{Binding TimeLeftText}" Margin="0,0,14,0" />
+              <TextBlock Grid.Column="2" Classes="caption" FontWeight="SemiBold" Text="{Binding SpeedText}" />
+            </Grid>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- Stat tiles -->
+      <Grid ColumnDefinitions="*,16,*,16,*">
+        <Border Classes="card" Padding="20">
+          <StackPanel Spacing="14">
+            <Border Classes="iconChip tone" HorizontalAlignment="Left">
+              <mi:MaterialIcon Kind="CloudCheckOutline" />
+            </Border>
+            <StackPanel Spacing="2">
+              <TextBlock Classes="stat" Text="{Binding BackedUpText}" />
+              <TextBlock Classes="caption" l:Tr.Text="Backed up" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="2" Classes="card" Padding="20">
+          <StackPanel Spacing="14">
+            <Border Classes="iconChip tone busy" HorizontalAlignment="Left">
+              <mi:MaterialIcon Kind="ClockOutline" />
+            </Border>
+            <StackPanel Spacing="2">
+              <TextBlock Classes="stat" Text="{Binding WaitingText}" />
+              <TextBlock Classes="caption" l:Tr.Text="Waiting to upload" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+        <Button Grid.Column="4" Padding="0" CornerRadius="18" HorizontalAlignment="Stretch" Background="Transparent" BorderThickness="0"
+                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                Command="{Binding ShowProblemsCommand}" l:Tr.Tip="See what went wrong">
+          <Border Classes="card" Padding="20">
+            <StackPanel Spacing="14">
+              <Border Classes="iconChip tone paused" Classes.warning="{Binding HasAttention}" HorizontalAlignment="Left">
+                <mi:MaterialIcon Kind="AlertCircleOutline" />
+              </Border>
+              <StackPanel Spacing="2">
+                <TextBlock Classes="stat" Text="{Binding AttentionText}" />
+                <TextBlock Classes="caption" l:Tr.Text="Need attention" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </Button>
+      </Grid>
+
+      <!-- Uploading now -->
+      <Border Classes="card" IsVisible="{Binding HasUploads}">
+        <StackPanel Spacing="14">
+          <TextBlock Classes="h3" l:Tr.Text="Uploading now" />
+          <ItemsControl ItemsSource="{Binding Uploads}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Spacing="14" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:UploadItemViewModel">
+                <Grid ColumnDefinitions="Auto,*">
+                  <Border Classes="iconChip" Width="38" Height="38">
+                    <mi:MaterialIcon Kind="{Binding Icon}" Width="20" Height="20" />
+                  </Border>
+                  <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="6" VerticalAlignment="Center">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="1" Classes="caption" Text="{Binding SizeText}" Margin="12,0,0,0" />
+                    </Grid>
+                    <ProgressBar Classes="thin" Value="{Binding Percent}" Maximum="100" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <!-- Folders -->
+      <Border Classes="card">
+        <StackPanel Spacing="16">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="h3" l:Tr.Text="Folders" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="link" l:Tr.Content="Manage folders" Command="{Binding ManageFoldersCommand}" />
+          </Grid>
+
+          <StackPanel Spacing="10" IsVisible="{Binding !HasFolders}" Margin="0,4,0,6">
+            <TextBlock Classes="secondary" l:Tr.Text="You're not backing up any folders yet." />
+            <Button Classes="primary" HorizontalAlignment="Left" Command="{Binding ManageFoldersCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="FolderPlusOutline" />
+                <TextBlock l:Tr.Text="Add a folder" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+
+          <ItemsControl ItemsSource="{Binding Folders}" IsVisible="{Binding HasFolders}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Spacing="16" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:FolderSummaryViewModel">
+                <Grid ColumnDefinitions="Auto,*,22" Opacity="{Binding Enabled, Converter={x:Static vm:Converters.EnabledOpacity}}">
+                  <Border Classes="iconChip">
+                    <mi:MaterialIcon Kind="Folder" />
+                  </Border>
+                  <StackPanel Grid.Column="1" Margin="12,0,10,0" Spacing="6" VerticalAlignment="Center">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="1" Classes="caption" Text="{Binding StatsText}" Margin="12,0,0,0" />
+                    </Grid>
+                    <ProgressBar Classes="thin" Classes.success="{Binding IsComplete}" Value="{Binding Percent}" Maximum="100" />
+                  </StackPanel>
+                  <mi:MaterialIcon Grid.Column="2" Kind="CheckCircle" Width="20" Height="20" HorizontalAlignment="Right"
+                                   Foreground="{DynamicResource AppSuccessBrush}" IsVisible="{Binding IsComplete}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,244 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichSplash.App.Services"
+             xmlns:vm="using:ImmichSplash.App.ViewModels"
+             xmlns:c="using:ImmichSplash.App.Controls"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichSplash.App.Views.OnboardingView"
+             x:DataType="vm:OnboardingViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <Grid MinHeight="600">
+      <Border Classes="card" Width="520" Padding="40,34" CornerRadius="26" Margin="24"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              BoxShadow="0 10 40 0 #14000000">
+        <StackPanel Spacing="22">
+
+          <!-- Progress dots -->
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6">
+            <Border Classes="stepDot" Classes.active="{Binding IsServerStep}" />
+            <Border Classes="stepDot" Classes.active="{Binding IsSignInStep}" />
+            <Border Classes="stepDot" Classes.active="{Binding IsFoldersStep}" />
+          </StackPanel>
+
+          <!-- ===== Step 1: server ===== -->
+          <StackPanel Spacing="20" IsVisible="{Binding IsServerStep}">
+            <c:AppLogo Width="84" Height="84" HorizontalAlignment="Center" />
+            <StackPanel Spacing="8">
+              <TextBlock Classes="display" l:Tr.Text="Welcome to Immich Splash" TextAlignment="Center" TextWrapping="Wrap" />
+              <TextBlock Classes="secondary" TextAlignment="Center" TextWrapping="Wrap" LineHeight="21"
+                         l:Tr.Text="Automatically back up the photos and videos on this computer to your own Immich server." />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+              <TextBlock Classes="label" l:Tr.Text="Server address" />
+              <TextBox Text="{Binding ServerUrl}" l:Tr.Watermark="https://photos.example.com">
+                <TextBox.InnerLeftContent>
+                  <mi:MaterialIcon Kind="Web" Width="18" Height="18" Margin="14,0,0,0"
+                                   Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                </TextBox.InnerLeftContent>
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding ConnectCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+              <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                         l:Tr.Text="The same address you use to open Immich in your browser." />
+            </StackPanel>
+
+            <Border Classes="banner error" IsVisible="{Binding ServerError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <mi:MaterialIcon Kind="AlertCircleOutline" Width="18" Height="18" VerticalAlignment="Top" />
+                <TextBlock Text="{Binding ServerError}" TextWrapping="Wrap" MaxWidth="390" />
+              </StackPanel>
+            </Border>
+
+            <Button Classes="primary large" HorizontalAlignment="Stretch" Command="{Binding ConnectCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <mi:MaterialIcon Kind="Loading" Classes="spin" IsVisible="{Binding IsBusy}" />
+                <TextBlock l:Tr.Text="Continue" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+
+          <!-- ===== Step 2: sign in ===== -->
+          <StackPanel Spacing="20" IsVisible="{Binding IsSignInStep}">
+            <Grid ColumnDefinitions="Auto,*">
+              <Button Classes="ghost icon" Command="{Binding BackCommand}" l:Tr.Tip="Back">
+                <mi:MaterialIcon Kind="ArrowLeft" />
+              </Button>
+              <Border Grid.Column="1" Classes="chip" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                  <mi:MaterialIcon Kind="CheckCircle" Width="15" Height="15" Foreground="{DynamicResource AppSuccessBrush}" />
+                  <TextBlock Classes="caption" Text="{Binding ServerHost}" FontWeight="Medium" />
+                  <TextBlock Classes="caption tertiary" Text="{Binding ServerVersion}" />
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <StackPanel Spacing="8">
+              <TextBlock Classes="display" l:Tr.Text="Sign in" />
+              <TextBlock Classes="secondary" TextWrapping="Wrap" l:Tr.Text="Use your Immich account. Your password is never stored on this computer." />
+            </StackPanel>
+
+            <Border Classes="banner warning" IsVisible="{Binding IsInsecure}">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <mi:MaterialIcon Kind="LockOpenVariantOutline" Width="18" Height="18" VerticalAlignment="Top" />
+                <TextBlock TextWrapping="Wrap" MaxWidth="390"
+                           l:Tr.Text="This connection isn't encrypted (http). That's fine on your home network, but use https if your server is reachable from the internet." />
+              </StackPanel>
+            </Border>
+
+            <StackPanel Spacing="20" IsVisible="{Binding ShowSignInForm}">
+            <Border Classes="segmented" HorizontalAlignment="Left">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton Classes="segment" GroupName="auth" l:Tr.Content="Email &amp; password" IsChecked="{Binding UsePassword}" IsVisible="{Binding OffersPassword}" />
+                <RadioButton Classes="segment" GroupName="auth" l:Tr.Content="API key" IsChecked="{Binding UseApiKey}" />
+              </StackPanel>
+            </Border>
+
+            <StackPanel Spacing="14" IsVisible="{Binding UsePassword}">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="label" l:Tr.Text="Email" />
+                <TextBox Text="{Binding Email}" l:Tr.Watermark="you@example.com" />
+              </StackPanel>
+              <StackPanel Spacing="8">
+                <TextBlock Classes="label" l:Tr.Text="Password" />
+                <TextBox Text="{Binding Password}" PasswordChar="&#x2022;" RevealPassword="False" l:Tr.Watermark="Password">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding SignInCommand}" />
+                  </TextBox.KeyBindings>
+                </TextBox>
+              </StackPanel>
+            </StackPanel>
+
+            <StackPanel Spacing="8" IsVisible="{Binding UseApiKey}">
+              <TextBlock Classes="label" l:Tr.Text="API key" />
+              <TextBox Text="{Binding ApiKey}" PasswordChar="&#x2022;" l:Tr.Watermark="Paste your API key">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding SignInCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+              <TextBlock Classes="caption" TextWrapping="Wrap" LineHeight="19"
+                         l:Tr.Text="Use this if you sign in with SSO/OAuth. Create a key in Immich under Account Settings → API Keys. It needs permission to upload assets, read your user, and manage albums." />
+              <Button Classes="link" HorizontalAlignment="Left" Command="{Binding OpenServerCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock l:Tr.Text="Open API key settings" />
+                  <mi:MaterialIcon Kind="OpenInNew" Width="14" Height="14" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+
+            <Border Classes="banner error" IsVisible="{Binding SignInError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <mi:MaterialIcon Kind="AlertCircleOutline" Width="18" Height="18" VerticalAlignment="Top" />
+                <TextBlock Text="{Binding SignInError}" TextWrapping="Wrap" MaxWidth="390" />
+              </StackPanel>
+            </Border>
+
+            <Button Classes="primary large" HorizontalAlignment="Stretch" Command="{Binding SignInCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <mi:MaterialIcon Kind="Loading" Classes="spin" IsVisible="{Binding IsBusy}" />
+                <TextBlock l:Tr.Text="Sign in" />
+              </StackPanel>
+            </Button>
+
+            <!-- SSO / OAuth (Authentik, Keycloak, Google, ...) -->
+            <StackPanel Spacing="16" IsVisible="{Binding OffersSso}">
+              <Grid ColumnDefinitions="*,Auto,*">
+                <Border Classes="divider" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Classes="caption tertiary" l:Tr.Text="or" Margin="12,0" />
+                <Border Grid.Column="2" Classes="divider" VerticalAlignment="Center" />
+              </Grid>
+              <Button Classes="secondary large" HorizontalAlignment="Stretch" Command="{Binding SignInWithSsoCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <mi:MaterialIcon Kind="ShieldAccountOutline" />
+                  <TextBlock Text="{Binding SsoButtonText}" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+            </StackPanel>
+
+            <!-- Waiting for the browser -->
+            <Border Classes="card" Padding="22" IsVisible="{Binding IsWaitingForBrowser}">
+              <StackPanel Spacing="12">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                  <mi:MaterialIcon Kind="Loading" Classes="spin" Width="22" Height="22" Foreground="{DynamicResource AppPrimaryBrush}" />
+                  <TextBlock Classes="h3" l:Tr.Text="Finish signing in in your browser" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Classes="caption" TextWrapping="Wrap" LineHeight="19"
+                           l:Tr.Text="We opened your sign-in page in your default browser. When you're done, your browser will ask to open Immich Splash. Allow it and you'll be signed in here." />
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap" LineHeight="19"
+                           l:Tr.Text="Seeing a redirect URI error? Ask your Immich admin to allow app.immich:///oauth-callback, the same one the mobile app uses." />
+                <Button Classes="secondary" HorizontalAlignment="Left" l:Tr.Content="Cancel" Command="{Binding CancelSsoCommand}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <!-- ===== Step 3: folders ===== -->
+          <StackPanel Spacing="18" IsVisible="{Binding IsFoldersStep}">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="display" l:Tr.Text="Choose what to back up" TextWrapping="Wrap" />
+              <TextBlock Classes="secondary" TextWrapping="Wrap" LineHeight="21"
+                         l:Tr.Text="Pick the folders you want to keep safe in Immich. Only photos and videos are uploaded. You can change this anytime." />
+            </StackPanel>
+
+            <Border BorderBrush="{DynamicResource AppCardBorderBrush}" BorderThickness="1" CornerRadius="16" ClipToBounds="True">
+              <ItemsControl ItemsSource="{Binding FolderChoices}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:FolderChoiceViewModel">
+                    <Border Padding="16,12" Background="Transparent" BorderBrush="{DynamicResource AppDividerBrush}" BorderThickness="0,0,0,1">
+                      <CheckBox IsChecked="{Binding IsSelected}" HorizontalAlignment="Stretch">
+                        <Grid ColumnDefinitions="Auto,*" Margin="6,0,0,0">
+                          <Border Classes="iconChip" Width="38" Height="38">
+                            <mi:MaterialIcon Kind="{Binding Icon}" />
+                          </Border>
+                          <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock Classes="caption" Text="{Binding Detail}" />
+                          </StackPanel>
+                        </Grid>
+                      </CheckBox>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Border>
+
+            <Button Classes="secondary" HorizontalAlignment="Left" Command="{Binding AddFolderCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="FolderPlusOutline" />
+                <TextBlock l:Tr.Text="Add another folder" />
+              </StackPanel>
+            </Button>
+
+            <Border Classes="banner error" IsVisible="{Binding FolderError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Text="{Binding FolderError}" TextWrapping="Wrap" />
+            </Border>
+
+            <Border Classes="divider" />
+
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding AutostartSupported}">
+              <TextBlock Text="{Binding AutostartLabel}" VerticalAlignment="Center" TextWrapping="Wrap" />
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding LaunchAtStartup}" />
+            </Grid>
+
+            <Border Classes="banner">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <mi:MaterialIcon Kind="InformationOutline" Width="18" Height="18" VerticalAlignment="Top"
+                                 Foreground="{DynamicResource AppPrimaryBrush}" />
+                <TextBlock TextWrapping="Wrap" MaxWidth="390" LineHeight="20"
+                           l:Tr.Text="Immich Splash runs quietly in the system tray and backs up new photos as they arrive. Close this window anytime." />
+              </StackPanel>
+            </Border>
+
+            <Button Classes="primary large" HorizontalAlignment="Stretch" Command="{Binding FinishCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <mi:MaterialIcon Kind="CloudUploadOutline" />
+                <TextBlock l:Tr.Text="Start backup" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
+  </ScrollViewer>
+</UserControl>

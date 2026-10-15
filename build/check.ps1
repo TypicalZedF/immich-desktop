@@ -14,7 +14,7 @@ param(
 $ErrorActionPreference = "Continue"
 $started = Get-Date
 
-$build = dotnet build "$script:Root/ImmichDesktop.slnx" -v q -nologo 2>&1 | ForEach-Object { "$_" }
+$build = dotnet build "$script:Root/ImmichSplash.slnx" -v q -nologo 2>&1 | ForEach-Object { "$_" }
 $errors = @($build | Where-Object { $_ -match ': error ' } | ForEach-Object { ($_ -replace [regex]::Escape("$script:Root\"), '' -replace '\s+\[[^\]]+\.csproj\]$', '').Trim() } | Select-Object -Unique)
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed ($($errors.Count) errors)" -ForegroundColor Red
@@ -26,7 +26,7 @@ $warnings = @($build | Where-Object { $_ -match ': warning ' } | Select-Object -
 Write-Host "Build ok ($warnings warnings)" -ForegroundColor Green
 if ($NoTest) { exit 0 }
 
-$testArgs = @("test", "$script:Root/tests/ImmichDesktop.Core.Tests", "--no-build", "-v", "m", "--nologo")
+$testArgs = @("test", "$script:Root/tests/ImmichSplash.Core.Tests", "--no-build", "-v", "m", "--nologo")
 if ($Filter) { $testArgs += @("--filter", "FullyQualifiedName~$Filter") }
 $test = & dotnet @testArgs 2>&1 | ForEach-Object { "$_" }
 $code = $LASTEXITCODE

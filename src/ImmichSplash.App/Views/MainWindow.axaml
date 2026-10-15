@@ -1,0 +1,50 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichSplash.App.Services"
+        xmlns:vm="using:ImmichSplash.App.ViewModels"
+        xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+        x:Class="ImmichSplash.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        l:Tr.Title="Immich Splash"
+        Width="1060" Height="720" MinWidth="880" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        DragDrop.AllowDrop="True">
+  <Panel>
+    <ContentControl Content="{Binding Content}" />
+
+    <!-- Dragging photos or folders over the window -->
+    <Border IsVisible="{Binding IsDragOver}" IsHitTestVisible="False" Margin="16" CornerRadius="24" BorderThickness="3"
+            BorderBrush="{DynamicResource AppPrimaryBrush}" Background="{DynamicResource AppOverlayBrush}">
+      <Border Classes="card" Padding="28,22" CornerRadius="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <mi:MaterialIcon Kind="CloudUploadOutline" Width="32" Height="32" Foreground="{DynamicResource AppPrimaryBrush}" />
+          <TextBlock Classes="h2" l:Tr.Text="Drop to upload to Immich" VerticalAlignment="Center" />
+        </StackPanel>
+      </Border>
+    </Border>
+
+    <!-- Larger in-window dialogs (e.g. choosing a profile picture) -->
+    <Panel IsVisible="{Binding Overlay, Converter={x:Static ObjectConverters.IsNotNull}}"
+           Background="{DynamicResource AppOverlayBrush}">
+      <ContentControl Content="{Binding Overlay}" />
+    </Panel>
+
+    <!-- In-window confirmation dialog -->
+    <Panel IsVisible="{Binding Dialog, Converter={x:Static ObjectConverters.IsNotNull}}"
+           Background="{DynamicResource AppOverlayBrush}">
+      <Border Classes="card" Width="440" Padding="28,26" CornerRadius="22"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              BoxShadow="0 18 50 0 #40000000">
+        <StackPanel Spacing="10" DataContext="{Binding Dialog}" x:DataType="vm:DialogViewModel">
+          <TextBlock Classes="h2" Text="{Binding Title}" TextWrapping="Wrap" />
+          <TextBlock Classes="secondary" Text="{Binding Message}" TextWrapping="Wrap" LineHeight="21" />
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,14,0,0">
+            <Button Classes="secondary" Content="{Binding CancelText}" Command="{Binding CancelCommand}" />
+            <Button Classes="primary" Classes.danger="{Binding IsDanger}"
+                    Content="{Binding ConfirmText}" Command="{Binding ConfirmCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Panel>
+  </Panel>
+</Window>

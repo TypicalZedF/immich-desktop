@@ -1,0 +1,62 @@
+<!-- Palette taken from the Immich web app (web/src/app.css): primary 66 80 175 / dark primary 172 203 250,
+     background white / 10 10 10, dark surfaces 33 33 33, plus Tailwind grays as used by Immich. -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ResourceDictionary.ThemeDictionaries>
+
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="AppPageBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="AppSidebarBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="AppCardBrush" Color="#F9FAFB" />
+      <SolidColorBrush x:Key="AppCardBorderBrush" Color="#E5E7EB" />
+      <SolidColorBrush x:Key="AppDividerBrush" Color="#E5E7EB" />
+      <SolidColorBrush x:Key="AppHoverBrush" Color="#F3F4F6" />
+      <SolidColorBrush x:Key="AppInputBrush" Color="#F3F4F6" />
+      <SolidColorBrush x:Key="AppTextBrush" Color="#0F0F0F" />
+      <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#4B5563" />
+      <SolidColorBrush x:Key="AppTextTertiaryBrush" Color="#6B7280" />
+      <SolidColorBrush x:Key="AppPrimaryBrush" Color="#4250AF" />
+      <SolidColorBrush x:Key="AppPrimaryHoverBrush" Color="#3B489E" />
+      <SolidColorBrush x:Key="AppPrimaryPressedBrush" Color="#35408C" />
+      <SolidColorBrush x:Key="AppOnPrimaryBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="AppPrimarySoftBrush" Color="#ECEEF7" />
+      <SolidColorBrush x:Key="AppSuccessBrush" Color="#16A34A" />
+      <SolidColorBrush x:Key="AppSuccessSoftBrush" Color="#DCFCE7" />
+      <SolidColorBrush x:Key="AppWarningBrush" Color="#B45309" />
+      <SolidColorBrush x:Key="AppWarningSoftBrush" Color="#FEF3C7" />
+      <SolidColorBrush x:Key="AppDangerBrush" Color="#DC2626" />
+      <SolidColorBrush x:Key="AppDangerSoftBrush" Color="#FEE2E2" />
+      <SolidColorBrush x:Key="AppNeutralSoftBrush" Color="#F3F4F6" />
+      <SolidColorBrush x:Key="AppOverlayBrush" Color="#66000000" />
+    </ResourceDictionary>
+
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="AppPageBrush" Color="#0A0A0A" />
+      <SolidColorBrush x:Key="AppSidebarBrush" Color="#0A0A0A" />
+      <SolidColorBrush x:Key="AppCardBrush" Color="#212121" />
+      <SolidColorBrush x:Key="AppCardBorderBrush" Color="#262626" />
+      <SolidColorBrush x:Key="AppDividerBrush" Color="#262626" />
+      <SolidColorBrush x:Key="AppHoverBrush" Color="#1F1F1F" />
+      <SolidColorBrush x:Key="AppInputBrush" Color="#1F2937" />
+      <SolidColorBrush x:Key="AppTextBrush" Color="#E5E7EB" />
+      <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#9CA3AF" />
+      <SolidColorBrush x:Key="AppTextTertiaryBrush" Color="#6B7280" />
+      <SolidColorBrush x:Key="AppPrimaryBrush" Color="#ACCBFA" />
+      <SolidColorBrush x:Key="AppPrimaryHoverBrush" Color="#BDD6FB" />
+      <SolidColorBrush x:Key="AppPrimaryPressedBrush" Color="#9ABFF8" />
+      <SolidColorBrush x:Key="AppOnPrimaryBrush" Color="#0A0A0A" />
+      <SolidColorBrush x:Key="AppPrimarySoftBrush" Color="#1D2330" />
+      <SolidColorBrush x:Key="AppSuccessBrush" Color="#4ADE80" />
+      <SolidColorBrush x:Key="AppSuccessSoftBrush" Color="#14291C" />
+      <SolidColorBrush x:Key="AppWarningBrush" Color="#FBBF24" />
+      <SolidColorBrush x:Key="AppWarningSoftBrush" Color="#2E2410" />
+      <SolidColorBrush x:Key="AppDangerBrush" Color="#F87171" />
+      <SolidColorBrush x:Key="AppDangerSoftBrush" Color="#3A1616" />
+      <SolidColorBrush x:Key="AppNeutralSoftBrush" Color="#262626" />
+      <SolidColorBrush x:Key="AppOverlayBrush" Color="#A6000000" />
+    </ResourceDictionary>
+
+  </ResourceDictionary.ThemeDictionaries>
+
+  <FontFamily x:Key="ImmichFont">avares://ImmichSplash/Assets/Fonts#Google Sans</FontFamily>
+</ResourceDictionary>

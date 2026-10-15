@@ -1,0 +1,159 @@
+<!-- The share / add to album panel shown over the page. Part of PhotosView. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichSplash.App.Services"
+             xmlns:vm="using:ImmichSplash.App.ViewModels"
+             xmlns:api="using:ImmichSplash.Core.Api"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichSplash.App.Views.Photos.SharePanel"
+             x:DataType="vm:PhotosViewModel">
+  <Panel Background="{DynamicResource AppOverlayBrush}">
+    <Border Classes="card" Width="440" Padding="24,22" CornerRadius="20" HorizontalAlignment="Center" VerticalAlignment="Center"
+            Background="{DynamicResource AppPageBrush}" BoxShadow="0 18 50 0 #40000000">
+      <ContentControl Content="{Binding Panel}">
+        <ContentControl.DataTemplates>
+          <DataTemplate DataType="vm:MapSettingsViewModel">
+            <StackPanel Spacing="4">
+              <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                <TextBlock Classes="h2" l:Tr.Text="Map settings" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="ghost icon" Command="{Binding CancelCommand}" l:Tr.Tip="Close">
+                  <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
+                </Button>
+              </Grid>
+              <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Allow dark mode" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding AllowDark}" OnContent="" OffContent="" /></Grid>
+              <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Only favorites" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding OnlyFavorites}" OnContent="" OffContent="" /></Grid>
+              <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Include archived" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding IncludeArchived}" OnContent="" OffContent="" /></Grid>
+              <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Include shared partner photos" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding IncludePartners}" OnContent="" OffContent="" /></Grid>
+              <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Include shared albums" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding IncludeSharedAlbums}" OnContent="" OffContent="" /></Grid>
+              <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Show photo panel by default" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowPanel}" OnContent="" OffContent="" /></Grid>
+              <Grid ColumnDefinitions="*,Auto"><TextBlock l:Tr.Text="Heat map" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding HeatMap}" OnContent="" OffContent="" /></Grid>
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock l:Tr.Text="Street detail" />
+                  <TextBlock Classes="caption" TextWrapping="Wrap" MaxWidth="300"
+                             l:Tr.Text="Roads and names from an online map service. Off: only the built-in map, and nothing about where your photos are leaves your PC." />
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding StreetDetail}" OnContent="" OffContent="" />
+              </Grid>
+              <TextBlock l:Tr.Text="Date range" Margin="0,8,0,4" />
+              <ComboBox ItemsSource="{Binding DateRanges}" SelectedItem="{Binding SelectedDateRange}" HorizontalAlignment="Stretch" />
+              <Grid ColumnDefinitions="*,12,*" IsVisible="{Binding IsCustom}" Margin="0,8,0,0">
+                <CalendarDatePicker SelectedDate="{Binding From}" HorizontalAlignment="Stretch" l:Tr.Watermark="From" />
+                <CalendarDatePicker Grid.Column="2" SelectedDate="{Binding To}" HorizontalAlignment="Stretch" l:Tr.Watermark="To" />
+              </Grid>
+              <Grid ColumnDefinitions="*,12,*" Margin="0,16,0,0">
+                <Button Classes="secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" l:Tr.Content="Cancel" Command="{Binding CancelCommand}" />
+                <Button Grid.Column="2" Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" l:Tr.Content="Save" Command="{Binding SaveCommand}" />
+              </Grid>
+            </StackPanel>
+          </DataTemplate>
+          <DataTemplate DataType="vm:SharePanelViewModel">
+            <StackPanel Spacing="14">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Classes="h2" l:Tr.Text="Share" />
+                  <TextBlock Classes="secondary" Text="{Binding What, StringFormat='Anyone with the link can see {0}.'}" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost icon" VerticalAlignment="Top" Command="{Binding CloseCommand}" l:Tr.Tip="Close">
+                  <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
+                </Button>
+              </Grid>
+              <StackPanel Spacing="12" IsVisible="{Binding !HasLink}">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock l:Tr.Text="Link expires" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" Width="150" ItemsSource="{Binding Expiries}" SelectedItem="{Binding SelectedExpiry}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock l:Tr.Text="Allow downloads" VerticalAlignment="Center" />
+                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding AllowDownload}" OnContent="" OffContent="" />
+                </Grid>
+                <Button Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding CreateCommand}"
+                        IsEnabled="{Binding !IsWorking}">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <mi:MaterialIcon Kind="Loading" Classes="spin" Width="16" Height="16" IsVisible="{Binding IsWorking}" />
+                    <mi:MaterialIcon Kind="LinkVariant" IsVisible="{Binding !IsWorking}" />
+                    <TextBlock l:Tr.Text="Create link" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+              <StackPanel Spacing="10" IsVisible="{Binding HasLink}">
+                <TextBox Text="{Binding Link}" IsReadOnly="True" />
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                  <TextBlock Classes="caption" l:Tr.Text="Copied to clipboard" VerticalAlignment="Center" Foreground="{DynamicResource AppSuccessBrush}"
+                             IsVisible="{Binding Copied}" Margin="0,0,6,0" />
+                  <Button Classes="secondary" Command="{Binding OpenLinkCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="OpenInNew" /><TextBlock l:Tr.Text="Open" /></StackPanel>
+                  </Button>
+                  <Button Classes="primary" Command="{Binding CopyCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="ContentCopy" /><TextBlock l:Tr.Text="Copy" /></StackPanel>
+                  </Button>
+                </StackPanel>
+              </StackPanel>
+              <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding Error}" TextWrapping="Wrap"
+                         IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+          </DataTemplate>
+          <DataTemplate DataType="vm:PinPanelViewModel">
+            <StackPanel Spacing="12">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Classes="h2" l:Tr.Text="Locked folder" />
+                  <TextBlock Classes="secondary" l:Tr.Text="Enter your Immich PIN to move photos into the locked folder." TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost icon" VerticalAlignment="Top" Command="{Binding CloseCommand}" l:Tr.Tip="Close">
+                  <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
+                </Button>
+              </Grid>
+              <TextBox Text="{Binding Pin}" PasswordChar="●" l:Tr.Watermark="PIN code" HorizontalContentAlignment="Center">
+                <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding UnlockCommand}" /></TextBox.KeyBindings>
+              </TextBox>
+              <Button Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding UnlockCommand}"
+                      IsEnabled="{Binding !IsWorking}" l:Tr.Content="Unlock" />
+              <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding Error}" TextWrapping="Wrap"
+                         IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+          </DataTemplate>
+          <DataTemplate DataType="vm:AlbumPickerViewModel">
+            <StackPanel Spacing="12">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Classes="h2" l:Tr.Text="Add to album" />
+                  <TextBlock Classes="secondary" Text="{Binding What}" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost icon" VerticalAlignment="Top" Command="{Binding CloseCommand}" l:Tr.Tip="Close">
+                  <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
+                </Button>
+              </Grid>
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox Text="{Binding NewAlbumName}" l:Tr.Watermark="New album name">
+                  <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding CreateCommand}" /></TextBox.KeyBindings>
+                </TextBox>
+                <Button Grid.Column="1" Classes="primary" Margin="8,0,0,0" l:Tr.Content="Create" Command="{Binding CreateCommand}" IsEnabled="{Binding !IsWorking}" />
+              </Grid>
+              <TextBlock Classes="section" l:Tr.Text="YOUR ALBUMS" Margin="0,6,0,0" />
+              <ScrollViewer MaxHeight="300" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Albums}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="api:AlbumInfo">
+                      <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,8"
+                              Command="{Binding $parent[ItemsControl].((vm:AlbumPickerViewModel)DataContext).AddToCommand}" CommandParameter="{Binding}">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                          <mi:MaterialIcon Kind="ImageAlbum" Width="18" Height="18" Margin="0,0,10,0" />
+                          <TextBlock Grid.Column="1" Text="{Binding AlbumName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="2" Classes="caption" Text="{Binding AssetCount}" VerticalAlignment="Center" Margin="10,0,0,0" />
+                        </Grid>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+              <mi:MaterialIcon Kind="Loading" Classes="spin" Width="22" Height="22" IsVisible="{Binding IsWorking}" HorizontalAlignment="Center" />
+              <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding Error}" TextWrapping="Wrap"
+                         IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+          </DataTemplate>
+        </ContentControl.DataTemplates>
+      </ContentControl>
+    </Border>
+  </Panel>
+</UserControl>

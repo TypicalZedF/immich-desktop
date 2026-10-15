@@ -24,7 +24,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
-$project = Join-Path $root "src/ImmichDesktop.App/ImmichDesktop.App.csproj"
+$project = Join-Path $root "src/ImmichSplash.App/ImmichSplash.App.csproj"
 $devDir = Join-Path $root "artifacts/dev"
 New-Item -ItemType Directory -Force $devDir | Out-Null
 
@@ -46,7 +46,7 @@ if (-not $NoWindows) {
     # Installs made before the rename keep their original folder.
     $oldDir = Join-Path $env:LOCALAPPDATA "Programs\Immich Desktop"
     if (-not (Test-Path $installDir) -and (Test-Path $oldDir)) { $installDir = $oldDir }
-    $installedExe = Join-Path $installDir "ImmichDesktop.exe"
+    $installedExe = Join-Path $installDir "ImmichSplash.exe"
 
     # libmpv (videos): reuse the installed app's copy if this checkout doesn't have it yet.
     $mpvDll = Join-Path $root "lib/mpv/libmpv-2.dll"
@@ -68,7 +68,7 @@ if (-not $NoWindows) {
         Write-Host "==> Replacing the installed app" -ForegroundColor Cyan
         & $installedExe --quit | Out-Null
         $deadline = (Get-Date).AddSeconds(15)
-        while ((Get-Process ImmichDesktop -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $installedExe }) -and (Get-Date) -lt $deadline) {
+        while ((Get-Process ImmichSplash -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $installedExe }) -and (Get-Date) -lt $deadline) {
             Start-Sleep -Milliseconds 300
         }
         # Copy over the installed files (the uninstaller and its data stay).
@@ -79,7 +79,7 @@ if (-not $NoWindows) {
     }
     else {
         Write-Host "    Immich Splash isn't installed here; starting the build from $out" -ForegroundColor Yellow
-        Start-Process (Join-Path $out "ImmichDesktop.exe")
+        Start-Process (Join-Path $out "ImmichSplash.exe")
     }
 }
 
@@ -101,7 +101,7 @@ if ($Linux) {
     $pkg = Join-Path $stage "immich-splash"
     New-Item -ItemType Directory -Force $pkg | Out-Null
     Copy-Item -Recurse $out (Join-Path $pkg "app")
-    Copy-Item (Join-Path $root "src/ImmichDesktop.App/Assets/logo-512.png") (Join-Path $pkg "immich-splash.png")
+    Copy-Item (Join-Path $root "src/ImmichSplash.App/Assets/logo-512.png") (Join-Path $pkg "immich-splash.png")
     $install = (Get-Content (Join-Path $root "build/linux-install.sh") -Raw) -replace "`r`n", "`n"
     [IO.File]::WriteAllText((Join-Path $pkg "install.sh"), $install)
     $tarball = Join-Path $devDir "ImmichSplash-dev-linux-x64.tar.gz"
@@ -114,9 +114,9 @@ if ($Linux) {
         if ($LASTEXITCODE -ne 0) { throw "Couldn't copy the build to $LinuxHost (is SSH set up? See CONTRIBUTING.md)" }
         # Close the Flatpak copy too (only one may run), install, then start it in the desktop session.
         $remote = 'set -e; d=$(mktemp -d); tar -xzf /tmp/immich-splash-dev.tar.gz -C "$d"; ' +
-                  'flatpak kill io.github.TypicalZedF.ImmichDesktop 2>/dev/null || true; ' +
+                  'flatpak kill io.github.TypicalZedF.ImmichSplash 2>/dev/null || true; ' +
                   'bash "$d/immich-splash/install.sh"; rm -rf "$d"; ' +
-                  'systemd-run --user --collect --quiet "$HOME/.local/opt/immich-splash/ImmichDesktop"'
+                  'systemd-run --user --collect --quiet "$HOME/.local/opt/immich-splash/ImmichSplash"'
         ssh $LinuxHost $remote
         if ($LASTEXITCODE -ne 0) { throw "Installing on $LinuxHost failed" }
         Write-Host "    Running $version on $LinuxHost" -ForegroundColor Green

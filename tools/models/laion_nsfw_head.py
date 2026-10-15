@@ -1,5 +1,5 @@
 """Exports LAION's CLIP-based NSFW detector for ViT-B/32 to the plain weights file the app reads
-(src/ImmichDesktop.Core/Models/nsfw-clip-b32-head.bin), without needing TensorFlow.
+(src/ImmichSplash.Core/Models/nsfw-clip-b32-head.bin), without needing TensorFlow.
 
 Source: https://github.com/LAION-AI/CLIP-based-NSFW-Detector (MIT), clip_autokeras_nsfw_b32.zip.
 Usage: python laion_nsfw_head.py <extracted clip_autokeras_nsfw_b32 folder> <out.bin>

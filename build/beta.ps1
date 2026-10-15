@@ -51,7 +51,7 @@ if ($ahead -eq 0) { Note "Nothing new to push."; exit 0 }
 
 if (-not $SkipTests) {
     Step "Running the tests"
-    $result = dotnet test (Join-Path $script:Root "tests/ImmichDesktop.Core.Tests") --nologo 2>&1 | Out-String
+    $result = dotnet test (Join-Path $script:Root "tests/ImmichSplash.Core.Tests") --nologo 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
         ($result -split "`n" | Where-Object { $_ -match 'error|Failed|Assert' } | Select-Object -First 20) | Write-Host
         Fail "Tests failed; nothing was pushed."

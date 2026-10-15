@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/ImmichDesktop.App/Assets/logo-256.png" width="96" alt="" />
+  <img src="src/ImmichSplash.App/Assets/logo-256.png" width="96" alt="" />
 </p>
 
 <h1 align="center">Immich Splash</h1>
@@ -48,7 +48,7 @@
 2. Run it and follow the wizard: choose *just me* (no admin) or *everyone*, pick the install folder, optional desktop shortcut.
 3. Sign in to your Immich server and pick folders. Done. The app keeps running in the tray.
 
-No-install option: **`ImmichSplash-Portable.zip`**: unzip anywhere and run `ImmichDesktop.exe` (no auto-updates).
+No-install option: **`ImmichSplash-Portable.zip`**: unzip anywhere and run `ImmichSplash.exe` (no auto-updates).
 
 Uninstall from **Settings → Apps → Installed apps → Immich Splash**. You'll be asked whether to keep your settings; nothing is ever removed from your Immich server.
 
@@ -94,7 +94,7 @@ GitHub Actions tests, builds `ImmichSplash-Setup.exe`, the portable zip and the 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download). For the installer: `winget install JRSoftware.InnoSetup`.
 
 ```bash
-dotnet run --project src/ImmichDesktop.App        # run the app
+dotnet run --project src/ImmichSplash.App        # run the app
 dotnet test                                       # run the tests
 ./build/publish.ps1 -Version 1.2.0                # installer + portable zip -> artifacts/installer
 ./build/publish.sh 1.2.0                          # Linux tarball (run on Linux)
@@ -103,27 +103,27 @@ dotnet test                                       # run the tests
 Developer tools (render the real UI headlessly):
 
 ```bash
-dotnet run --project tools/ImmichDesktop.DevTools -- icons src/ImmichDesktop.App/Assets   # app + tray icons
-dotnet run --project tools/ImmichDesktop.DevTools -- installer build/installer            # installer wizard art
-dotnet run --project tools/ImmichDesktop.DevTools -- screens docs/screenshots             # screenshots
+dotnet run --project tools/ImmichSplash.DevTools -- icons src/ImmichSplash.App/Assets   # app + tray icons
+dotnet run --project tools/ImmichSplash.DevTools -- installer build/installer            # installer wizard art
+dotnet run --project tools/ImmichSplash.DevTools -- screens docs/screenshots             # screenshots
 ```
 
-Set `IMMICH_DESKTOP_DATA_DIR` to use a throwaway profile while developing.
+Set `IMMICH_SPLASH_DATA_DIR` to use a throwaway profile while developing.
 
 ## Project layout
 
 ```
-src/ImmichDesktop.Core       Platform-neutral engine (no UI)
+src/ImmichSplash.Core       Platform-neutral engine (no UI)
   Api/                       Immich REST client: discovery, login, OAuth/PKCE, uploads, library, albums, search, sharing
   Sync/SyncEngine*.cs        Scan → hash → dedupe → upload → albums, watchers, retry/backoff (one file per stage)
   Storage/StateDatabase.cs   SQLite index of every file and its backup state
   Privacy/                   On-device checks for the locked-folder suggestions (ONNX models, OCR)
   Updates/                   GitHub Releases update checker (SHA-256 verified downloads)
   Platform/                  Credentials (DPAPI), autostart, app.immich:// link handler, password hashing, power, network
-src/ImmichDesktop.App        Avalonia UI: tray, onboarding, lock screen, library (Views/Photos*), map, backup, settings
+src/ImmichSplash.App        Avalonia UI: tray, onboarding, lock screen, library (Views/Photos*), map, backup, settings
   Assets/i18n/               Translations (English text is the key; tests keep the files in step)
 tests/                       xUnit tests incl. end-to-end sync against a fake Immich server
-tools/ImmichDesktop.DevTools Icons, installer art and screenshots rendered from the real UI
+tools/ImmichSplash.DevTools Icons, installer art and screenshots rendered from the real UI
 build/                       publish.ps1 / installer.iss (Inno Setup) / publish.sh (Linux)
 ```
 
@@ -133,4 +133,4 @@ The code is cross-platform: Windows-only pieces (DPAPI, registry, Windows Hello)
 
 ## Credits
 
-Immich is © FUTO / the Immich contributors; the name is used here only to say what this app works with. The app's logo is its own. This is an unofficial, community-made companion app and is not affiliated with or endorsed by the Immich project or FUTO. Google Sans is licensed under the SIL Open Font License (`src/ImmichDesktop.App/Assets/Fonts/OFL.txt`).
+Immich is © FUTO / the Immich contributors; the name is used here only to say what this app works with. The app's logo is its own. This is an unofficial, community-made companion app and is not affiliated with or endorsed by the Immich project or FUTO. Google Sans is licensed under the SIL Open Font License (`src/ImmichSplash.App/Assets/Fonts/OFL.txt`).

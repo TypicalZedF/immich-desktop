@@ -7,7 +7,7 @@
 ;   ISCC.exe /DAppVersion=1.2.0 /DSourceDir=..\artifacts\publish\win-x64 build\installer.iss
 
 #define AppName "Immich Splash"
-#define AppExe "ImmichDesktop.exe"
+#define AppExe "ImmichSplash.exe"
 #define AppUrl "https://github.com/TypicalZedF/immich-splash"
 #ifndef AppVersion
   #define AppVersion "0.0.0"
@@ -54,7 +54,7 @@ WizardStyle=modern
 WizardResizable=no
 WizardImageFile=installer\wizard-large-100.bmp,installer\wizard-large-150.bmp,installer\wizard-large-200.bmp
 WizardSmallImageFile=installer\wizard-small-100.bmp,installer\wizard-small-150.bmp,installer\wizard-small-200.bmp
-SetupIconFile=..\src\ImmichDesktop.App\Assets\app.ico
+SetupIconFile=..\src\ImmichSplash.App\Assets\app.ico
 UninstallDisplayIcon={app}\{#AppExe}
 ; Tell Windows to re-read icons when done, so shortcuts and pinned taskbar icons show a new logo.
 ChangesAssociations=yes
@@ -91,6 +91,13 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[InstallDelete]
+; Files from before the app was renamed.
+Type: files; Name: "{app}\ImmichDesktop.*"
+
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "ImmichDesktop"; Flags: deletevalue
+
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
@@ -105,7 +112,7 @@ Filename: "{app}\{#AppExe}"; Parameters: "--background"; Flags: nowait runasorig
 
 [UninstallRun]
 ; Quits a running copy and removes autostart, the link handler, the saved sign-in and logs.
-Filename: "{app}\{#AppExe}"; Parameters: "--uninstall"; Flags: runhidden waituntilterminated; RunOnceId: "ImmichDesktopCleanup"
+Filename: "{app}\{#AppExe}"; Parameters: "--uninstall"; Flags: runhidden waituntilterminated; RunOnceId: "ImmichSplashCleanup"
 
 [Code]
 function IsRelaunch: Boolean;

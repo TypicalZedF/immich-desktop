@@ -1,0 +1,12 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ImmichSplash.App.Controls.Avatar"
+            >
+  <!-- Profile picture when there is one, otherwise initials on the user's Immich avatar color. -->
+  <Border Name="Circle" ClipToBounds="True">
+    <Panel>
+      <TextBlock Name="InitialText" Foreground="White" FontWeight="Medium" HorizontalAlignment="Center" VerticalAlignment="Center" />
+      <Image Name="Picture" Stretch="UniformToFill" />
+    </Panel>
+  </Border>
+</UserControl>

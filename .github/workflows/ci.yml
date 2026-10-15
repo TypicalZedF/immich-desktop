@@ -36,29 +36,29 @@ jobs:
           $setup = "artifacts/installer/ImmichSplash-Setup.exe"
           Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CURRENTUSER", "/NORESTART" -Wait
           $dir = "$env:LOCALAPPDATA\Programs\Immich Splash"
-          if (-not (Test-Path "$dir\ImmichDesktop.exe")) { throw "App was not installed to $dir" }
+          if (-not (Test-Path "$dir\ImmichSplash.exe")) { throw "App was not installed to $dir" }
           if (-not (Test-Path "$dir\unins000.exe")) { throw "Uninstaller missing" }
           Write-Host "Installed OK"
 
-          $env:IMMICH_DESKTOP_DATA_DIR = "$env:RUNNER_TEMP\immich-desktop-smoke"
-          $app = Start-Process "$dir\ImmichDesktop.exe" -ArgumentList "--background" -PassThru
+          $env:IMMICH_SPLASH_DATA_DIR = "$env:RUNNER_TEMP\immich-splash-smoke"
+          $app = Start-Process "$dir\ImmichSplash.exe" -ArgumentList "--background" -PassThru
           Start-Sleep -Seconds 10
           if ($app.HasExited) { throw "App exited during startup (code $($app.ExitCode))" }
           Write-Host "App running OK"
-          Start-Process "$dir\ImmichDesktop.exe" -ArgumentList "--quit" -Wait
+          Start-Process "$dir\ImmichSplash.exe" -ArgumentList "--quit" -Wait
           Start-Sleep -Seconds 3
           if (-not $app.HasExited) { throw "App did not quit when asked" }
           Write-Host "Quit OK"
 
           Start-Process "$dir\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -Wait
           Start-Sleep -Seconds 3
-          if (Test-Path "$dir\ImmichDesktop.exe") { throw "Uninstall left the app behind" }
+          if (Test-Path "$dir\ImmichSplash.exe") { throw "Uninstall left the app behind" }
           Write-Host "Uninstalled OK"
 
       - name: UI checks - render every screen against a demo server
         # The harness drives the real pages headlessly and fails on broken behaviour (grouping, Select all, …).
         shell: pwsh
-        run: dotnet run --project tools/ImmichDesktop.DevTools -c Release -- screens artifacts/screens
+        run: dotnet run --project tools/ImmichSplash.DevTools -c Release -- screens artifacts/screens
 
       - uses: actions/upload-artifact@v4
         with:
@@ -88,5 +88,5 @@ jobs:
 
       - name: Build and test (Linux)
         run: |
-          dotnet build ImmichDesktop.slnx -c Release
-          dotnet test tests/ImmichDesktop.Core.Tests -c Release --no-build
+          dotnet build ImmichSplash.slnx -c Release
+          dotnet test tests/ImmichSplash.Core.Tests -c Release --no-build

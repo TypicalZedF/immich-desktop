@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Immich Splash
+Comment=Back up photos and videos to your Immich server
+Exec=immich-splash %u
+Icon=io.github.TypicalZedF.ImmichSplash
+Categories=Graphics;Photography;Utility;
+Keywords=Immich;Photos;Backup;
+MimeType=x-scheme-handler/app.immich;
+StartupWMClass=ImmichSplash
+Terminal=false

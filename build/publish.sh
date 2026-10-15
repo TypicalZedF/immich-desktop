@@ -12,15 +12,15 @@ PUBLISH_DIR="$ROOT/artifacts/publish/$RUNTIME"
 OUT_DIR="$ROOT/artifacts/installer"
 STAGE="$ROOT/artifacts/stage/immich-splash"
 
-dotnet test "$ROOT/tests/ImmichDesktop.Core.Tests" -c Release --nologo
+dotnet test "$ROOT/tests/ImmichSplash.Core.Tests" -c Release --nologo
 
 rm -rf "$PUBLISH_DIR" "$STAGE"
-dotnet publish "$ROOT/src/ImmichDesktop.App/ImmichDesktop.App.csproj" -c Release -r "$RUNTIME" --self-contained true \
+dotnet publish "$ROOT/src/ImmichSplash.App/ImmichSplash.App.csproj" -c Release -r "$RUNTIME" --self-contained true \
   -p:Version="$VERSION" -p:DebugType=none -o "$PUBLISH_DIR" --nologo
 
 mkdir -p "$STAGE" "$OUT_DIR"
 cp -r "$PUBLISH_DIR" "$STAGE/app"
-cp "$ROOT/src/ImmichDesktop.App/Assets/logo-512.png" "$STAGE/immich-splash.png"
+cp "$ROOT/src/ImmichSplash.App/Assets/logo-512.png" "$STAGE/immich-splash.png"
 cp "$ROOT/build/linux-install.sh" "$STAGE/install.sh"
 chmod +x "$STAGE/install.sh"
 

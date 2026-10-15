@@ -1,0 +1,571 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichSplash.App.Services"
+             xmlns:vm="using:ImmichSplash.App.ViewModels"
+             xmlns:c="using:ImmichSplash.App.Controls"
+             xmlns:api="using:ImmichSplash.Core.Api"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichSplash.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  <UserControl.Styles>
+    <Style Selector="Grid.row">
+      <Setter Property="MinHeight" Value="58" />
+    </Style>
+    <Style Selector="Grid.row > StackPanel">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Spacing" Value="2" />
+      <Setter Property="Margin" Value="0,0,20,0" />
+    </Style>
+    <Style Selector="Grid.row TextBlock.title">
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="32,24,36,36" Spacing="18" MaxWidth="820" HorizontalAlignment="Stretch">
+      <TextBlock Classes="h1" l:Tr.Text="Settings" />
+
+      <!-- Account -->
+      <Border Classes="card">
+        <StackPanel Spacing="16">
+          <TextBlock Classes="section" l:Tr.Text="ACCOUNT" />
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <c:Avatar Width="64" Height="64" Initial="{Binding UserInitial}" />
+            <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center" Spacing="2">
+              <TextBlock Classes="h3" Text="{Binding UserName}" />
+              <TextBlock Classes="caption" Text="{Binding UserEmail}" />
+              <StackPanel Orientation="Horizontal" Spacing="4" Margin="-8,4,0,0">
+                <Button Classes="ghost" Padding="8,4" Command="{Binding ChangePhotoCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="ImageMultipleOutline" Width="16" Height="16" />
+                    <TextBlock l:Tr.Text="Choose from Immich" FontSize="13" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="ghost" Padding="8,4" Command="{Binding RemovePhotoCommand}" IsVisible="{Binding HasPhoto}">
+                  <TextBlock l:Tr.Text="Remove" FontSize="13" />
+                </Button>
+              </StackPanel>
+              <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding PhotoError}" TextWrapping="Wrap"
+                         IsVisible="{Binding PhotoError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+            <Button Grid.Column="2" Classes="secondary" VerticalAlignment="Center" Command="{Binding SignOutCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="Logout" />
+                <TextBlock l:Tr.Text="Sign out" />
+              </StackPanel>
+            </Button>
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Server" />
+              <TextBlock Classes="caption" Text="{Binding ServerUrl}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="0" VerticalAlignment="Center">
+              <Border Classes="chip" VerticalAlignment="Center">
+                <TextBlock Classes="caption" Text="{Binding ServerVersion}" />
+              </Border>
+              <Button Classes="ghost" Command="{Binding OpenServerCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="OpenInNew" />
+                  <TextBlock l:Tr.Text="Open" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Appearance & general -->
+      <Border Classes="card" Padding="22,16">
+        <StackPanel>
+          <TextBlock Classes="section" l:Tr.Text="GENERAL" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Theme" />
+              <TextBlock Classes="caption" l:Tr.Text="Light, dark, or follow your Windows setting." TextWrapping="Wrap" />
+            </StackPanel>
+            <Border Grid.Column="1" Classes="segmented" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton Classes="segment" GroupName="theme" IsChecked="{Binding ThemeSystem}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="ThemeLightDark" Width="16" Height="16" />
+                    <TextBlock l:Tr.Text="System" />
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Classes="segment" GroupName="theme" IsChecked="{Binding ThemeLight}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="WeatherSunny" Width="16" Height="16" />
+                    <TextBlock l:Tr.Text="Light" />
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Classes="segment" GroupName="theme" IsChecked="{Binding ThemeDark}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="WeatherNight" Width="16" Height="16" />
+                    <TextBlock l:Tr.Text="Dark" />
+                  </StackPanel>
+                </RadioButton>
+              </StackPanel>
+            </Border>
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Language" />
+              <TextBlock Classes="caption" l:Tr.Text="The language of this app. Dates and numbers follow it too." TextWrapping="Wrap" />
+            </StackPanel>
+            <ComboBox Grid.Column="1" Width="190" VerticalAlignment="Center" ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding SelectedLanguage}" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Graphics acceleration" />
+              <TextBlock Classes="caption" l:Tr.Text="Use the graphics card to draw the app, for smoother scrolling and maps. Turn off if you see flickering or blank windows." TextWrapping="Wrap" />
+              <TextBlock Classes="caption tertiary" Text="{Binding GpuStatus}" TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding GpuRendering}" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Notifications" />
+              <TextBlock Classes="caption" l:Tr.Text="Desktop notifications about your backup. Choose which below." TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding Notifications}" />
+          </Grid>
+          <Grid Classes="row" ColumnDefinitions="*,Auto" Margin="20,0,0,0" IsVisible="{Binding Notifications}">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="When a backup finishes" />
+              <TextBlock Classes="caption" l:Tr.Text="Big backups are 20 or more photos and videos, or ones that take a few minutes." TextWrapping="Wrap" />
+            </StackPanel>
+            <ComboBox Grid.Column="1" MinWidth="180" ItemsSource="{Binding BackupNoticeChoices}" SelectedIndex="{Binding NotifyBackupsIndex}" />
+          </Grid>
+          <Grid Classes="row" ColumnDefinitions="*,Auto" Margin="20,0,0,0" IsVisible="{Binding Notifications}">
+            <TextBlock Classes="title" l:Tr.Text="When files can't be backed up" VerticalAlignment="Center" />
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding NotifyFailures}" />
+          </Grid>
+          <Grid Classes="row" ColumnDefinitions="*,Auto" Margin="20,0,0,0" IsVisible="{Binding Notifications}">
+            <TextBlock Classes="title" l:Tr.Text="When you need to sign in again" VerticalAlignment="Center" />
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding NotifySignIn}" />
+          </Grid>
+          <Border Classes="divider" IsVisible="{Binding AutostartSupported}" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto" IsVisible="{Binding AutostartSupported}">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Start automatically" />
+              <TextBlock Classes="caption" Text="{Binding AutostartDescription}" TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding LaunchAtStartup}" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Network -->
+      <Border Classes="card" Padding="22,16">
+        <StackPanel>
+          <TextBlock Classes="section" l:Tr.Text="NETWORK" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Data saving" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         l:Tr.Text="On metered connections (phone hotspots, capped plans). Photos also skip full-resolution downloads there." />
+            </StackPanel>
+            <ComboBox Grid.Column="1" Width="190" VerticalAlignment="Center" ItemsSource="{Binding MeteredOptions}" SelectedItem="{Binding SelectedMetered}" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Automatic server switching" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         l:Tr.Text="Use a local address on your home network and external addresses everywhere else, like the Immich mobile app." />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoSwitchServer}" />
+          </Grid>
+          <StackPanel IsVisible="{Binding AutoSwitchServer}" Spacing="10" Margin="0,4,0,10">
+            <TextBlock Classes="section" l:Tr.Text="LOCAL NETWORK" Margin="0,8,0,0" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox Text="{Binding LocalNetworkName}" l:Tr.Watermark="Network name (your Wi-Fi name)" />
+              <Button Grid.Column="1" Classes="secondary" Margin="8,0,0,0" Command="{Binding UseCurrentNetworkCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="Wifi" />
+                  <TextBlock l:Tr.Text="Use current connection" />
+                </StackPanel>
+              </Button>
+            </Grid>
+            <TextBox Text="{Binding LocalServerUrl}" l:Tr.Watermark="Local server address, e.g. http://192.168.1.10:2283" />
+
+            <TextBlock Classes="section" l:Tr.Text="EXTERNAL ADDRESSES" Margin="0,10,0,0" />
+            <TextBlock Classes="caption" TextWrapping="Wrap"
+                       l:Tr.Text="Tried in order when you're away from home. The address you signed in with is always tried last." />
+            <ItemsControl ItemsSource="{Binding ExternalServerUrls}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Border Background="{DynamicResource AppInputBrush}" CornerRadius="10" Padding="12,4,4,4" Margin="0,0,0,6">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                      <mi:MaterialIcon Kind="Earth" Width="16" Height="16" Margin="0,0,10,0" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                      <TextBlock Grid.Column="1" Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <Button Grid.Column="2" Classes="ghost icon" l:Tr.Tip="Try this one earlier"
+                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).MoveExternalUrlUpCommand}" CommandParameter="{Binding}">
+                        <mi:MaterialIcon Kind="ArrowUp" Width="16" Height="16" />
+                      </Button>
+                      <Button Grid.Column="3" Classes="ghost icon" l:Tr.Tip="Remove"
+                              Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).RemoveExternalUrlCommand}" CommandParameter="{Binding}">
+                        <mi:MaterialIcon Kind="Close" Width="16" Height="16" />
+                      </Button>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox Text="{Binding NewExternalUrl}" l:Tr.Watermark="Add an address, e.g. https://photos.example.com">
+                <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding AddExternalUrlCommand}" /></TextBox.KeyBindings>
+              </TextBox>
+              <Button Grid.Column="1" Classes="secondary" Margin="8,0,0,0" l:Tr.Content="Add" Command="{Binding AddExternalUrlCommand}" />
+            </Grid>
+            <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding NetworkError}" TextWrapping="Wrap"
+                       IsVisible="{Binding NetworkError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <mi:MaterialIcon Kind="LanConnect" Width="16" Height="16" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                <TextBlock Classes="caption" Text="{Binding NetworkStatus}" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button Classes="ghost" l:Tr.Content="Check now" Command="{Binding CheckNetworkCommand}" />
+                <Button Classes="primary" Command="{Binding SaveNetworkCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <mi:MaterialIcon Kind="Check" IsVisible="{Binding NetworkSaved}" />
+                    <TextBlock l:Tr.Text="Save" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Desktop background -->
+      <Border Classes="card" Padding="22,16" IsVisible="{Binding WallpaperSupported}">
+        <StackPanel>
+          <TextBlock Classes="section" l:Tr.Text="DESKTOP BACKGROUND" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Show your photos on the desktop" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         l:Tr.Text="Like a digital picture frame: your desktop background changes to a photo from Immich every so often." />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding WallpaperEnabled}" />
+          </Grid>
+          <StackPanel IsVisible="{Binding WallpaperEnabled}">
+            <Border Classes="divider" />
+            <Grid Classes="row" ColumnDefinitions="*,Auto">
+              <StackPanel>
+                <TextBlock Classes="title" l:Tr.Text="Photos from" />
+                <TextBlock Classes="caption" l:Tr.Text="Landscape photos are picked first, so they fill your screen." TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0" VerticalAlignment="Center">
+                <ComboBox Width="170" ItemsSource="{Binding WallpaperAlbums}" SelectedItem="{Binding SelectedWallpaperAlbum}"
+                          IsVisible="{Binding IsAlbumWallpaper}" l:Tr.Placeholder="Choose an album">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="api:AlbumInfo">
+                      <TextBlock Text="{Binding AlbumName}" TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <ComboBox Width="150" ItemsSource="{Binding WallpaperSources}" SelectedItem="{Binding SelectedWallpaperSource}" />
+              </StackPanel>
+            </Grid>
+            <Border Classes="divider" />
+            <Grid Classes="row" ColumnDefinitions="*,Auto">
+              <StackPanel>
+                <TextBlock Classes="title" l:Tr.Text="Change picture" />
+                <TextBlock Classes="caption" Text="{Binding WallpaperStatus}" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0" VerticalAlignment="Center">
+                <ComboBox Width="170" ItemsSource="{Binding WallpaperIntervals}" SelectedItem="{Binding SelectedWallpaperInterval}" />
+                <Button Classes="secondary" Command="{Binding ChangeWallpaperNowCommand}" IsEnabled="{Binding !IsChangingWallpaper}">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <mi:MaterialIcon Kind="ImageRefreshOutline" Classes.spin="{Binding IsChangingWallpaper}" />
+                    <TextBlock l:Tr.Text="Next" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Security -->
+      <Border Classes="card" Padding="22,16">
+        <StackPanel>
+          <TextBlock Classes="section" l:Tr.Text="SECURITY" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="App lock" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         l:Tr.Text="Require Windows Hello or a password to open this window. Backup keeps running while locked." />
+            </StackPanel>
+            <Border Grid.Column="1" Classes="segmented" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton Classes="segment" GroupName="lock" l:Tr.Content="Off" IsChecked="{Binding LockOff}" />
+                <RadioButton Classes="segment" GroupName="lock" IsChecked="{Binding LockHello}" IsEnabled="{Binding HelloAvailable}"
+                             l:Tr.Tip="Face, fingerprint or PIN">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="FaceRecognition" Width="16" Height="16" />
+                    <TextBlock l:Tr.Text="Windows Hello" />
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Classes="segment" GroupName="lock" IsChecked="{Binding LockPassword}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="FormTextboxPassword" Width="16" Height="16" />
+                    <TextBlock l:Tr.Text="Password" />
+                  </StackPanel>
+                </RadioButton>
+              </StackPanel>
+            </Border>
+          </Grid>
+
+          <!-- Set a password -->
+          <Border Classes="banner" Margin="0,4,0,10" Padding="18,16" IsVisible="{Binding IsSettingPassword}">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="h3" l:Tr.Text="Choose an app password" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         l:Tr.Text="This only unlocks Immich Splash on this PC. It's stored as a secure hash, never as plain text." />
+              <Grid ColumnDefinitions="*,12,*">
+                <TextBox Text="{Binding NewPassword}" PasswordChar="&#x2022;" l:Tr.Watermark="New password" />
+                <TextBox Grid.Column="2" Text="{Binding ConfirmPassword}" PasswordChar="&#x2022;" l:Tr.Watermark="Confirm password">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding SavePasswordCommand}" />
+                  </TextBox.KeyBindings>
+                </TextBox>
+              </Grid>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Classes="primary" l:Tr.Content="Turn on app lock" Command="{Binding SavePasswordCommand}" />
+                <Button Classes="ghost" l:Tr.Content="Cancel" Command="{Binding CancelPasswordCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Border Classes="banner error" Margin="0,4,0,10" IsVisible="{Binding LockError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding LockError}" TextWrapping="Wrap" />
+          </Border>
+
+          <Border Classes="divider" IsVisible="{Binding IsLockEnabled}" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto" IsVisible="{Binding IsLockEnabled}">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Lock now" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         l:Tr.Text="The app also locks when you close the window and after 5 minutes without activity." />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="secondary" Command="{Binding LockNowCommand}" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="LockOutline" />
+                <TextBlock l:Tr.Text="Lock" />
+              </StackPanel>
+            </Button>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Backup -->
+      <Border Classes="card" Padding="22,16">
+        <StackPanel>
+          <TextBlock Classes="section" l:Tr.Text="BACKUP" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Upload speed limit" />
+              <TextBlock Classes="caption" l:Tr.Text="Leave bandwidth for everything else on your network." TextWrapping="Wrap" />
+            </StackPanel>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding SpeedLimits}" SelectedItem="{Binding SelectedSpeedLimit}" VerticalAlignment="Center" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Simultaneous uploads" />
+              <TextBlock Classes="caption" l:Tr.Text="More is faster on a good connection; fewer is gentler on your server." TextWrapping="Wrap" />
+            </StackPanel>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding Concurrency}" SelectedItem="{Binding SelectedConcurrency}" VerticalAlignment="Center" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Pause on battery" />
+              <TextBlock Classes="caption" l:Tr.Text="Wait until your laptop is plugged in before uploading." TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding PauseOnBattery}" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Only back up during certain hours" />
+              <TextBlock Classes="caption" l:Tr.Text="For example overnight. New photos are still noticed; they upload when the time comes." TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding BackupWindowEnabled}" />
+          </Grid>
+          <StackPanel Classes="row" Orientation="Horizontal" Spacing="10" Margin="20,0,0,0" IsVisible="{Binding BackupWindowEnabled}">
+            <TextBlock l:Tr.Text="From" VerticalAlignment="Center" />
+            <ComboBox ItemsSource="{Binding TimeChoices}" SelectedItem="{Binding BackupWindowStart}" MinWidth="110" />
+            <TextBlock l:Tr.Text="to" VerticalAlignment="Center" />
+            <ComboBox ItemsSource="{Binding TimeChoices}" SelectedItem="{Binding BackupWindowEnd}" MinWidth="110" />
+          </StackPanel>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Stack RAW photos with their JPEG" />
+              <TextBlock Classes="caption" l:Tr.Text="When a camera saves a shot twice (like IMG_1.CR2 and IMG_1.JPG), show it once in Immich." TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding StackRawWithJpeg}" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Full folder check" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         l:Tr.Text="New files are noticed instantly. A full check also runs periodically to catch anything missed." />
+            </StackPanel>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding RescanIntervals}" SelectedItem="{Binding SelectedRescan}" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Updates when running as a Flatpak: Flatpak handles them -->
+      <Border Classes="card" Padding="22,16" IsVisible="{Binding IsFlatpak}">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="section" l:Tr.Text="UPDATES" Margin="0,4,0,0" />
+          <TextBlock Classes="title" Text="{Binding Version}" />
+          <TextBlock Classes="caption" TextWrapping="Wrap"
+                     l:Tr.Text="This copy is a Flatpak, so Flatpak keeps it up to date: new versions appear in Discover or GNOME Software, or run flatpak update." />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Classes="secondary" Command="{Binding OpenReleaseNotesCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="TextBoxOutline" Width="16" Height="16" />
+                <TextBlock l:Tr.Text="Release notes" />
+              </StackPanel>
+            </Button>
+            <Button Classes="secondary" Command="{Binding OpenProjectPageCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="Github" Width="16" Height="16" />
+                <TextBlock l:Tr.Text="View on GitHub" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Updates -->
+      <Border Classes="card" Padding="22,16" IsVisible="{Binding UpdatesEnabled}">
+        <StackPanel>
+          <TextBlock Classes="section" l:Tr.Text="UPDATES" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="Auto,*,Auto">
+            <c:AppLogo Width="40" Height="40" Margin="0,0,14,0" />
+            <StackPanel Grid.Column="1">
+              <TextBlock Classes="title" Text="{Binding Version}" />
+              <TextBlock Classes="caption" Text="{Binding UpdateStatus}" TextWrapping="Wrap" IsVisible="{Binding HasUpdateStatus}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Button Classes="secondary" Command="{Binding CheckForUpdatesCommand}" IsVisible="{Binding CanCheck}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="Refresh" Classes.spin="{Binding IsCheckingUpdates}" />
+                  <TextBlock l:Tr.Text="Check now" />
+                </StackPanel>
+              </Button>
+              <Button Classes="primary" l:Tr.Content="Restart to update" Command="{Binding InstallUpdateCommand}" IsVisible="{Binding UpdateReady}" />
+              <Button Classes="primary" l:Tr.Content="Download" Command="{Binding OpenReleasePageCommand}" IsVisible="{Binding UpdateAvailable}" />
+            </StackPanel>
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Check for updates automatically" />
+              <TextBlock Classes="caption" l:Tr.Text="Looks for new versions on GitHub every few hours." TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding CheckForUpdates}" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Update channel" />
+              <TextBlock Classes="caption" Text="{Binding ChannelDescription}" TextWrapping="Wrap" />
+            </StackPanel>
+            <Border Grid.Column="1" Classes="segmented" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton Classes="segment" GroupName="channel" IsChecked="{Binding ChannelStable}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="ShieldCheckOutline" Width="16" Height="16" />
+                    <TextBlock l:Tr.Text="Stable" />
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Classes="segment" GroupName="channel" IsChecked="{Binding ChannelBeta}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <mi:MaterialIcon Kind="FlaskOutline" Width="16" Height="16" />
+                    <TextBlock l:Tr.Text="Beta" />
+                  </StackPanel>
+                </RadioButton>
+              </StackPanel>
+            </Border>
+          </Grid>
+          <Border Classes="divider" IsVisible="{Binding CanSelfUpdate}" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto" IsVisible="{Binding CanSelfUpdate}">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Install updates automatically" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         l:Tr.Text="Updates install quietly while the window is closed and nothing is uploading." />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoInstallUpdates}" IsEnabled="{Binding CheckForUpdates}" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row">
+          <StackPanel Spacing="10">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Where updates come from" />
+              <TextBlock Classes="caption" Text="{Binding UpdateSourceText}" TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="secondary" Command="{Binding OpenReleaseNotesCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="TextBoxOutline" Width="16" Height="16" />
+                  <TextBlock l:Tr.Text="Release notes" />
+                </StackPanel>
+              </Button>
+              <Button Classes="secondary" Command="{Binding OpenProjectPageCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="Github" Width="16" Height="16" />
+                  <TextBlock l:Tr.Text="View on GitHub" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Troubleshooting -->
+      <Border Classes="card" Padding="22,16">
+        <StackPanel>
+          <TextBlock Classes="section" l:Tr.Text="TROUBLESHOOTING" Margin="0,4,0,6" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Re-check all files" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         l:Tr.Text="Compare everything with your Immich library again. Nothing is uploaded twice." />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="secondary" l:Tr.Content="Re-check" Command="{Binding RecheckAllCommand}" VerticalAlignment="Center" />
+          </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Logs and app data" />
+              <TextBlock Classes="caption" l:Tr.Text="Helpful when reporting a problem." />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0" VerticalAlignment="Center">
+              <Button Classes="secondary" l:Tr.Content="Open logs" Command="{Binding OpenLogsCommand}" />
+              <Button Classes="ghost" l:Tr.Content="Data folder" Command="{Binding OpenDataFolderCommand}" />
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <TextBlock Classes="caption tertiary" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,4,0,0"
+                 l:Tr.Text="An unofficial desktop companion for Immich. Immich and its logo belong to FUTO." />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

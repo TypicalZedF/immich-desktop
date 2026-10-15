@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ImmichSplash.App/ImmichSplash.App.csproj" />
+    <Project Path="src/ImmichSplash.Core/ImmichSplash.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ImmichSplash.Core.Tests/ImmichSplash.Core.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/ImmichSplash.DevTools/ImmichSplash.DevTools.csproj" />
+  </Folder>
+</Solution>

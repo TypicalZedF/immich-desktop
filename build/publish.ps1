@@ -21,13 +21,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
-$project = Join-Path $root "src/ImmichDesktop.App/ImmichDesktop.App.csproj"
+$project = Join-Path $root "src/ImmichSplash.App/ImmichSplash.App.csproj"
 $publishDir = Join-Path $root "artifacts/publish/$Runtime"
 $outputDir = Join-Path $root "artifacts/installer"
 
 if (-not $SkipTests) {
     Write-Host "==> Running tests" -ForegroundColor Cyan
-    dotnet test (Join-Path $root "tests/ImmichDesktop.Core.Tests") -c Release --nologo
+    dotnet test (Join-Path $root "tests/ImmichSplash.Core.Tests") -c Release --nologo
     if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
 }
 

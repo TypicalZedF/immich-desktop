@@ -76,7 +76,7 @@ Start-Sleep -Seconds 10
 $ok = Wait-Workflows $sha @("Release", "Flatpak") $tag 60
 if (-not $ok) { exit 1 }
 
-$flatpakref = "https://typicalzedf.github.io/immich-splash/io.github.TypicalZedF.ImmichDesktop.flatpakref"
+$flatpakref = "https://typicalzedf.github.io/immich-splash/io.github.TypicalZedF.ImmichSplash.flatpakref"
 try { $code = (Invoke-WebRequest $flatpakref -UseBasicParsing -Method Head).StatusCode } catch { $code = 0 }
 if ($code -eq 200) { Ok "Flatpak repository is live: $flatpakref" } else { Note "The Flatpak page isn't answering yet (GitHub Pages can take a few minutes): $flatpakref" }
 Ok "Released: https://github.com/$($script:Repo)/releases/tag/$tag"

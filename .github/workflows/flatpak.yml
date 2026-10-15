@@ -1,5 +1,5 @@
 # Builds the Linux Flatpak (build/flatpak).
-#   Pushes to beta: ImmichDesktop.flatpak attached to the run (testing).
+#   Pushes to beta: ImmichSplash.flatpak attached to the run (testing).
 #   Stable tags (vX.Y.Z): a signed Flatpak repository published to GitHub Pages, so installed copies
 #   update through Flatpak (Discover, GNOME Software, flatpak update), plus the bundle on the release.
 # Windows is not involved: its installer updates from GitHub Releases as before.
@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 env:
-  APP_ID: io.github.TypicalZedF.ImmichDesktop
+  APP_ID: io.github.TypicalZedF.ImmichSplash
   REPO_URL: https://typicalzedf.github.io/immich-splash/repo/
 
 jobs:
@@ -40,7 +40,7 @@ jobs:
 
       - name: Publish the app for Linux
         run: |
-          dotnet publish src/ImmichDesktop.App/ImmichDesktop.App.csproj -c Release -r linux-x64 --self-contained true \
+          dotnet publish src/ImmichSplash.App/ImmichSplash.App.csproj -c Release -r linux-x64 --self-contained true \
             -p:Version="$VERSION" -p:DebugType=none -o artifacts/publish/linux-x64 --nologo
 
       - name: Install flatpak-builder
@@ -82,14 +82,14 @@ jobs:
             EXTRA=(--repo-url="$REPO_URL" --gpg-keys=build/flatpak/repo-key.gpg stable)
           fi
           mkdir -p artifacts
-          flatpak build-bundle repo artifacts/ImmichDesktop.flatpak $APP_ID "${EXTRA[@]}" \
+          flatpak build-bundle repo artifacts/ImmichSplash.flatpak $APP_ID "${EXTRA[@]}" \
             --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
-          ls -lh artifacts/ImmichDesktop.flatpak
+          ls -lh artifacts/ImmichSplash.flatpak
 
       - uses: actions/upload-artifact@v4
         with:
           name: flatpak
-          path: artifacts/ImmichDesktop.flatpak
+          path: artifacts/ImmichSplash.flatpak
 
       - name: Site for GitHub Pages (stable releases)
         if: steps.kind.outputs.stable == 'true'
@@ -97,9 +97,9 @@ jobs:
           KEY=$(base64 -w0 build/flatpak/repo-key.gpg)
           mkdir -p site && cp -r repo site/repo
           printf '%s\n' "[Flatpak Repo]" "Title=Immich Splash" "Url=$REPO_URL" "Homepage=https://github.com/TypicalZedF/immich-splash" \
-            "Comment=Unofficial desktop companion for Immich" "GPGKey=$KEY" > site/immich-desktop.flatpakrepo
+            "Comment=Unofficial desktop companion for Immich" "GPGKey=$KEY" > site/immich-splash.flatpakrepo
           printf '%s\n' "[Flatpak Ref]" "Name=$APP_ID" "Branch=stable" "Title=Immich Splash" "Url=$REPO_URL" "IsRuntime=false" \
-            "SuggestRemoteName=immich-desktop" "RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo" "GPGKey=$KEY" > site/$APP_ID.flatpakref
+            "SuggestRemoteName=immich-splash" "RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo" "GPGKey=$KEY" > site/$APP_ID.flatpakref
           cp build/flatpak/index.html site/index.html
 
       - name: Attach the bundle to the release (stable releases)
@@ -109,7 +109,7 @@ jobs:
         run: |
           # The release is created by the Release workflow; wait for it, then add the Flatpak.
           for i in $(seq 1 60); do gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 && break; sleep 30; done
-          gh release upload "$GITHUB_REF_NAME" artifacts/ImmichDesktop.flatpak site/$APP_ID.flatpakref --clobber
+          gh release upload "$GITHUB_REF_NAME" artifacts/ImmichSplash.flatpak site/$APP_ID.flatpakref --clobber
 
       - uses: actions/upload-pages-artifact@v3
         if: steps.kind.outputs.stable == 'true'

@@ -1,0 +1,98 @@
+<!-- Sharing: shared albums, your share links and partners. Part of PhotosView. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichSplash.App.Services"
+             xmlns:vm="using:ImmichSplash.App.ViewModels"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichSplash.App.Views.Photos.SharingSection"
+             x:DataType="vm:PhotosViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="28,4,10,24">
+    <StackPanel Spacing="10">
+      <StackPanel Spacing="10" IsVisible="{Binding HasPartners}">
+        <TextBlock Classes="h3" l:Tr.Text="Partners" />
+        <TextBlock Classes="secondary" l:Tr.Text="People who share their photos with you." />
+        <ItemsControl ItemsSource="{Binding Partners}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PartnerViewModel">
+              <Button Classes="secondary" Margin="0,0,10,10" Padding="10,8,16,8" Command="{Binding OpenCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <Border Width="34" Height="34" CornerRadius="17" Background="{DynamicResource AppPrimarySoftBrush}">
+                    <TextBlock Text="{Binding Initial}" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Partner.Name}" FontWeight="Medium" />
+                    <TextBlock Classes="caption" Text="{Binding Partner.Email}" />
+                  </StackPanel>
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <TextBlock Classes="h3" l:Tr.Text="Shared albums" />
+      <TextBlock Classes="secondary" Text="{Binding SharedAlbumsMessage}" TextWrapping="Wrap"
+                 IsVisible="{Binding SharedAlbumsMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <ItemsControl ItemsSource="{Binding SharedAlbums}">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:AlbumCardViewModel">
+            <Button Classes="cover" Width="176" Command="{Binding OpenCommand}">
+              <StackPanel Spacing="8">
+                <Border Classes="coverImage" Width="176" Height="176" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
+                  <Panel>
+                    <mi:MaterialIcon Kind="ImageAlbum" Width="40" Height="40" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                    <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                  </Panel>
+                </Border>
+                <StackPanel Spacing="1" Margin="2,0">
+                  <TextBlock Text="{Binding Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Classes="caption" Text="{Binding Subtitle}" />
+                </StackPanel>
+              </StackPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Classes="h3" l:Tr.Text="Shared links" Margin="0,12,0,0" />
+      <TextBlock Classes="secondary" Text="{Binding SharedLinksMessage}" TextWrapping="Wrap"
+                 IsVisible="{Binding SharedLinksMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <ItemsControl ItemsSource="{Binding SharedLinks}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:SharedLinkViewModel">
+            <Border Classes="card" Padding="10" Margin="0,0,0,8" CornerRadius="14">
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <Border Width="56" Height="56" CornerRadius="10" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
+                  <Panel>
+                    <mi:MaterialIcon Kind="LinkVariant" Width="22" Height="22" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                    <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                  </Panel>
+                </Border>
+                <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="2">
+                  <TextBlock Text="{Binding Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Classes="caption" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis"
+                             Classes.tertiary="{Binding IsExpired}" />
+                  <TextBlock Classes="caption tertiary" Text="{Binding Url}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                  <Button Classes="ghost icon" Command="{Binding CopyCommand}" l:Tr.Tip="Copy link">
+                    <mi:MaterialIcon Kind="ContentCopy" Width="18" Height="18" />
+                  </Button>
+                  <Button Classes="ghost icon" Command="{Binding OpenCommand}" l:Tr.Tip="Open">
+                    <mi:MaterialIcon Kind="OpenInNew" Width="18" Height="18" />
+                  </Button>
+                  <Button Classes="ghost icon" Command="{Binding DeleteCommand}" l:Tr.Tip="Delete link">
+                    <mi:MaterialIcon Kind="TrashCanOutline" Width="18" Height="18" />
+                  </Button>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
