@@ -4,8 +4,8 @@
     <AssemblyName>ImmichDesktop</AssemblyName>
     <RootNamespace>ImmichDesktop.App</RootNamespace>
     <!-- Windows builds get the Windows SDK projection (Windows Hello); other platforms stay plain net10.0. -->
-    <TargetFramework Condition="$([MSBuild]::IsOSPlatform('Windows'))">net10.0-windows10.0.19041.0</TargetFramework>
-    <SupportedOSPlatformVersion Condition="$([MSBuild]::IsOSPlatform('Windows'))">10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetFramework Condition="'$(ImmichWindows)' == 'true'">net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion Condition="'$(ImmichWindows)' == 'true'">10.0.17763.0</SupportedOSPlatformVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon Condition="Exists('Assets\app.ico')">Assets\app.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
@@ -25,7 +25,7 @@
     <None Include="Assets\logo-256.png" Link="notification-icon.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <!-- libmpv plays videos on Windows (downloaded into lib/mpv by build/publish.ps1; Linux uses the system's). -->
     <None Include="..\..\lib\mpv\libmpv-2.dll" Link="libmpv-2.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
-          Condition="$([MSBuild]::IsOSPlatform('Windows')) And Exists('..\..\lib\mpv\libmpv-2.dll')" />
+          Condition="'$(ImmichWindows)' == 'true' And Exists('..\..\lib\mpv\libmpv-2.dll')" />
   </ItemGroup>
 
   <ItemGroup>

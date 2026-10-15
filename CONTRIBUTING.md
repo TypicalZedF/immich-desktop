@@ -11,6 +11,37 @@ By participating you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md). 
 - Improve documentation and screenshots.
 - Help with Linux support, which is in progress.
 
+## Trying your changes on your own machines
+
+You don't need a beta release to test a change. `build/dev.ps1` builds what you have checked out and puts it on your machines in about a minute:
+
+```powershell
+./build/dev.ps1                                   # this PC: replaces your installed copy and restarts it (settings kept)
+./build/dev.ps1 -Linux -LinuxHost you@laptop.local # also a Linux machine, over SSH (the host is remembered)
+./build/dev.ps1 -Linux -NoWindows                 # only the Linux machine
+```
+
+Dev builds are versioned like `1.5.2-dev.10151342`. They count as newer than the current betas, so the app won't switch back by itself; the next stable release or a newer beta replaces them as usual.
+
+On Linux the dev build installs like the tarball, to `~/.local/opt/immich-desktop`. It closes the Flatpak copy if one is running. It keeps its own settings (`~/.local/share/immich-desktop`), so sign in once. Videos need `mpv-libs` (Fedora) or `libmpv2` (Debian/Ubuntu).
+
+One-time SSH setup for `-LinuxHost`:
+
+1. On the Linux machine (Fedora shown), turn on SSH:
+
+   ```bash
+   sudo systemctl enable --now sshd
+   ```
+
+2. On Windows, in PowerShell, create a key and copy it over so you aren't asked for a password each time:
+
+   ```powershell
+   ssh-keygen -t ed25519
+   type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh you@laptop.local "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+   ```
+
+Without SSH, `-Linux` leaves `artifacts/dev/ImmichDesktop-dev-linux-x64.tar.gz`; copy it over, extract it and run `./immich-desktop/install.sh`.
+
 ## Before you open a pull request
 
 - Keep each PR focused on a single change. Smaller PRs are reviewed faster.

@@ -10,5 +10,14 @@
     <Copyright>Copyright © Immich Desktop contributors</Copyright>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Building the Windows app (on Windows, unless publishing for Linux with -r linux-x64, e.g. build/dev.ps1 -Linux). -->
+    <ImmichWindows>false</ImmichWindows>
+    <ImmichWindows Condition="$([MSBuild]::IsOSPlatform('Windows')) And !$(RuntimeIdentifier.StartsWith('linux'))">true</ImmichWindows>
+  </PropertyGroup>
+  <!-- A Linux build made on Windows (build/dev.ps1 -Linux) keeps its own build folders, so it doesn't fight the Windows build. -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) And $(RuntimeIdentifier.StartsWith('linux'))">
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)artifacts\linux-build\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)artifacts\linux-build\bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin\**;obj\**</DefaultItemExcludes>
   </PropertyGroup>
 </Project>
