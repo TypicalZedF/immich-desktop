@@ -34,14 +34,24 @@ public class ViewerActionsApiTests
     }
 
     [Fact]
-    public async Task Naming_and_hiding_a_person_sends_only_what_changed()
+    public async Task Naming_a_person_sends_only_the_name()
     {
         var server = new FakeImmichServer();
         using var client = Client(server);
 
-        await client.UpdatePersonAsync("p1", "Sam", null, TestContext.Current.CancellationToken);
-        await client.UpdatePersonAsync("p2", null, true, TestContext.Current.CancellationToken);
+        await client.UpdatePersonAsync("p1", "Sam", TestContext.Current.CancellationToken);
 
-        Assert.Equal(["/api/people/p1 {\"name\":\"Sam\"}", "/api/people/p2 {\"isHidden\":true}"], server.PeopleUpdates);
+        Assert.Equal("/api/people/p1 {\"name\":\"Sam\"}", Assert.Single(server.PeopleUpdates));
+    }
+
+    [Fact]
+    public async Task A_discarded_face_is_deleted_on_the_server()
+    {
+        var server = new FakeImmichServer();
+        using var client = Client(server);
+
+        await client.DeletePersonAsync("p9", TestContext.Current.CancellationToken);
+
+        Assert.Equal("DELETE /api/people/p9", Assert.Single(server.PeopleUpdates));
     }
 }

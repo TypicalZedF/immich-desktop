@@ -1,0 +1,103 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichSplash.App.Services"
+             xmlns:vm="using:ImmichSplash.App.ViewModels"
+             xmlns:api="using:ImmichSplash.Core.Api"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichSplash.App.Views.ShareManagerView"
+             x:DataType="vm:ShareManagerViewModel">
+  <Border Classes="card" Width="540" MaxHeight="640" Padding="26,24" CornerRadius="22" HorizontalAlignment="Center" VerticalAlignment="Center"
+          BoxShadow="0 18 50 0 #40000000">
+    <DockPanel>
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
+        <mi:MaterialIcon Kind="ShareVariantOutline" Width="26" Height="26" Foreground="{DynamicResource AppPrimaryBrush}" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+          <TextBlock Classes="h2" l:Tr.Text="Sharing" />
+          <TextBlock Classes="caption" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <Button Grid.Column="2" Classes="ghost icon" Command="{Binding CloseCommand}" l:Tr.Tip="Close" AutomationProperties.Name="Close">
+          <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
+        </Button>
+      </Grid>
+
+      <ProgressBar DockPanel.Dock="Top" IsIndeterminate="True" IsVisible="{Binding IsLoading}" Classes="thin" />
+      <TextBlock DockPanel.Dock="Top" Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding Error}" TextWrapping="Wrap" Margin="0,0,0,8"
+                 IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding ShowContent}">
+        <StackPanel Spacing="10" Margin="0,0,10,0">
+          <!-- People -->
+          <TextBlock Classes="h3" l:Tr.Text="People" />
+          <TextBlock Classes="caption" Text="{Binding OwnerText}" />
+          <TextBlock Classes="secondary" l:Tr.Text="Not shared with anyone yet." IsVisible="{Binding NoMembers}" />
+          <ItemsControl ItemsSource="{Binding Members}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:MemberRowViewModel">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,4">
+                  <Border Width="34" Height="34" CornerRadius="17" Background="{DynamicResource AppPrimarySoftBrush}">
+                    <TextBlock Text="{Binding Initial}" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Member.Name}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="caption" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <ComboBox Grid.Column="2" MinWidth="110" ItemsSource="{Binding $parent[ItemsControl].((vm:ShareManagerViewModel)DataContext).Roles}" SelectedItem="{Binding Role}"
+                            AutomationProperties.Name="What they can do">
+                  </ComboBox>
+                  <Button Grid.Column="3" Classes="ghost icon" Command="{Binding RemoveCommand}" l:Tr.Tip="Stop sharing with them" AutomationProperties.Name="Stop sharing with them">
+                    <mi:MaterialIcon Kind="Close" Width="18" Height="18" />
+                  </Button>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,4,0,0">
+            <ComboBox ItemsSource="{Binding Candidates}" SelectedItem="{Binding SelectedCandidate}" HorizontalAlignment="Stretch" l:Tr.Placeholder="Add a person" AutomationProperties.Name="Add a person">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="api:ServerUser"><TextBlock Text="{Binding Name}" /></DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <ComboBox Grid.Column="1" MinWidth="110" ItemsSource="{Binding Roles}" SelectedItem="{Binding SelectedAddRole}" AutomationProperties.Name="What they can do">
+            </ComboBox>
+            <Button Grid.Column="2" Classes="primary" l:Tr.Content="Add" Command="{Binding AddPersonCommand}" IsEnabled="{Binding CanAddPerson}" />
+          </Grid>
+
+          <!-- Links -->
+          <Border Classes="divider" Margin="0,10" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="h3" l:Tr.Text="Shared links" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="secondary" Command="{Binding CreateLinkCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="LinkVariantPlus" Width="16" Height="16" />
+                <TextBlock l:Tr.Text="Create link" />
+              </StackPanel>
+            </Button>
+          </Grid>
+          <TextBlock Classes="secondary" l:Tr.Text="No public links. Anyone with a link can see the album without signing in." TextWrapping="Wrap" IsVisible="{Binding NoLinks}" />
+          <ItemsControl ItemsSource="{Binding Links}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:LinkRowViewModel">
+                <Border Classes="card" Padding="12" Margin="0,0,0,8" CornerRadius="14">
+                  <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Summary}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="caption tertiary" Text="{Binding Url}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+                        <Button Classes="ghost icon" Command="{Binding CopyCommand}" l:Tr.Tip="Copy link" AutomationProperties.Name="Copy link"><mi:MaterialIcon Kind="ContentCopy" Width="18" Height="18" /></Button>
+                        <Button Classes="ghost icon" Command="{Binding DeleteCommand}" l:Tr.Tip="Delete link" AutomationProperties.Name="Delete link"><mi:MaterialIcon Kind="TrashCanOutline" Width="18" Height="18" /></Button>
+                      </StackPanel>
+                    </Grid>
+                    <ToggleSwitch IsChecked="{Binding AllowDownload}" l:Tr.Content="People with the link can download" OnContent="" OffContent="" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+</UserControl>

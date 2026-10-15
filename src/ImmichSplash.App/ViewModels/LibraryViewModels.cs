@@ -79,6 +79,15 @@ public sealed class AlbumCardViewModel(PhotosViewModel owner, AlbumInfo album) :
 
     public bool HasDateText => DateText.Length > 0;
 
+    /// <summary>Shared with people or through a public link: the card gets a small icon.</summary>
+    public bool IsSharedWithPeople => Album.IsSharedWithPeople(AppServices.Settings.Current.UserId);
+    public bool HasSharedLink => Album.HasSharedLink;
+    public bool ShowSharedBadge => IsSharedWithPeople || HasSharedLink;
+    public Material.Icons.MaterialIconKind SharedIcon => IsSharedWithPeople ? Material.Icons.MaterialIconKind.AccountMultiple : Material.Icons.MaterialIconKind.LinkVariant;
+
+    public string SharedTip => IsSharedWithPeople && HasSharedLink ? Tr.T("Shared with people, and has a public link")
+        : IsSharedWithPeople ? Tr.T("Shared with other people") : Tr.T("Has a public link");
+
     /// <summary>"221 items · Owned" (or Shared).</summary>
     public string Meta => Format.Plural(Album.AssetCount, "item") + " · " +
         (Album.IsOwnedBy(AppServices.Settings.Current.UserId) ? Tr.T("Owned") : Tr.T("Shared"));
@@ -115,18 +124,13 @@ public sealed class PersonCardViewModel(PhotosViewModel owner, PersonInfo person
 
     protected override void Open() => Owner.OpenPerson(Person);
 
-    public bool IsHidden => Person.IsHidden;
-    public bool IsVisiblePerson => !Person.IsHidden;
     public string NameActionText => IsNamed ? Tr.T("Change name") : Tr.T("Add a name");
 
     public IRelayCommand NameCommand => _name ??= new RelayCommand(() => Owner.NamePerson(Person));
     IRelayCommand? _name;
 
-    public IRelayCommand HideCommand => _hide ??= new AsyncRelayCommand(() => Owner.SetPersonHiddenAsync(Person, true));
-    IRelayCommand? _hide;
-
-    public IRelayCommand UnhideCommand => _unhide ??= new AsyncRelayCommand(() => Owner.SetPersonHiddenAsync(Person, false));
-    IRelayCommand? _unhide;
+    public IRelayCommand DiscardCommand => _discard ??= new AsyncRelayCommand(() => Owner.DiscardPersonAsync(Person));
+    IRelayCommand? _discard;
 }
 
 public sealed class PlaceCardViewModel(PhotosViewModel owner, PlaceInfo place) : LibraryCardViewModel(owner)

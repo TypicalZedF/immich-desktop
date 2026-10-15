@@ -489,23 +489,29 @@ public sealed class ImmichClient : IDisposable
         return results;
     }
 
-    /// <summary>The people Immich found; with <paramref name="hidden"/>, only the ones you've hidden.</summary>
-    public async Task<List<PersonInfo>> GetPeopleAsync(CancellationToken ct, bool hidden = false)
+    public async Task<List<PersonInfo>> GetPeopleAsync(CancellationToken ct)
     {
         var people = new List<PersonInfo>();
         for (var page = 1; page <= 20; page++)
         {
-            var response = await SendAsync<PeopleResponseDto>(HttpMethod.Get, $"people?withHidden={(hidden ? "true" : "false")}&page={page}&size=500", null, ct);
-            people.AddRange((response.People ?? []).Where(p => p.IsHidden == hidden).Select(p => new PersonInfo(p.Id, p.Name ?? "", p.IsHidden)));
+            var response = await SendAsync<PeopleResponseDto>(HttpMethod.Get, $"people?withHidden=false&page={page}&size=500", null, ct);
+            people.AddRange((response.People ?? []).Where(p => !p.IsHidden).Select(p => new PersonInfo(p.Id, p.Name ?? "", p.IsHidden)));
             if (response.HasNextPage != true)
                 break;
         }
         return people;
     }
 
-    /// <summary>Names a person and/or hides or shows them (leave a value null to keep it as it is).</summary>
-    public Task UpdatePersonAsync(string personId, string? name, bool? isHidden, CancellationToken ct) =>
-        SendAsync(HttpMethod.Put, $"people/{Uri.EscapeDataString(personId)}", new UpdatePersonRequestDto(name, isHidden), ct);
+    /// <summary>Gives a person a name.</summary>
+    public Task UpdatePersonAsync(string personId, string name, CancellationToken ct) =>
+        SendAsync(HttpMethod.Put, $"people/{Uri.EscapeDataString(personId)}", new UpdatePersonRequestDto(name), ct);
+
+    /// <summary>
+    /// Discards a person: Immich forgets them. Their photos stay; the faces aren't matched to a new person
+    /// again unless the server's face detection is forced to run over everything.
+    /// </summary>
+    public Task DeletePersonAsync(string personId, CancellationToken ct) =>
+        SendAsync(HttpMethod.Delete, $"people/{Uri.EscapeDataString(personId)}", null, ct);
 
     public async Task<byte[]> GetPersonThumbnailAsync(string personId, CancellationToken ct)
     {
@@ -708,9 +714,41 @@ public sealed class ImmichClient : IDisposable
                 : isAlbum ? l.Album?.AlbumName ?? ""
                 : "";
             var cover = isAlbum ? l.Album?.AlbumThumbnailAssetId : l.Assets?.FirstOrDefault()?.Id;
-            return new SharedLinkSummary(l.Id, l.Key, isAlbum, title, cover, count, l.CreatedAt, l.ExpiresAt, l.AllowDownload);
+            return new SharedLinkSummary(l.Id, l.Key, isAlbum, title, cover, count, l.CreatedAt, l.ExpiresAt, l.AllowDownload, isAlbum ? l.Album?.Id : null);
         }).OrderByDescending(l => l.CreatedAt).ToList();
     }
+
+    /// <summary>Changes what a link allows (whether people can download).</summary>
+    public Task UpdateSharedLinkAsync(string id, bool? allowDownload, CancellationToken ct) =>
+        SendAsync(HttpMethod.Patch, $"shared-links/{Uri.EscapeDataString(id)}", new UpdateSharedLinkRequestDto(allowDownload, null), ct);
+
+    // ---- Who an album is shared with ----
+
+    public async Task<AlbumSharing> GetAlbumSharingAsync(string albumId, CancellationToken ct)
+    {
+        var album = await SendAsync<AlbumDetailDto>(HttpMethod.Get, $"albums/{Uri.EscapeDataString(albumId)}?withoutAssets=true", null, ct);
+        static AlbumMember? Member(UserBriefDto? user, string role) =>
+            user is null ? null : new AlbumMember(user.Id, user.Name ?? user.Email ?? "", user.Email ?? "", role);
+        var members = (album.AlbumUsers ?? [])
+            .Select(u => Member(u.User, string.Equals(u.Role, "editor", StringComparison.OrdinalIgnoreCase) ? "editor" : "viewer"))
+            .OfType<AlbumMember>().ToList();
+        return new AlbumSharing(album.Id, album.AlbumName, Member(album.Owner, "owner"), members, album.HasSharedLink == true);
+    }
+
+    /// <summary>Everyone on the server you could share with.</summary>
+    public async Task<List<ServerUser>> GetUsersAsync(CancellationToken ct) =>
+        (await SendAsync<List<UserBriefDto>>(HttpMethod.Get, "users", null, ct))
+            .Select(u => new ServerUser(u.Id, u.Name ?? u.Email ?? "", u.Email ?? "")).ToList();
+
+    public Task AddAlbumUsersAsync(string albumId, IReadOnlyList<string> userIds, string role, CancellationToken ct) =>
+        SendAsync(HttpMethod.Put, $"albums/{Uri.EscapeDataString(albumId)}/users",
+            new AddAlbumUsersDto(userIds.Select(id => new AlbumUserRoleDto(id, role)).ToList()), ct);
+
+    public Task SetAlbumUserRoleAsync(string albumId, string userId, string role, CancellationToken ct) =>
+        SendAsync(HttpMethod.Put, $"albums/{Uri.EscapeDataString(albumId)}/user/{Uri.EscapeDataString(userId)}", new RoleDto(role), ct);
+
+    public Task RemoveAlbumUserAsync(string albumId, string userId, CancellationToken ct) =>
+        SendAsync(HttpMethod.Delete, $"albums/{Uri.EscapeDataString(albumId)}/user/{Uri.EscapeDataString(userId)}", null, ct);
 
     public Task DeleteSharedLinkAsync(string id, CancellationToken ct) =>
         SendAsync(HttpMethod.Delete, $"shared-links/{Uri.EscapeDataString(id)}", null, ct);

@@ -47,7 +47,7 @@ public sealed record UploadResult(string Id, string Status)
 public sealed record AlbumInfo(string Id, string AlbumName, string? AlbumThumbnailAssetId = null, int AssetCount = 0, bool Shared = false,
     string? OwnerId = null, List<System.Text.Json.JsonElement>? AlbumUsers = null, System.Text.Json.JsonElement? Owner = null,
     DateTimeOffset? CreatedAt = null, DateTimeOffset? UpdatedAt = null, DateTimeOffset? StartDate = null, DateTimeOffset? EndDate = null,
-    string? Description = null)
+    string? Description = null, bool HasSharedLink = false)
 {
     /// <summary>
     /// Shared with other people: anyone besides you is in it (or it's someone else's album). The
@@ -101,7 +101,7 @@ public sealed record TimelineFilter(string? AlbumId = null, string? PersonId = n
 
 /// <summary>A public link you created (to photos or an album).</summary>
 public sealed record SharedLinkSummary(string Id, string Key, bool IsAlbum, string Title, string? CoverAssetId, int AssetCount,
-    DateTimeOffset? CreatedAt, DateTimeOffset? ExpiresAt, bool AllowDownload)
+    DateTimeOffset? CreatedAt, DateTimeOffset? ExpiresAt, bool AllowDownload, string? AlbumId = null)
 {
     public bool IsExpired => ExpiresAt is { } e && e < DateTimeOffset.Now;
 }
@@ -228,7 +228,7 @@ internal sealed record TimeBucketAssetsDto(
     List<List<string>?>? Stack = null);
 internal sealed record WellKnownDto(WellKnownApiDto? Api);
 internal sealed record PeopleResponseDto(List<PersonDto>? People, bool? HasNextPage);
-internal sealed record UpdatePersonRequestDto(string? Name, bool? IsHidden);
+internal sealed record UpdatePersonRequestDto(string Name);
 internal sealed record PersonDto(string Id, string? Name, bool IsHidden);
 internal sealed record ExifDto(
     string? Make, string? Model, string? LensModel, double? FNumber, string? ExposureTime, double? Iso, double? FocalLength,
@@ -278,10 +278,26 @@ internal sealed record SharedLinkDto(string Id, string Key);
 internal sealed record ServerExternalDomainDto(string? ExternalDomain);
 internal sealed record VisibilityRequestDto(IReadOnlyList<string> Ids, string Visibility);
 internal sealed record IdsRequestDto(IReadOnlyList<string> Ids);
-internal sealed record SharedLinkAlbumDto(string? AlbumName, string? AlbumThumbnailAssetId, int? AssetCount);
+internal sealed record SharedLinkAlbumDto(string? Id, string? AlbumName, string? AlbumThumbnailAssetId, int? AssetCount);
 internal sealed record SharedLinkAssetDto(string Id);
 internal sealed record SharedLinkFullDto(string Id, string Key, string? Type, string? Description, SharedLinkAlbumDto? Album,
     List<SharedLinkAssetDto>? Assets, DateTimeOffset? CreatedAt, DateTimeOffset? ExpiresAt, bool AllowDownload);
+/// <summary>Someone an album is shared with, and what they may do ("viewer" or "editor").</summary>
+public sealed record AlbumMember(string UserId, string Name, string Email, string Role);
+
+/// <summary>Who an album is shared with.</summary>
+public sealed record AlbumSharing(string AlbumId, string AlbumName, AlbumMember? Owner, IReadOnlyList<AlbumMember> Members, bool HasSharedLink);
+
+/// <summary>Another person on the server (to share an album with).</summary>
+public sealed record ServerUser(string Id, string Name, string Email);
+
+internal sealed record UserBriefDto(string Id, string? Name, string? Email);
+internal sealed record AlbumUserDto(string? Role, UserBriefDto? User);
+internal sealed record AlbumDetailDto(string Id, string AlbumName, List<AlbumUserDto>? AlbumUsers, UserBriefDto? Owner, bool? HasSharedLink);
+internal sealed record AlbumUserRoleDto(string UserId, string Role);
+internal sealed record AddAlbumUsersDto(IReadOnlyList<AlbumUserRoleDto> AlbumUsers);
+internal sealed record RoleDto(string Role);
+internal sealed record UpdateSharedLinkRequestDto(bool? AllowDownload, string? Description);
 internal sealed record PartnerDto(string Id, string? Name, string? Email);
 internal sealed record AuthStatusDto(bool PinCode, bool IsElevated);
 internal sealed record DuplicateGroupDto(string DuplicateId, List<AssetDto> Assets);

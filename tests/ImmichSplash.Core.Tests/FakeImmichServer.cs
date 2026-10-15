@@ -26,6 +26,8 @@ sealed class FakeImmichServer : HttpMessageHandler
 
     /// <summary>Jobs asked for with POST /assets/jobs, and the kinds of smart search made.</summary>
     public ConcurrentQueue<string> AssetJobs { get; } = new();
+    public ConcurrentQueue<string> SharedLinkPatches { get; } = new();
+    public ConcurrentDictionary<string, List<(string UserId, string Role)>> AlbumMembers { get; } = new();
     public ConcurrentQueue<string> PeopleUpdates { get; } = new();
     public ConcurrentQueue<string> SmartSearches { get; } = new();
     public bool RejectAuth { get; set; }
@@ -89,6 +91,9 @@ sealed class FakeImmichServer : HttpMessageHandler
                 AfterUpload?.Invoke(UploadedFileNames.Count);
                 return Json(HttpStatusCode.Created, new { id, status = "created" });
             }
+            case ("DELETE", _) when path.StartsWith("/api/people/", StringComparison.Ordinal):
+                PeopleUpdates.Enqueue("DELETE " + path);
+                return Json(HttpStatusCode.NoContent, new { });
             case ("PUT", _) when path.StartsWith("/api/people/", StringComparison.Ordinal):
             {
                 // Like Immich v3 (zod): optional fields may be left out but not null.
@@ -97,6 +102,55 @@ sealed class FakeImmichServer : HttpMessageHandler
                     return Json(HttpStatusCode.BadRequest, new { message = "Validation failed", statusCode = 400 });
                 PeopleUpdates.Enqueue(path + " " + doc.RootElement.GetRawText());
                 return Json(HttpStatusCode.OK, new { id = path.Split('/')[^1] });
+            }
+            case ("GET", "/api/users"):
+                return Json(HttpStatusCode.OK, new[] { new { id = "u1", name = "Alex", email = "alex@x.test" }, new { id = "u2", name = "Sam", email = "sam@x.test" }, new { id = "u3", name = "Riley", email = "riley@x.test" } });
+            case ("GET", _) when path.StartsWith("/api/albums/", StringComparison.Ordinal) && path.Count(c => c == '/') == 3:
+            {
+                var albumId = path.Split('/')[^1];
+                var users = AlbumMembers.GetValueOrDefault(albumId) ?? [];
+                return Json(HttpStatusCode.OK, new
+                {
+                    id = albumId, albumName = "Trip",
+                    owner = new { id = "u1", name = "Alex", email = "alex@x.test" },
+                    albumUsers = users.Select(u => new { role = u.Role, user = new { id = u.UserId, name = u.UserId, email = u.UserId + "@x.test" } }),
+                    hasSharedLink = false,
+                });
+            }
+            case ("PUT", _) when path.StartsWith("/api/albums/", StringComparison.Ordinal) && path.EndsWith("/users", StringComparison.Ordinal):
+            {
+                using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+                var albumId = path.Split('/')[3];
+                var list = AlbumMembers.GetOrAdd(albumId, _ => []);
+                foreach (var entry in doc.RootElement.GetProperty("albumUsers").EnumerateArray())
+                {
+                    var role = entry.GetProperty("role").GetString();
+                    if (role is not ("editor" or "viewer"))
+                        return Json(HttpStatusCode.BadRequest, new { message = "Validation failed", statusCode = 400 });
+                    list.Add((entry.GetProperty("userId").GetString()!, role!));
+                }
+                return Json(HttpStatusCode.OK, new { id = albumId });
+            }
+            case ("PUT", _) when path.Contains("/user/", StringComparison.Ordinal) && path.StartsWith("/api/albums/", StringComparison.Ordinal):
+            {
+                using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+                var parts = path.Split('/');
+                var list = AlbumMembers.GetOrAdd(parts[3], _ => []);
+                var i = list.FindIndex(u => u.UserId == parts[5]);
+                if (i >= 0)
+                    list[i] = (parts[5], doc.RootElement.GetProperty("role").GetString()!);
+                return Json(HttpStatusCode.OK, new { });
+            }
+            case ("DELETE", _) when path.Contains("/user/", StringComparison.Ordinal) && path.StartsWith("/api/albums/", StringComparison.Ordinal):
+            {
+                var parts = path.Split('/');
+                AlbumMembers.GetOrAdd(parts[3], _ => []).RemoveAll(u => u.UserId == parts[5]);
+                return Json(HttpStatusCode.NoContent, new { });
+            }
+            case ("PATCH", _) when path.StartsWith("/api/shared-links/", StringComparison.Ordinal):
+            {
+                SharedLinkPatches.Enqueue(path + " " + await request.Content!.ReadAsStringAsync(ct));
+                return Json(HttpStatusCode.OK, new { });
             }
             case ("POST", "/api/assets/jobs"):
             {

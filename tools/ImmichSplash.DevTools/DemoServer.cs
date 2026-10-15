@@ -229,6 +229,13 @@ sealed class DemoServer : HttpMessageHandler
                     ? new object[] { new { role = "editor", user = new { id = "u1", name = "Alex" } }, new { role = "editor", user = new { id = "u2", name = "Sam" } } }
                     : new object[] { new { role = "editor", user = new { id = "u1", name = "Alex" } } },
             })),
+            "/api/users" => Json(new object[] { new { id = "u1", name = "Alex Morgan", email = "alex@example.com" }, new { id = "u2", name = "Sam Rivera", email = "sam@example.com" }, new { id = "u3", name = "Jordan Lee", email = "jordan@example.com" } }),
+            _ when path.StartsWith("/api/albums/", StringComparison.Ordinal) && request.Method == HttpMethod.Get && path.Count(c => c == '/') == 3 => Json(new
+            {
+                id = path.Split('/')[^1], albumName = "Summer in Lisbon", hasSharedLink = true,
+                owner = new { id = "u1", name = "Alex Morgan", email = "alex@example.com" },
+                albumUsers = new object[] { new { role = "editor", user = new { id = "u2", name = "Sam Rivera", email = "sam@example.com" } } },
+            }),
             "/api/people" => Json(new { people = People.Select((p, i) => new { id = $"p{i}", name = p.Name, isHidden = false }), hasNextPage = false }),
             _ when path.StartsWith("/api/people/", StringComparison.Ordinal) => Bytes(_faces[int.Parse(path.Split('/')[3][1..]) % _faces.Count]),
             "/api/search/cities" => Json(Cities.Select((c, i) => new { id = $"202608-{i * 2}", exifInfo = new { city = c.City, state = c.State, country = c.Country } })),

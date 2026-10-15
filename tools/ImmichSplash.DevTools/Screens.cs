@@ -437,6 +437,11 @@ static class Screens
             ((PhotosViewModel)Page(shell, ShellPage.Albums)).CreateAlbumCommand.Execute(null);
             Shot(main, outDir, $"19a2-create-album-{suffix}", height: 760, settle: TimeSpan.FromMilliseconds(600));
             main.CloseOverlay(main.Overlay);
+            // Who an album is shared with, and its links.
+            ((PhotosViewModel)Page(shell, ShellPage.Albums)).ShareAlbumFromCard(new ImmichSplash.Core.Api.AlbumInfo("a1", "Summer in Lisbon"));
+            Pump(TimeSpan.FromSeconds(2));
+            Shot(main, outDir, $"19a4-share-manager-{suffix}", height: 760, settle: TimeSpan.FromMilliseconds(600));
+            main.CloseOverlay(main.Overlay);
             // Toasts: small messages over the page.
             var toastPage = (PhotosViewModel)Page(shell, ShellPage.Albums);
             toastPage.ShowNotice(Tr.T("Copied to clipboard"));

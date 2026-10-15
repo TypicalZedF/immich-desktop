@@ -109,6 +109,10 @@
                           <Panel>
                             <mi:MaterialIcon Kind="ImageAlbum" Width="40" Height="40" Foreground="{DynamicResource AppTextTertiaryBrush}" />
                             <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Width="28" Height="28" CornerRadius="14" Background="#99000000"
+                                    IsVisible="{Binding ShowSharedBadge}" ToolTip.Tip="{Binding SharedTip}">
+                              <mi:MaterialIcon Kind="{Binding SharedIcon}" Width="16" Height="16" Foreground="White" />
+                            </Border>
                           </Panel>
                         </Border>
                         <StackPanel Spacing="1" Margin="2,0">
@@ -145,7 +149,11 @@
                           </Panel>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="1">
-                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <mi:MaterialIcon Kind="{Binding SharedIcon}" Width="16" Height="16" Foreground="{DynamicResource AppTextTertiaryBrush}"
+                                             IsVisible="{Binding ShowSharedBadge}" ToolTip.Tip="{Binding SharedTip}" VerticalAlignment="Center" />
+                          </StackPanel>
                           <TextBlock Classes="caption" Text="{Binding DateText}" IsVisible="{Binding HasDateText}" />
                         </StackPanel>
                         <TextBlock Grid.Column="2" Classes="secondary" Text="{Binding Meta}" VerticalAlignment="Center" Margin="0,0,16,0" />

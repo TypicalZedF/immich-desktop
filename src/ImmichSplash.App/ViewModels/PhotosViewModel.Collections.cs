@@ -20,15 +20,6 @@ public sealed partial class PhotosViewModel
     readonly List<PersonCardViewModel> _allPeople = [];
     readonly List<PlaceCardViewModel> _allPlaces = [];
 
-    /// <summary>Explore lists the people you've hidden (so you can bring them back) instead of the others.</summary>
-    [ObservableProperty]
-    public partial bool ShowHiddenPeople { get; set; }
-
-    partial void OnShowHiddenPeopleChanged(bool value) => _ = LoadPeopleAsync();
-
-    [RelayCommand]
-    void ToggleHiddenPeople() => ShowHiddenPeople = !ShowHiddenPeople;
-
     /// <summary>Asks for a name for a person (Immich then groups their photos under it).</summary>
     internal void NamePerson(PersonInfo person)
     {
@@ -43,7 +34,7 @@ public sealed partial class PhotosViewModel
                     return Tr.T("Not signed in.");
                 try
                 {
-                    await client.UpdatePersonAsync(person.Id, name, null, CancellationToken.None);
+                    await client.UpdatePersonAsync(person.Id, name, CancellationToken.None);
                     ShowNotice(Tr.T("Named them {0}", name));
                     _ = LoadPeopleAsync();
                     return null;
@@ -55,20 +46,28 @@ public sealed partial class PhotosViewModel
             }));
     }
 
-    /// <summary>Hides a person (their face is no longer listed, in Explore or in search) or brings them back.</summary>
-    internal async Task SetPersonHiddenAsync(PersonInfo person, bool hidden)
+    /// <summary>
+    /// Discards a face: Immich forgets this person (their photos stay), and it won't suggest them again
+    /// unless the server is made to scan everything for faces anew.
+    /// </summary>
+    internal async Task DiscardPersonAsync(PersonInfo person)
     {
-        if (Client is not { } client)
+        if (Client is not { } client || _main is null)
+            return;
+        var who = person.Name.Length > 0 ? $"“{person.Name}”" : Tr.T("this face");
+        if (!await _main.ConfirmAsync(Tr.T("Discard {0}?", who),
+                Tr.T("Immich forgets this person. The photos stay in your library, and the face isn't offered again unless you make the server scan every photo for faces anew."),
+                Tr.T("Discard"), danger: true))
             return;
         try
         {
-            await client.UpdatePersonAsync(person.Id, null, hidden, CancellationToken.None);
-            ShowNotice(hidden ? Tr.T("Hidden. Find them again under “Show hidden”.") : Tr.T("They're back in your people"));
+            await client.DeletePersonAsync(person.Id, CancellationToken.None);
+            ShowNotice(Tr.T("Discarded {0}", who));
             _ = LoadPeopleAsync();
         }
         catch (Exception ex)
         {
-            ShowNotice(Tr.T("Couldn't change that. {0}", NetworkErrors.Describe(ex)));
+            ShowNotice(Tr.T("Couldn't discard that. {0}", NetworkErrors.Describe(ex)));
         }
     }
 
@@ -104,7 +103,7 @@ public sealed partial class PhotosViewModel
 
     Task LoadPeopleAsync() => LoadCardsAsync(async c =>
     {
-        var people = await c.GetPeopleAsync(_lifetime.Token, ShowHiddenPeople);
+        var people = await c.GetPeopleAsync(_lifetime.Token);
         // Named people first, like the web app.
         return people.OrderByDescending(p => p.Name.Length > 0).Select(p => new PersonCardViewModel(this, p)).ToList();
     }, People, _allPeople, Tr.T("No people yet. Immich finds faces when machine learning is turned on in your server settings."),

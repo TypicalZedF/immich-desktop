@@ -10,15 +10,7 @@
     <StackPanel Spacing="10">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Classes="h3" l:Tr.Text="People" />
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14">
-          <Button Classes="link" l:Tr.Content="Show all" Command="{Binding ShowAllPeopleCommand}" IsVisible="{Binding HasMorePeople}" />
-          <ToggleButton Classes="toolToggle" IsChecked="{Binding ShowHiddenPeople, Mode=OneWay}" Command="{Binding ToggleHiddenPeopleCommand}" l:Tr.Tip="People you've hidden">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <mi:MaterialIcon Kind="EyeOffOutline" Width="16" Height="16" />
-              <TextBlock l:Tr.Text="Show hidden" />
-            </StackPanel>
-          </ToggleButton>
-        </StackPanel>
+        <Button Grid.Column="1" Classes="link" l:Tr.Content="Show all" Command="{Binding ShowAllPeopleCommand}" IsVisible="{Binding HasMorePeople}" />
       </Grid>
       <TextBlock Classes="secondary" Text="{Binding PeopleMessage}" TextWrapping="Wrap"
                  IsVisible="{Binding PeopleMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -31,9 +23,8 @@
                 <Button.ContextMenu>
                   <ContextMenu>
                     <MenuItem l:Tr.Header="Open" Command="{Binding OpenCommand}" />
-                    <MenuItem Header="{Binding NameActionText}" Command="{Binding NameCommand}" IsVisible="{Binding IsVisiblePerson}" />
-                    <MenuItem l:Tr.Header="Hide this person" Command="{Binding HideCommand}" IsVisible="{Binding IsVisiblePerson}" />
-                    <MenuItem l:Tr.Header="Show this person again" Command="{Binding UnhideCommand}" IsVisible="{Binding IsHidden}" />
+                    <MenuItem Header="{Binding NameActionText}" Command="{Binding NameCommand}" />
+                    <MenuItem l:Tr.Header="Discard this face" Command="{Binding DiscardCommand}" />
                   </ContextMenu>
                 </Button.ContextMenu>
                 <Border Classes="coverImage" Width="120" Height="120" CornerRadius="60" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
@@ -45,8 +36,10 @@
               </Button>
               <!-- Named: the name. Unnamed: a way to give one (the tile itself opens their photos). -->
               <TextBlock Text="{Binding Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" IsVisible="{Binding IsNamed}" />
-              <Button Classes="link" HorizontalAlignment="Center" Command="{Binding NameCommand}" l:Tr.Content="Add a name" IsVisible="{Binding !IsNamed}" />
-              <Button Classes="link" HorizontalAlignment="Center" Command="{Binding UnhideCommand}" l:Tr.Content="Show again" IsVisible="{Binding IsHidden}" />
+              <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center" IsVisible="{Binding !IsNamed}">
+                <Button Classes="link" Command="{Binding NameCommand}" l:Tr.Content="Add a name" />
+                <Button Classes="link" Command="{Binding DiscardCommand}" l:Tr.Content="Discard" l:Tr.Tip="Forget this face (the photos stay)" />
+              </StackPanel>
             </StackPanel>
           </DataTemplate>
         </ItemsControl.ItemTemplate>

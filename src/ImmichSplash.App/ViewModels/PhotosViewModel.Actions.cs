@@ -34,7 +34,7 @@ public sealed partial class PhotosViewModel
     void ShareAlbum()
     {
         if (Drill?.Album is { } album)
-            Panel = new SharePanelViewModel(this, Tr.T("the album “{0}”", album.AlbumName), null, album.Id);
+            ShareAlbumFromCard(album);
     }
 
     [RelayCommand]

@@ -298,8 +298,22 @@ public sealed partial class PhotosViewModel
         }
     }
 
-    internal void ShareAlbumFromCard(AlbumInfo album) =>
-        Panel = new SharePanelViewModel(this, Tr.T("the album “{0}”", album.AlbumName), null, album.Id);
+    /// <summary>The sharing dialog for an album: who it's shared with, and its public links.</summary>
+    internal void ShareAlbumFromCard(AlbumInfo album)
+    {
+        if (_main is not null)
+            _main.ShowOverlay(new ShareManagerViewModel(this, _main, album));
+    }
+
+    /// <summary>Sharing changed (people or links): the albums' share icons and the Sharing page catch up.</summary>
+    internal void OnSharingChanged()
+    {
+        AppServices.RaiseAlbumsChanged();
+        if (Page == LibraryPage.Albums)
+            _ = LoadAlbumsAsync();
+        else if (Page == LibraryPage.Sharing)
+            _ = LoadSharingAsync();
+    }
 
     internal async Task DownloadAlbumAsync(AlbumInfo album)
     {
