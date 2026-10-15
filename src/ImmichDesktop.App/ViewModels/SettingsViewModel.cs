@@ -32,6 +32,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
         LaunchAtStartup = Autostart.IsEnabled();
         GpuRendering = s.GpuRendering;
+        Notifications = s.Notifications;
         _theme = s.Theme;
         LanguageOptions = [new Option<string?>(Tr.T("System ({0})", Tr.Languages.First(l => l.Code == Tr.SystemLanguage).Name), null),
             .. Tr.Languages.Select(l => new Option<string?>(l.Name, l.Code))];
@@ -391,6 +392,15 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(GpuStatus))]
     public partial bool GpuRendering { get; set; }
+
+    [ObservableProperty]
+    public partial bool Notifications { get; set; }
+
+    partial void OnNotificationsChanged(bool value)
+    {
+        if (!_loading)
+            AppServices.Settings.Update(s => s.Notifications = value);
+    }
 
     partial void OnGpuRenderingChanged(bool value)
     {

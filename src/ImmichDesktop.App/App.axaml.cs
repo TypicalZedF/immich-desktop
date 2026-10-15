@@ -54,6 +54,12 @@ public partial class App : Application
             AppServices.Network.Start();
             AppServices.Engine.Start();
             AppServices.Engine.StatusChanged += OnEngineStatus;
+            DesktopNotifications.Clicked += kind => Dispatcher.UIThread.Post(() => ShowMainWindow(kind switch
+            {
+                NoticeKind.Failed => ShellPage.Activity,
+                NoticeKind.BackedUp => ShellPage.Overview,
+                _ => null,
+            }));
             AppServices.Settings.Changed += OnSettingsChanged;
 
             AppServices.Updates.QuitApp = Quit;
@@ -136,8 +142,15 @@ public partial class App : Application
     });
 
     /// <summary>When a sync run finishes while only the tray is showing, hand memory back and maybe update.</summary>
+    readonly BackupNotifier _notifier = new();
+
     void OnEngineStatus(SyncStatus status)
     {
+        Notice? notice;
+        lock (_notifier)
+            notice = _notifier.OnStatus(status, DateTimeOffset.Now);
+        if (notice is not null && AppServices.Settings.Current.Notifications)
+            DesktopNotifications.Show(notice);
         var busy = status.IsBusy;
         if (_wasBusy && !busy)
         {

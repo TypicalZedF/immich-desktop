@@ -24,6 +24,13 @@ internal static class Program
             SingleInstance.RequestQuit(TimeSpan.FromSeconds(15));
             return 0;
         }
+        if (args.Contains("--test-notification"))
+        {
+            // Support: check that desktop notifications work on this PC.
+            DesktopNotifications.Show(new Core.Sync.Notice(Core.Sync.NoticeKind.BackedUp, Core.AppInfo.Name, "Notifications work."));
+            Thread.Sleep(3000);
+            return 0;
+        }
         if (args.Contains("--uninstall"))
         {
             SingleInstance.RequestQuit(TimeSpan.FromSeconds(15));

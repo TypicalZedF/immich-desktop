@@ -125,6 +125,14 @@
             </StackPanel>
             <ToggleSwitch Grid.Column="1" IsChecked="{Binding GpuRendering}" />
           </Grid>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Notifications" />
+              <TextBlock Classes="caption" l:Tr.Text="Let you know when a big backup finishes, when files can't be backed up, or when you need to sign in again." TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding Notifications}" />
+          </Grid>
           <Border Classes="divider" IsVisible="{Binding AutostartSupported}" />
           <Grid Classes="row" ColumnDefinitions="*,Auto" IsVisible="{Binding AutostartSupported}">
             <StackPanel>

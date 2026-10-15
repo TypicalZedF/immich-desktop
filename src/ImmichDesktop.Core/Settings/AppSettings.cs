@@ -122,6 +122,9 @@ public sealed class AppSettings
     /// <summary>Draw the app with the graphics card (smoother). Off: the processor draws it. Applies after a restart.</summary>
     public bool GpuRendering { get; set; } = true;
 
+    /// <summary>Desktop notifications when a big backup finishes, files fail, or you need to sign in again.</summary>
+    public bool Notifications { get; set; } = true;
+
     /// <summary>Photo grid thumbnail size in pixels (the zoom slider in Photos).</summary>
     public int ThumbnailSize { get; set; } = 168;
 
