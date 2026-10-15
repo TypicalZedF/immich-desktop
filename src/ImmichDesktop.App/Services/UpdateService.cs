@@ -34,7 +34,8 @@ public sealed class UpdateService : IDisposable
 
     public UpdateService()
     {
-        if (!string.IsNullOrWhiteSpace(AppInfo.UpdateRepository))
+        // A Flatpak is updated by Flatpak (Discover, GNOME Software, flatpak update), never by the app.
+        if (!string.IsNullOrWhiteSpace(AppInfo.UpdateRepository) && !Core.Platform.Flatpak.IsRunning)
             _checker = new GitHubUpdateChecker(AppInfo.UpdateRepository);
     }
 

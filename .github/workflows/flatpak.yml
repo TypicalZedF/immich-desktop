@@ -1,15 +1,27 @@
-# Builds the Linux Flatpak (build/flatpak) and attaches ImmichDesktop.flatpak to the run.
-# Install it with: flatpak install --user ImmichDesktop.flatpak
+# Builds the Linux Flatpak (build/flatpak).
+#   Pushes to beta: ImmichDesktop.flatpak attached to the run (testing).
+#   Stable tags (vX.Y.Z): a signed Flatpak repository published to GitHub Pages, so installed copies
+#   update through Flatpak (Discover, GNOME Software, flatpak update), plus the bundle on the release.
+# Windows is not involved: its installer updates from GitHub Releases as before.
 name: Flatpak
 
 on:
   push:
     branches: [beta]
+    tags: ["v*"]
   workflow_dispatch:
+
+env:
+  APP_ID: io.github.TypicalZedF.ImmichDesktop
+  REPO_URL: https://typicalzedf.github.io/immich-desktop/repo/
 
 jobs:
   flatpak:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      stable: ${{ steps.kind.outputs.stable }}
     steps:
       - uses: actions/checkout@v4
 
@@ -17,10 +29,19 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Stable release?
+        id: kind
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "stable=true" >> "$GITHUB_OUTPUT"; echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "stable=false" >> "$GITHUB_OUTPUT"; echo "VERSION=0.0.0-dev" >> "$GITHUB_ENV"
+          fi
+
       - name: Publish the app for Linux
         run: |
           dotnet publish src/ImmichDesktop.App/ImmichDesktop.App.csproj -c Release -r linux-x64 --self-contained true \
-            -p:DebugType=none -o artifacts/publish/linux-x64 --nologo
+            -p:Version="$VERSION" -p:DebugType=none -o artifacts/publish/linux-x64 --nologo
 
       - name: Install flatpak-builder
         run: |
@@ -35,14 +56,33 @@ jobs:
           key: flatpak-builder-${{ hashFiles('build/flatpak/*.yaml') }}
           restore-keys: flatpak-builder-
 
+      - name: Signing key (stable releases)
+        if: steps.kind.outputs.stable == 'true'
+        env:
+          KEY: ${{ secrets.FLATPAK_GPG_KEY }}
+        run: |
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"; mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
+          echo "$KEY" | gpg --batch --import
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+          echo "GPG_KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^fpr/{print $10; exit}')" >> "$GITHUB_ENV"
+
       - name: Build the Flatpak
         run: |
+          SIGN=(); BRANCH=master
+          if [[ -n "${GPG_KEY_ID:-}" ]]; then SIGN=(--gpg-sign="$GPG_KEY_ID" --gpg-homedir="$GNUPGHOME"); BRANCH=stable; fi
           flatpak-builder --user --install-deps-from=flathub --force-clean --disable-rofiles-fuse \
-            --repo=repo build-dir build/flatpak/io.github.TypicalZedF.ImmichDesktop.yaml
+            --default-branch="$BRANCH" "${SIGN[@]}" \
+            --repo=repo build-dir build/flatpak/$APP_ID.yaml
 
       - name: Bundle
         run: |
-          flatpak build-bundle repo artifacts/ImmichDesktop.flatpak io.github.TypicalZedF.ImmichDesktop \
+          EXTRA=()
+          if [[ -n "${GPG_KEY_ID:-}" ]]; then
+            flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" --gpg-homedir="$GNUPGHOME" --title="Immich Desktop" repo
+            EXTRA=(--repo-url="$REPO_URL" --gpg-keys=build/flatpak/repo-key.gpg stable)
+          fi
+          mkdir -p artifacts
+          flatpak build-bundle repo artifacts/ImmichDesktop.flatpak $APP_ID "${EXTRA[@]}" \
             --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
           ls -lh artifacts/ImmichDesktop.flatpak
 
@@ -50,3 +90,42 @@ jobs:
         with:
           name: flatpak
           path: artifacts/ImmichDesktop.flatpak
+
+      - name: Site for GitHub Pages (stable releases)
+        if: steps.kind.outputs.stable == 'true'
+        run: |
+          KEY=$(base64 -w0 build/flatpak/repo-key.gpg)
+          mkdir -p site && cp -r repo site/repo
+          printf '%s\n' "[Flatpak Repo]" "Title=Immich Desktop" "Url=$REPO_URL" "Homepage=https://github.com/TypicalZedF/immich-desktop" \
+            "Comment=Unofficial desktop companion for Immich" "GPGKey=$KEY" > site/immich-desktop.flatpakrepo
+          printf '%s\n' "[Flatpak Ref]" "Name=$APP_ID" "Branch=stable" "Title=Immich Desktop" "Url=$REPO_URL" "IsRuntime=false" \
+            "SuggestRemoteName=immich-desktop" "RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo" "GPGKey=$KEY" > site/$APP_ID.flatpakref
+          cp build/flatpak/index.html site/index.html
+
+      - name: Attach the bundle to the release (stable releases)
+        if: steps.kind.outputs.stable == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The release is created by the Release workflow; wait for it, then add the Flatpak.
+          for i in $(seq 1 60); do gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 && break; sleep 30; done
+          gh release upload "$GITHUB_REF_NAME" artifacts/ImmichDesktop.flatpak site/$APP_ID.flatpakref --clobber
+
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.kind.outputs.stable == 'true'
+        with:
+          path: site
+
+  pages:
+    needs: flatpak
+    if: needs.flatpak.outputs.stable == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

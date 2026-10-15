@@ -419,6 +419,30 @@
         </StackPanel>
       </Border>
 
+      <!-- Updates when running as a Flatpak: Flatpak handles them -->
+      <Border Classes="card" Padding="22,16" IsVisible="{Binding IsFlatpak}">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="section" l:Tr.Text="UPDATES" Margin="0,4,0,0" />
+          <TextBlock Classes="title" Text="{Binding Version}" />
+          <TextBlock Classes="caption" TextWrapping="Wrap"
+                     l:Tr.Text="This copy is a Flatpak, so Flatpak keeps it up to date: new versions appear in Discover or GNOME Software, or run flatpak update." />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Classes="secondary" Command="{Binding OpenReleaseNotesCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="TextBoxOutline" Width="16" Height="16" />
+                <TextBlock l:Tr.Text="Release notes" />
+              </StackPanel>
+            </Button>
+            <Button Classes="secondary" Command="{Binding OpenProjectPageCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="Github" Width="16" Height="16" />
+                <TextBlock l:Tr.Text="View on GitHub" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
       <!-- Updates -->
       <Border Classes="card" Padding="22,16" IsVisible="{Binding UpdatesEnabled}">
         <StackPanel>

@@ -740,6 +740,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     static void OpenReleasePage() => AppServices.Updates.OpenReleasePage();
 
+    /// <summary>Running as a Flatpak: updates come through Flatpak, not the app.</summary>
+    public bool IsFlatpak => Core.Platform.Flatpak.IsRunning;
+
     /// <summary>Where updates come from, so it's clear nothing else is involved.</summary>
     public string UpdateSourceText => Tr.T(
         "Updates come only from the official GitHub releases of Immich Desktop ({0}). Every download is checked against the fingerprint GitHub publishes for it before it's installed.",

@@ -663,6 +663,7 @@
  "This album is filled by backing up {0}. Deleting it also stops that folder from adding photos to an album; otherwise the next backup would just create it again. You can turn the album back on in Folders.": "Este álbum é preenchido pelo backup de {0}. Excluí-lo também faz essa pasta parar de adicionar fotos a um álbum; senão o próximo backup o criaria de novo. Você pode reativar o álbum em Pastas.",
  "This area": "Esta área",
  "This connection isn't encrypted (http). That's fine on your home network, but use https if your server is reachable from the internet.": "Esta conexão não é criptografada (http). Tudo bem na sua rede de casa, mas use https se o servidor for acessível pela internet.",
+ "This copy is a Flatpak, so Flatpak keeps it up to date: new versions appear in Discover or GNOME Software, or run flatpak update.": "Esta cópia é um Flatpak, então o Flatpak a mantém atualizada: novas versões aparecem no Discover ou no GNOME Software, ou execute flatpak update.",
  "This doesn't look like an Immich server.": "Isso não parece um servidor Immich.",
  "This file type isn't supported by your Immich server.": "Este tipo de arquivo não é compatível com o seu servidor Immich.",
  "This is my home network ({0})": "Esta é a minha rede de casa ({0})",
