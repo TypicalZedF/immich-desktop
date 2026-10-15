@@ -260,7 +260,7 @@
             <Grid Classes="row" ColumnDefinitions="*,Auto">
               <StackPanel>
                 <TextBlock Classes="title" l:Tr.Text="Photos from" />
-                <TextBlock Classes="caption" l:Tr.Text="Landscape photos are picked first, so they fill your screen." TextWrapping="Wrap" />
+                <TextBlock Classes="caption" l:Tr.Text="An album, your favorites or all your photos." TextWrapping="Wrap" />
               </StackPanel>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0" VerticalAlignment="Center">
                 <ComboBox Width="170" ItemsSource="{Binding WallpaperAlbums}" SelectedItem="{Binding SelectedWallpaperAlbum}"
@@ -273,6 +273,15 @@
                 </ComboBox>
                 <ComboBox Width="150" ItemsSource="{Binding WallpaperSources}" SelectedItem="{Binding SelectedWallpaperSource}" />
               </StackPanel>
+            </Grid>
+            <Border Classes="divider" />
+            <Grid Classes="row" ColumnDefinitions="*,Auto">
+              <StackPanel>
+                <TextBlock Classes="title" l:Tr.Text="Order" />
+                <TextBlock Classes="caption" Text="{Binding WallpaperOrderHint}" TextWrapping="Wrap" />
+              </StackPanel>
+              <ComboBox Grid.Column="1" Width="170" VerticalAlignment="Center" ItemsSource="{Binding WallpaperOrders}" SelectedItem="{Binding SelectedWallpaperOrder}"
+                        AutomationProperties.Name="Order" />
             </Grid>
             <Border Classes="divider" />
             <Grid Classes="row" ColumnDefinitions="*,Auto">

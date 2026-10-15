@@ -37,6 +37,14 @@ public enum MeteredBackup
     Pause,
 }
 
+/// <summary>In what order desktop backgrounds are shown.</summary>
+public enum WallpaperOrder
+{
+    Random,
+    OldestFirst,
+    NewestFirst,
+}
+
 /// <summary>Where desktop backgrounds come from.</summary>
 public enum WallpaperSource
 {
@@ -223,6 +231,10 @@ public sealed class AppSettings
     public string? WallpaperAlbumId { get; set; }
     public string? WallpaperAlbumName { get; set; }
     public int WallpaperIntervalMinutes { get; set; } = 60;
+    public WallpaperOrder WallpaperOrder { get; set; } = WallpaperOrder.Random;
+
+    /// <summary>In order: where it got to ("source|month|photo id"), so it carries on after a restart.</summary>
+    public string? WallpaperPosition { get; set; }
 
     public bool IsConfigured => !string.IsNullOrEmpty(ServerUrl) && !string.IsNullOrEmpty(UserId);
 }

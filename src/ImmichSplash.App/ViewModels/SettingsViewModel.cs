@@ -63,6 +63,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         WallpaperEnabled = s.WallpaperEnabled;
         SelectedWallpaperSource = WallpaperSources.FirstOrDefault(o => o.Value == s.WallpaperSource) ?? WallpaperSources[0];
         SelectedWallpaperInterval = WallpaperIntervals.FirstOrDefault(o => o.Value == s.WallpaperIntervalMinutes) ?? WallpaperIntervals[2];
+        SelectedWallpaperOrder = WallpaperOrders.FirstOrDefault(o => o.Value == s.WallpaperOrder) ?? WallpaperOrders[0];
         _lockMode = s.AppLock;
         _loading = false;
 
@@ -296,6 +297,27 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         new(Tr.T("Every 6 hours"), 360),
         new(Tr.T("Once a day"), 1440),
     ];
+
+    public IReadOnlyList<Option<WallpaperOrder>> WallpaperOrders { get; } =
+    [
+        new(Tr.T("Random"), WallpaperOrder.Random),
+        new(Tr.T("Oldest first"), WallpaperOrder.OldestFirst),
+        new(Tr.T("Newest first"), WallpaperOrder.NewestFirst),
+    ];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WallpaperOrderHint))]
+    public partial Option<WallpaperOrder> SelectedWallpaperOrder { get; set; }
+
+    public string WallpaperOrderHint => SelectedWallpaperOrder?.Value == WallpaperOrder.Random
+        ? Tr.T("Landscape photos are picked first, so they fill your screen.")
+        : Tr.T("One after another by date, starting again after the last one.");
+
+    partial void OnSelectedWallpaperOrderChanged(Option<WallpaperOrder> value)
+    {
+        if (_loading || value is null) return;
+        AppServices.Settings.Update(s => s.WallpaperOrder = value.Value);
+    }
 
     [ObservableProperty]
     public partial Option<int> SelectedWallpaperInterval { get; set; }

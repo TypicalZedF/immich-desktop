@@ -1024,5 +1024,11 @@
  "Type the same PIN again to confirm": "Gib dieselbe PIN zur Bestätigung noch einmal ein",
  "Type your current PIN.": "Gib deine aktuelle PIN ein.",
  "Without a PIN the locked folder can't be opened (here, on the web or on your phone) until you make a new one. The photos in it stay locked away.": "Ohne PIN lässt sich der gesperrte Ordner (hier, im Web oder auf dem Handy) nicht öffnen, bis du eine neue erstellst. Die Fotos darin bleiben weggeschlossen.",
- "You'll use it here and in Immich's web and mobile apps. Forgot it? Your Immich password can reset it; if you sign in with SSO, only a server admin can.": "Du nutzt sie hier und in den Web- und Handy-Apps von Immich. Vergessen? Mit deinem Immich-Passwort lässt sie sich zurücksetzen; wenn du dich per SSO anmeldest, kann das nur ein Server-Admin."
+ "You'll use it here and in Immich's web and mobile apps. Forgot it? Your Immich password can reset it; if you sign in with SSO, only a server admin can.": "Du nutzt sie hier und in den Web- und Handy-Apps von Immich. Vergessen? Mit deinem Immich-Passwort lässt sie sich zurücksetzen; wenn du dich per SSO anmeldest, kann das nur ein Server-Admin.",
+ "An album, your favorites or all your photos.": "Ein Album, deine Favoriten oder alle deine Fotos.",
+ "Newest first": "Neueste zuerst",
+ "Oldest first": "Älteste zuerst",
+ "One after another by date, starting again after the last one.": "Eins nach dem anderen nach Datum, nach dem letzten wieder von vorn.",
+ "Order": "Reihenfolge",
+ "Random": "Zufällig"
 }

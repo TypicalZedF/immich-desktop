@@ -5,7 +5,7 @@
 <h1 align="center">Immich Splash</h1>
 
 <p align="center">
-  Automatic photo &amp; video backup from your Windows PC to your own <a href="https://immich.app">Immich</a> server.<br/>
+  Automatic photo &amp; video backup from your PC to your own <a href="https://immich.app">Immich</a> server, and your whole library on the desktop.<br/>
   Lives in the system tray. Looks and feels like Immich. For Windows and Linux.
 </p>
 
@@ -17,11 +17,16 @@
 
 - **Feels at home next to Immich.** Google Sans, Immich's colors and a familiar layout (top bar, sidebar, storage meter and server status), with its own logo so it's never mistaken for an official app.
 - **Light, dark or follow Windows.** One click on the sun/moon in the top bar, or choose in Settings.
-- **Your library, like the web and mobile apps.** A sidebar with Photos (with a date rail to jump through the years), Explore (people and places), Map, Sharing (shared albums, your links, partners) and Albums, plus a Library group: Favorites, Archive, Locked Folder (unlocked with your PIN) and Trash. Search from the top bar, with suggestions and recent searches. A sharp full-screen viewer with zoom, favorite, copy, download, add to album, trash and photo info, and videos play right in the app.
+- **Your library, like the web and mobile apps.** A sidebar with Photos (with a date rail to jump through the years), Explore (people and places), Map, Sharing (shared albums, your links, partners) and Albums, plus a Library group: Favorites, Archive, Locked Folder (unlocked with your PIN) and Trash. Search from the top bar, with suggestions and recent searches. Photos keep their shape in the grid, and right-click menus are everywhere. Drop files on the window (or on an open album) to upload them.
+- **A full viewer.** Zoom, favorite, copy, download, add to album, slideshow, archive, move to the locked folder, view similar photos, and a detailed info panel. Videos play right in the app with volume, a draggable progress bar and previews as you point along it.
+- **Edit photos.** Turn, flip and crop (free or with a fixed shape) using Immich's own editing, applied to the full-quality original on your server; take the edits off again any time.
+- **Albums.** Filter (all, yours, shared with you), search, six ways to sort, group by year, cover or list view. Create and edit albums, and the three you used last are one click away in the sidebar. "Add to album" searches your albums or creates a new one from the same box.
+- **People.** Name the faces Immich found, merge someone found twice into one person, or discard a face.
 - **Offline map.** A built-in world map with country and state lines, photo thumbnails, a heat map and a side panel with the photos of the area you're looking at; online street detail is optional.
 - **Utilities.** Review duplicates, archive screenshots and screen recordings, find your largest files, and see which files on this PC aren't in Immich yet.
 - **Private photos, found on your PC.** An optional check suggests photos for the locked folder (nudity, payment cards, IDs, bank and tax papers, passwords, medical records). It runs entirely on your PC with on-device models (NudeNet for nudity, plus an optional thorough mode with CLIP that also understands drawings, art and game screenshots); your photos and results are never sent anywhere and nothing is moved without you.
-- **Share.** Select photos (or a whole album) and create a share link with an expiry date, copied straight to your clipboard.
+- **Share.** Select photos (or a whole album) and create a share link with an expiry date, copied straight to your clipboard. Share albums with people on your server as viewers or editors, and manage your links (copy, allow downloads, delete). Shared photos are marked in the grid and the viewer.
+- **Locked folder.** Open it with your PIN, or create a PIN right in the app; change or remove it in Settings.
 - **Desktop picture frame.** Your desktop background can rotate through photos from your favorites, an album or the whole library.
 - **Your profile picture.** Shown from Immich. Change it in Settings by picking a photo from your Immich library (or your PC), then move, zoom and rotate it in the circle, just like the web app.
 - **Every way to sign in.** Email & password, **SSO / OAuth** (Authentik, Keycloak, Google, …) through your browser, or an API key.
