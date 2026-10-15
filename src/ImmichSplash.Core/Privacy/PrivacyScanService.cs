@@ -46,7 +46,6 @@ public sealed class PrivacyScanService : IDisposable
     readonly StateDatabase _db;
     readonly AccountService _account;
     readonly Func<bool> _isMetered;
-    readonly Func<bool> _isPrivateNetwork;
     readonly Func<byte[], BgraImage?> _decode;
     readonly Lock _gate = new();
     CancellationTokenSource? _run;
@@ -56,14 +55,9 @@ public sealed class PrivacyScanService : IDisposable
     bool _once;        // a one-time check was asked for
     bool _wasEnabled;  // the setting, last time it was applied
 
-    /// <param name="isPrivateNetwork">
-    /// True on a home (private) network. The check only runs then: never on public Wi-Fi, even
-    /// though it only talks to your own server.
-    /// </param>
     public PrivacyScanService(SettingsStore settings, StateDatabase db, AccountService account, Func<bool> isMetered,
-        Func<bool> isPrivateNetwork, Func<byte[], BgraImage?> decode)
+        Func<byte[], BgraImage?> decode)
     {
-        _isPrivateNetwork = isPrivateNetwork;
         _settings = settings;
         _db = db;
         _account = account;
@@ -311,8 +305,6 @@ public sealed class PrivacyScanService : IDisposable
     string? PauseReason()
     {
         var s = _settings.Current;
-        if (!_isPrivateNetwork())
-            return Loc.T("Paused: only runs on a private network, like at home");
         if (PowerStatus.IsOnBattery())
             return Loc.T("Paused while on battery");
         if (_isMetered())

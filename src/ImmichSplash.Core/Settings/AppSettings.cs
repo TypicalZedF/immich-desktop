@@ -145,6 +145,13 @@ public sealed class AppSettings
     /// <summary>Photo grid thumbnail size in pixels (the zoom slider in Photos).</summary>
     public int ThumbnailSize { get; set; } = 168;
 
+    /// <summary>Where the main window was when it was last closed (null: use the default size, centred).</summary>
+    public double? WindowWidth { get; set; }
+    public double? WindowHeight { get; set; }
+    public int? WindowX { get; set; }
+    public int? WindowY { get; set; }
+    public bool WindowMaximized { get; set; }
+
     /// <summary>App language code (e.g. "de"); null follows the system language.</summary>
     public string? Language { get; set; }
 
@@ -182,11 +189,6 @@ public sealed class AppSettings
     /// <summary>Only check while the PC isn't being used, so it never slows down games or calls.</summary>
     public bool PrivacyScanOnlyWhenIdle { get; set; }
 
-    /// <summary>
-    /// Networks (by name) you've said are your home network, so the privacy check may run there. Needed
-    /// on Linux, which has no private/public network setting, and wherever Windows calls home Public.
-    /// </summary>
-    public List<string> PrivacyHomeNetworks { get; set; } = [];
 
     /// <summary>
     /// Also use the thorough nudity check (CLIP, downloaded once), which understands drawings, art and

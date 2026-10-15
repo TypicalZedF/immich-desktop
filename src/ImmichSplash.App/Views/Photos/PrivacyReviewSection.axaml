@@ -42,13 +42,6 @@
                         <TextBlock Classes="caption" Text="{Binding StatusText}" TextWrapping="Wrap" />
                       </StackPanel>
                       <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="1" IsVisible="{Binding ShowProgress}" Height="4" />
-                      <Button Classes="secondary" HorizontalAlignment="Left" Command="{Binding MarkHomeNetworkCommand}"
-                              IsVisible="{Binding HomeNetworkOffer, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                          <mi:MaterialIcon Kind="HomeOutline" Width="16" Height="16" />
-                          <TextBlock Text="{Binding HomeNetworkButtonText}" />
-                        </StackPanel>
-                      </Button>
                     </StackPanel>
                     <!-- With the setting off: check the library just this once -->
                     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEnabled}">
@@ -103,7 +96,7 @@
                     <TextBlock Classes="secondary" TextWrapping="Wrap"
                                l:Tr.Text="Each photo's preview (about 1440 pixels) is fetched from your own Immich server, checked in memory and let go. Previews aren't saved to disk." />
                     <TextBlock Classes="secondary" TextWrapping="Wrap"
-                               l:Tr.Text="Only on a private network, like at home: one set to Private in Windows' network settings, or where the app reaches your server at its home address. On public Wi-Fi (a café, an airport) it waits. It also waits on battery and on metered connections." />
+                               l:Tr.Text="It waits while the PC is on battery or on a metered connection." />
                   </StackPanel>
                   <StackPanel Spacing="4">
                     <TextBlock Classes="h3" l:Tr.Text="What leaves this PC" />

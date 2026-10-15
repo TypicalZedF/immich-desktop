@@ -1,9 +1,11 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using ImmichSplash.App.Services;
 using ImmichSplash.App.ViewModels;
 
 namespace ImmichSplash.App.Views;
@@ -23,6 +25,10 @@ public partial class MainWindow : Window
         var icon = new Uri("avares://ImmichSplash/Assets/app.ico");
         if (AssetLoader.Exists(icon))
             Icon = new WindowIcon(AssetLoader.Open(icon));
+
+        RestoreBounds();
+
+        Closing += (_, _) => SaveBounds();
 
         Opened += async (_, _) =>
         {
@@ -55,6 +61,70 @@ public partial class MainWindow : Window
         // A locked window asks for Windows Hello only when you come back to it, never in the background.
         Activated += (_, _) => (CurrentLock)?.OnWindowActivated();
         Deactivated += (_, _) => (CurrentLock)?.OnWindowDeactivated();
+    }
+
+    /// <summary>Opens at the size and place the window had when it was last closed.</summary>
+    void RestoreBounds()
+    {
+        try
+        {
+            var settings = AppServices.Settings.Current;
+            if (settings.WindowWidth is not { } width || settings.WindowHeight is not { } height)
+                return;
+            Width = Math.Max(MinWidth, width);
+            Height = Math.Max(MinHeight, height);
+            if (settings.WindowX is { } x && settings.WindowY is { } y)
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Position = new PixelPoint(x, y);
+                // A screen that's gone (unplugged monitor) must not leave the window out of reach.
+                Opened += (_, _) =>
+                {
+                    var grip = new PixelPoint(Position.X + 100, Position.Y + 20);
+                    if (!Screens.All.Any(screen => screen.WorkingArea.Contains(grip)) && Screens.Primary is { } primary)
+                    {
+                        var area = primary.WorkingArea;
+                        Position = new PixelPoint(area.X + Math.Max(0, (area.Width - (int)(Width * primary.Scaling)) / 2),
+                            area.Y + Math.Max(0, (area.Height - (int)(Height * primary.Scaling)) / 2));
+                    }
+                };
+            }
+            if (settings.WindowMaximized)
+                WindowState = WindowState.Maximized;
+        }
+        catch (Exception ex)
+        {
+            Core.Log.Info($"Couldn't restore the window size: {ex.Message}");
+        }
+    }
+
+    /// <summary>Remembers the window's size and place (and whether it was maximized) for next time.</summary>
+    void SaveBounds()
+    {
+        try
+        {
+            var state = WindowState;
+            if (state == WindowState.Minimized)
+                return;
+            var size = ClientSize;
+            var position = Position;
+            AppServices.Settings.Update(s =>
+            {
+                s.WindowMaximized = state == WindowState.Maximized;
+                // Maximized: keep the last normal size, so un-maximizing later goes back to it.
+                if (state == WindowState.Normal && size.Width > 0 && size.Height > 0)
+                {
+                    s.WindowWidth = size.Width;
+                    s.WindowHeight = size.Height;
+                    s.WindowX = position.X;
+                    s.WindowY = position.Y;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Core.Log.Info($"Couldn't save the window size: {ex.Message}");
+        }
     }
 
     LockViewModel? CurrentLock => (DataContext as MainWindowViewModel)?.Content as LockViewModel;

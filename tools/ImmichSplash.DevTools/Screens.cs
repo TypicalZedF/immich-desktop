@@ -334,17 +334,7 @@ static class Screens
             // then shows what it suggests for the locked folder.
             if (suffix == "light" && Environment.GetEnvironmentVariable("IMMICH_SCREENS_QUICK") is null)
             {
-                // On public Wi-Fi it waits...
-                ImmichSplash.Core.Platform.NetworkStatus.Override = new ImmichSplash.Core.Platform.NetworkSnapshot("Cafe Wi-Fi", false, IsPrivate: false);
-                Task.Run(() => AppServices.Network.CheckAsync()).GetAwaiter().GetResult(); // off the UI thread: it awaits
                 AppServices.Settings.Update(s => { s.PrivacyScanEnabled = true; s.PrivacyScanUseGpu = false; });
-                Pump(TimeSpan.FromSeconds(4));
-                Console.WriteLine($"Privacy check on public Wi-Fi: {AppServices.PrivacyScan.Status.State} ({AppServices.PrivacyScan.Status.Detail}), checked {AppServices.PrivacyScan.Status.Checked}");
-                if (AppServices.PrivacyScan.Status.State != ImmichSplash.Core.Privacy.PrivacyScanState.Paused)
-                    throw new InvalidOperationException("The privacy check ran on a public network");
-                // ...and runs at home.
-                ImmichSplash.Core.Platform.NetworkStatus.Override = new ImmichSplash.Core.Platform.NetworkSnapshot("Home", false, IsPrivate: true);
-                Task.Run(() => AppServices.Network.CheckAsync()).GetAwaiter().GetResult(); // off the UI thread: it awaits
                 // Turning it off mid-check says "Off" and stays that way (a photo finishing must not flip it back).
                 var waitStart = DateTime.UtcNow;
                 while (AppServices.PrivacyScan.Status.State != ImmichSplash.Core.Privacy.PrivacyScanState.Scanning && DateTime.UtcNow - waitStart < TimeSpan.FromSeconds(40))
