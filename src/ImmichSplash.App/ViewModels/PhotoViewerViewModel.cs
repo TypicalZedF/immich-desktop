@@ -692,6 +692,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     [RelayCommand]
     void Close()
     {
+        StopSlideshow();
         StopVideo();
         _cts?.Cancel();
         _owner.CloseViewer();

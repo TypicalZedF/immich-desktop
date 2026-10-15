@@ -86,6 +86,10 @@ public partial class PhotosView : UserControl
         layer.AddHandler(PointerPressedEvent, (_, _) => WakeVideoControls(), RoutingStrategies.Tunnel, handledEventsToo: true);
         _controlsIdle = new Avalonia.Threading.DispatcherTimer(TimeSpan.FromMilliseconds(2500), Avalonia.Threading.DispatcherPriority.Background, (_, _) => HideVideoControls());
 
+        // The "..." button opens its menu on a click.
+        var more = this.FindControl<Button>("ViewerMoreButton")!;
+        more.Click += (_, _) => more.ContextMenu?.Open(more);
+
         // The video's progress bar: drag it, and see pictures from the video where you point.
         var seek = this.FindControl<VideoSeekBar>("VideoSeek")!;
         seek.ScrubStarted += f => _viewer?.ScrubStarted(f);

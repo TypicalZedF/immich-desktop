@@ -652,6 +652,17 @@ public sealed class ImmichClient : IDisposable
     // ---- Archive, locked folder, trash -------------------------------------------------------
 
     /// <summary>Moves assets to the timeline ("timeline"), the archive ("archive") or the locked folder ("locked").</summary>
+    /// <summary>Photos that look like this one, most similar first (needs machine learning on the server).</summary>
+    public async Task<List<TimelineAsset>> SimilarSearchAsync(string assetId, int size, CancellationToken ct)
+    {
+        var response = await SendAsync<SearchResponseDto>(HttpMethod.Post, "search/smart", new SimilarSearchRequestDto(assetId, 1, size), ct, TimeSpan.FromSeconds(60));
+        return response.Assets.Items.Select(ToTimelineAsset).Where(a => a.Id != assetId).ToList();
+    }
+
+    /// <summary>Asks the server to redo something for photos: "refresh-faces", "refresh-metadata" or "regenerate-thumbnail".</summary>
+    public Task RunAssetJobAsync(IReadOnlyList<string> assetIds, string job, CancellationToken ct) =>
+        SendAsync(HttpMethod.Post, "assets/jobs", new AssetJobRequestDto(assetIds, job), ct);
+
     public Task SetVisibilityAsync(IReadOnlyList<string> assetIds, string visibility, CancellationToken ct) =>
         SendAsync(HttpMethod.Put, "assets", new VisibilityRequestDto(assetIds, visibility), ct);
 

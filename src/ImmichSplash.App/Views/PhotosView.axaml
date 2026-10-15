@@ -763,6 +763,37 @@
               <Button Classes="viewerNav" Command="{Binding TrashCommand}" IsVisible="{Binding CanEdit}" l:Tr.Tip="Move to trash (Delete)">
                 <mi:MaterialIcon Kind="TrashCanOutline" />
               </Button>
+              <Button Name="ViewerMoreButton" Classes="viewerNav" IsVisible="{Binding CanEdit}" l:Tr.Tip="More" AutomationProperties.Name="More">
+                <mi:MaterialIcon Kind="DotsVertical" />
+                <Button.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="{Binding IsSlideshow, Converter={x:Static vm:Converters.SlideshowText}}" Command="{Binding ToggleSlideshowCommand}">
+                      <MenuItem.Icon><mi:MaterialIcon Kind="PresentationPlay" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem l:Tr.Header="Download" Command="{Binding DownloadCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="TrayArrowDown" /></MenuItem.Icon></MenuItem>
+                    <MenuItem l:Tr.Header="Add to album" Command="{Binding AddToAlbumCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="Plus" /></MenuItem.Icon></MenuItem>
+                    <MenuItem l:Tr.Header="Set as profile picture" Command="{Binding SetAsProfilePictureCommand}" IsVisible="{Binding !IsVideo}">
+                      <MenuItem.Icon><mi:MaterialIcon Kind="AccountCircleOutline" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="{Binding InArchive, Converter={x:Static vm:Converters.ArchiveText}}" Command="{Binding ArchiveCommand}" IsVisible="{Binding CanArchive}">
+                      <MenuItem.Icon><mi:MaterialIcon Kind="ArchiveOutline" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem l:Tr.Header="View in timeline" Command="{Binding ViewInTimelineCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="ImageMultipleOutline" /></MenuItem.Icon></MenuItem>
+                    <MenuItem l:Tr.Header="View similar photos" Command="{Binding ViewSimilarCommand}" IsVisible="{Binding !IsVideo}">
+                      <MenuItem.Icon><mi:MaterialIcon Kind="ImageSearchOutline" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="{Binding InLockedFolder, Converter={x:Static vm:Converters.LockedText}}" Command="{Binding MoveToLockedCommand}">
+                      <MenuItem.Icon><mi:MaterialIcon Kind="LockOutline" /></MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem l:Tr.Header="Refresh faces" Command="{Binding RefreshFacesCommand}" IsVisible="{Binding !IsVideo}">
+                      <MenuItem.Icon><mi:MaterialIcon Kind="FaceRecognition" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem l:Tr.Header="Refresh metadata" Command="{Binding RefreshMetadataCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="DatabaseRefreshOutline" /></MenuItem.Icon></MenuItem>
+                    <MenuItem l:Tr.Header="Refresh thumbnails" Command="{Binding RefreshThumbnailsCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="ImageRefreshOutline" /></MenuItem.Icon></MenuItem>
+                  </ContextMenu>
+                </Button.ContextMenu>
+              </Button>
               <Button Classes="viewerNav" Command="{Binding OpenInImmichCommand}" IsVisible="{Binding IsInImmich}"
                       ToolTip.Tip="{Binding IsVideo, Converter={x:Static vm:Converters.VideoOpenText}}">
                 <mi:MaterialIcon Kind="OpenInNew" />

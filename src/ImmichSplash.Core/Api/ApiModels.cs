@@ -251,6 +251,8 @@ internal sealed record CreateStackRequestDto(IReadOnlyList<string> AssetIds);
 internal sealed record SearchAssetsDto(List<AssetDto> Items, string? NextPage);
 internal sealed record SearchResponseDto(SearchAssetsDto Assets);
 internal sealed record SmartSearchRequestDto(string Query, int Page, int Size);
+internal sealed record SimilarSearchRequestDto(string QueryAssetId, int Page, int Size);
+internal sealed record AssetJobRequestDto(IReadOnlyList<string> AssetIds, string Name);
 /// <summary>A screen capture search: the file name or folder contains some text.</summary>
 internal sealed record CaptureSearchRequestDto(string? OriginalFileName, string? OriginalPath, string? Type, string Visibility, int Page, int Size);
 

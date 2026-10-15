@@ -23,6 +23,10 @@ sealed class FakeImmichServer : HttpMessageHandler
 
     /// <summary>Stacks made, each as its asset ids (the main photo first).</summary>
     public ConcurrentQueue<string[]> Stacks { get; } = new();
+
+    /// <summary>Jobs asked for with POST /assets/jobs, and the kinds of smart search made.</summary>
+    public ConcurrentQueue<string> AssetJobs { get; } = new();
+    public ConcurrentQueue<string> SmartSearches { get; } = new();
     public bool RejectAuth { get; set; }
 
     /// <summary>Order of uploads and album additions, to check albums fill during a long upload.</summary>
@@ -83,6 +87,23 @@ sealed class FakeImmichServer : HttpMessageHandler
                 Events.Enqueue("upload");
                 AfterUpload?.Invoke(UploadedFileNames.Count);
                 return Json(HttpStatusCode.Created, new { id, status = "created" });
+            }
+            case ("POST", "/api/assets/jobs"):
+            {
+                // Like Immich v3 (zod): a list of ids and one of the known job names.
+                using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+                var name = doc.RootElement.GetProperty("name").GetString();
+                if (name is not ("refresh-faces" or "refresh-metadata" or "regenerate-thumbnail" or "transcode-video")
+                    || doc.RootElement.GetProperty("assetIds").GetArrayLength() == 0)
+                    return Json(HttpStatusCode.BadRequest, new { message = "Validation failed", statusCode = 400 });
+                AssetJobs.Enqueue(name!);
+                return Json(HttpStatusCode.NoContent, new { });
+            }
+            case ("POST", "/api/search/smart"):
+            {
+                using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+                SmartSearches.Enqueue(doc.RootElement.TryGetProperty("queryAssetId", out var id) ? "similar:" + id.GetString() : "text");
+                return Json(HttpStatusCode.OK, new { assets = new { items = Array.Empty<object>(), nextPage = (string?)null } });
             }
             case ("GET", "/api/albums"):
                 return Json(HttpStatusCode.OK, Albums.Select(a => new { id = a.Key, albumName = a.Value.Name }).ToList());

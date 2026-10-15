@@ -359,6 +359,8 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         Rows = new ObservableCollection<object>(rows);
         if (anchor is { } a && RowIndexOf(a) is >= 0 and var index)
             ScrollToRowRequested?.Invoke(index);
+        else
+            ApplyPendingScroll();
     }
 
     /// <summary>
