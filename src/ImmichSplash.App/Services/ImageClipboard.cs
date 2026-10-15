@@ -122,8 +122,29 @@ public static partial class ImageClipboard
 
     // ---- Linux ----
 
+    /// <summary>The main window's clipboard (set by the window).</summary>
+    public static Avalonia.Input.Platform.IClipboard? Clipboard { get; set; }
+
     static void CopyLinux(byte[] png)
     {
+        if (Clipboard is { } clipboard)
+        {
+            try
+            {
+                // Called off the UI thread; the clipboard lives on it.
+                Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    var data = new Avalonia.Input.DataTransfer();
+                    data.Add(Avalonia.Input.DataTransferItem.Create(Avalonia.Input.DataFormat.CreateBytesPlatformFormat("image/png"), png));
+                    await clipboard.SetDataAsync(data);
+                }).GetAwaiter().GetResult();
+                return;
+            }
+            catch (Exception ex)
+            {
+                Core.Log.Info($"The app's clipboard didn't take the picture: {ex.Message}");
+            }
+        }
         var wayland = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
         (string File, string[] Args)[] tools = wayland
             ? [("wl-copy", ["--type", "image/png"]), ("xclip", ["-selection", "clipboard", "-t", "image/png", "-i"])]

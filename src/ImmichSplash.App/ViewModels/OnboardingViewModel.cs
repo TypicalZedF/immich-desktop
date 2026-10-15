@@ -31,6 +31,8 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
         OAuthCallbacks.Received += OnOAuthCallback;
         if (resumeSignIn && ServerUrl.Length > 0)
             _ = ConnectAsync();
+        else
+            _ = FindOnNetworkAsync();
     }
 
     // ---- Step state ----
@@ -64,6 +66,45 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     public partial bool IsInsecure { get; set; }
+
+    /// <summary>Immich servers found on the local network, to pick instead of typing an address.</summary>
+    public ObservableCollection<string> FoundServers { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowFoundServers))]
+    public partial bool IsSearchingNetwork { get; set; }
+
+    public bool ShowFoundServers => IsSearchingNetwork || FoundServers.Count > 0;
+
+    async Task FindOnNetworkAsync()
+    {
+        IsSearchingNetwork = true;
+        try
+        {
+            foreach (var url in await Core.Services.LocalServerFinder.FindAsync(_lifetime.Token))
+                FoundServers.Add(url.ToString().TrimEnd('/'));
+            Log.Info($"Found {FoundServers.Count} Immich server(s) on the local network");
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Log.Info($"Couldn't look for servers on the network: {ex.Message}");
+        }
+        finally
+        {
+            IsSearchingNetwork = false;
+            OnPropertyChanged(nameof(ShowFoundServers));
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanAct))]
+    Task UseFoundServerAsync(string url)
+    {
+        ServerUrl = url;
+        return ConnectAsync();
+    }
 
     [RelayCommand(CanExecute = nameof(CanAct))]
     async Task ConnectAsync()

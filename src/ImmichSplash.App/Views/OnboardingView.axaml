@@ -44,6 +44,35 @@
                          l:Tr.Text="The same address you use to open Immich in your browser." />
             </StackPanel>
 
+            <!-- Servers found on this network -->
+            <StackPanel Spacing="8" IsVisible="{Binding ShowFoundServers}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <mi:MaterialIcon Kind="Loading" Classes="spin" Width="15" Height="15" IsVisible="{Binding IsSearchingNetwork}"
+                                 Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                <TextBlock Classes="caption tertiary" l:Tr.Text="Looking for Immich on your network…" IsVisible="{Binding IsSearchingNetwork}" />
+                <TextBlock Classes="label" l:Tr.Text="Found on your network" IsVisible="{Binding !IsSearchingNetwork}" />
+              </StackPanel>
+              <ItemsControl ItemsSource="{Binding FoundServers}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <Button Classes="secondary" Margin="0,0,8,8"
+                            Command="{Binding $parent[UserControl].((vm:OnboardingViewModel)DataContext).UseFoundServerCommand}"
+                            CommandParameter="{Binding}">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <mi:MaterialIcon Kind="Server" Width="16" Height="16" />
+                        <TextBlock Text="{Binding}" />
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
             <Border Classes="banner error" IsVisible="{Binding ServerError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
               <StackPanel Orientation="Horizontal" Spacing="10">
                 <mi:MaterialIcon Kind="AlertCircleOutline" Width="18" Height="18" VerticalAlignment="Top" />

@@ -184,6 +184,7 @@ static class Screens
             Application.Current!.RequestedThemeVariant = variant;
 
             // Onboarding: server, sign in, folders
+            ImmichSplash.Core.Services.LocalServerFinder.Override = _ => Task.FromResult<IReadOnlyList<Uri>>([new Uri("http://192.168.1.20:2283/")]);
             var main = new MainWindowViewModel();
             main.ShowOnboarding(resumeSignIn: false);
             var onboarding = (OnboardingViewModel)main.Content;

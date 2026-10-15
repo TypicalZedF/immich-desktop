@@ -86,7 +86,27 @@ public class NetworkTests
             NetworkStatus.Override = null;
         }
     }
+
+    [Fact]
+    public void Looks_for_servers_on_the_home_network_only()
+    {
+        var hosts = LocalServerFinder.CandidateHosts([
+            (System.Net.IPAddress.Parse("192.168.1.42"), 24),
+            (System.Net.IPAddress.Parse("10.20.30.40"), 8), // a big network: just its /24
+            (System.Net.IPAddress.Parse("192.168.1.50"), 24), // a second address on the same network
+            (System.Net.IPAddress.Parse("8.8.4.4"), 24), // public: never scanned
+        ]).ToList();
+
+        Assert.Equal(["localhost", "immich.local", "immich"], hosts.Take(3));
+        Assert.Equal(3 + 253 + 253, hosts.Count); // two /24s, minus this computer on each
+        Assert.Contains("192.168.1.1", hosts);
+        Assert.DoesNotContain("192.168.1.42", hosts); // this computer (localhost covers it)
+        Assert.Contains("10.20.30.254", hosts);
+        Assert.DoesNotContain("10.20.31.1", hosts);
+        Assert.DoesNotContain(hosts, h => h.StartsWith("8.8.", StringComparison.Ordinal));
+    }
 }
+
 
 public class TimeLeftTests
 {

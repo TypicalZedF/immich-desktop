@@ -100,6 +100,29 @@ public class LibraryApiTests
     }
 
     [Fact]
+    public async Task Search_leaves_out_the_hidden_video_half_of_live_photos()
+    {
+        // Searching "mp4" also matches a live photo's motion part: hidden in Immich, with no thumbnail of its own.
+        var handler = new Recorder((_, _) => new
+        {
+            assets = new
+            {
+                items = new object[]
+                {
+                    new { id = "clip", type = "VIDEO", visibility = "timeline", isFavorite = false, fileCreatedAt = "2026-10-01T10:00:00.000Z", duration = "0:00:05.000" },
+                    new { id = "motion", type = "VIDEO", visibility = "hidden", isFavorite = false, fileCreatedAt = "2026-10-01T10:00:00.000Z", duration = "0:00:02.000" },
+                    new { id = "old", type = "VIDEO", isFavorite = false, fileCreatedAt = "2026-10-01T10:00:00.000Z", duration = "0:00:03.000" }, // older servers: no visibility
+                },
+                nextPage = (string?)null,
+            },
+        });
+        using var client = Client(handler);
+
+        Assert.Equal(["clip", "old"], (await client.SearchAsync("mp4", null, 100, CancellationToken.None)).Select(r => r.Id));
+        Assert.Equal(["clip", "old"], (await client.SmartSearchAsync("beach", 100, CancellationToken.None)).Select(r => r.Id));
+    }
+
+    [Fact]
     public async Task Shared_links_for_photos_and_albums()
     {
         var handler = new Recorder((_, _) => new { id = "l1", key = "abc" });

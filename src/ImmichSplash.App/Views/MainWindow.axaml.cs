@@ -138,6 +138,7 @@ public partial class MainWindow : Window
             vm.PickImage = PickImageAsync;
             vm.PickSaveFile = PickSaveFileAsync;
             vm.CopyText = text => Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
+            ImageClipboard.Clipboard = Clipboard;
             vm.GetWindowHandle = () => TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
         }
     }

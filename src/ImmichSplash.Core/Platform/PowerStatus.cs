@@ -32,10 +32,16 @@ public static partial class PowerStatus
         foreach (var supply in Directory.EnumerateDirectories(root))
         {
             var type = ReadTrimmed(Path.Combine(supply, "type"));
-            if (type == "Mains" && ReadTrimmed(Path.Combine(supply, "online")) == "1")
+            // A charger: the classic AC adapter, or USB-C power delivery.
+            if (type is "Mains" or "USB" && ReadTrimmed(Path.Combine(supply, "online")) == "1")
                 return false;
-            if (type == "Battery")
+            // Only the computer's own battery; a wireless mouse or headset reports one too ("Device" scope).
+            if (type == "Battery" && ReadTrimmed(Path.Combine(supply, "scope")) != "Device")
+            {
+                if (ReadTrimmed(Path.Combine(supply, "status")) is "Charging" or "Full" or "Not charging")
+                    return false;
                 hasBattery = true;
+            }
         }
         return hasBattery;
     }

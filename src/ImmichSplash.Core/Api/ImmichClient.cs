@@ -451,7 +451,7 @@ public sealed class ImmichClient : IDisposable
     public async Task<List<TimelineAsset>> SmartSearchAsync(string query, int size, CancellationToken ct)
     {
         var response = await SendAsync<SearchResponseDto>(HttpMethod.Post, "search/smart", new SmartSearchRequestDto(query, 1, size), ct, TimeSpan.FromSeconds(60));
-        return response.Assets.Items.Select(ToTimelineAsset).ToList();
+        return response.Assets.Items.Where(a => !a.IsHidden).Select(ToTimelineAsset).ToList();
     }
 
     /// <summary>
@@ -484,7 +484,8 @@ public sealed class ImmichClient : IDisposable
         {
             var response = await SendAsync<SearchResponseDto>(HttpMethod.Post, "search/metadata",
                 new MetadataSearchRequestDto(city, fileName, page, Math.Min(250, max)), ct, TimeSpan.FromSeconds(60));
-            results.AddRange(response.Assets.Items.Select(ToTimelineAsset));
+            // Search also finds live photos' hidden video parts (no thumbnails); the timeline never shows those.
+            results.AddRange(response.Assets.Items.Where(a => !a.IsHidden).Select(ToTimelineAsset));
             if (string.IsNullOrEmpty(response.Assets.NextPage) || response.Assets.Items.Count == 0)
                 break;
         }

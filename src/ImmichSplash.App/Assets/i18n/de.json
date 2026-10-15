@@ -1030,5 +1030,7 @@
  "Oldest first": "Älteste zuerst",
  "One after another by date, starting again after the last one.": "Eins nach dem anderen nach Datum, nach dem letzten wieder von vorn.",
  "Order": "Reihenfolge",
- "Random": "Zufällig"
+ "Random": "Zufällig",
+ "Looking for Immich on your network…": "Suche nach Immich in deinem Netzwerk…",
+ "Found on your network": "In deinem Netzwerk gefunden"
 }

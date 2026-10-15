@@ -253,7 +253,11 @@ internal sealed record MemoryDto(string Id, string Type, MemoryDataDto? Data, Li
 
 internal sealed record AssetDto(
     string Id, string? Type, string? OriginalFileName, string? FileCreatedAt, bool IsFavorite, System.Text.Json.JsonElement Duration,
-    ExifDto? ExifInfo, List<AssetPersonDto>? People, string? LivePhotoVideoId = null, AssetStackDto? Stack = null);
+    ExifDto? ExifInfo, List<AssetPersonDto>? People, string? LivePhotoVideoId = null, AssetStackDto? Stack = null, string? Visibility = null)
+{
+    /// <summary>A live photo's video part: Immich hides it and makes no thumbnail for it.</summary>
+    public bool IsHidden => Visibility == "hidden";
+}
 internal sealed record AssetStackDto(string Id, string? PrimaryAssetId, int AssetCount);
 internal sealed record StackDto(string Id, string? PrimaryAssetId, List<AssetDto> Assets);
 internal sealed record CreateStackRequestDto(IReadOnlyList<string> AssetIds);

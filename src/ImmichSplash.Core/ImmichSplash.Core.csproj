@@ -7,6 +7,8 @@
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+    <!-- Linux desktop services (network, notifications, background) over D-Bus; the same version Avalonia uses. -->
+    <PackageReference Include="Tmds.DBus.Protocol" />
     <!-- On-device photo checks (Privacy). Windows: runs on any DirectX 12 graphics card, falling back to the CPU. -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Condition="'$(ImmichWindows)' == 'true'" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Condition="'$(ImmichWindows)' != 'true'" />

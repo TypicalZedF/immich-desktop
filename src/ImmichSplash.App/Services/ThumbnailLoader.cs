@@ -1,3 +1,4 @@
+using System.Net;
 using Avalonia.Media.Imaging;
 using ImmichSplash.Core.Api;
 
@@ -23,6 +24,8 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
     readonly Lock _gate = new();
     readonly Dictionary<string, LinkedListNode<(string Key, byte[] Data)>> _index = [];
     readonly LinkedList<(string Key, byte[] Data)> _lru = new();
+    readonly Dictionary<string, (DateTime Until, ImmichApiException Error)> _missing = [];
+    static readonly TimeSpan MissingRetryAfter = TimeSpan.FromMinutes(2);
     long _cachedBytes;
 
     /// <summary>A grid thumbnail, decoded at <paramref name="decodeWidth"/> pixels wide.</summary>
@@ -251,12 +254,29 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
     {
         if (FromCache(key) is { } cached)
             return cached;
+        lock (_gate)
+        {
+            if (_missing.TryGetValue(key, out var missing) && DateTime.UtcNow < missing.Until)
+                throw missing.Error;
+        }
         byte[] data;
         await _downloads.WaitAsync(ct);
         try
         {
             ct.ThrowIfCancellationRequested();
             data = await fetch(ct);
+        }
+        catch (ImmichApiException ex) when (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)
+        {
+            // Not there (yet): a video still being processed, or one Immich couldn't make a picture for. Every cell and
+            // re-layout would ask again at once; wait a while instead.
+            lock (_gate)
+            {
+                if (_missing.Count > 1000)
+                    _missing.Clear();
+                _missing[key] = (DateTime.UtcNow + MissingRetryAfter, ex);
+            }
+            throw;
         }
         finally
         {

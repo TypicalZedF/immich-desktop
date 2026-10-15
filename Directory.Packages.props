@@ -12,6 +12,7 @@
     <PackageVersion Include="Material.Icons.Avalonia" Version="2.4.1" />
     <!-- Core -->
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.21.3" />
     <PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.12" />
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
     <!-- Same version for both, so the code is identical on Windows and Linux -->

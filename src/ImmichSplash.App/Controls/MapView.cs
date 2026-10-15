@@ -837,11 +837,15 @@ public sealed class MapView : Control
         return ((uint)(alpha * 255) << 24) | ((uint)Mix(r0, r1) << 16) | ((uint)Mix(g0, g1) << 8) | Mix(b0, b1);
     }
 
-    // ---- Mouse ----
+    // ---- Mouse and touch ----
+    // One finger works like the mouse (drag, flick, tap, double-tap); two fingers pinch to zoom and move the map together.
 
     Point? _pressAt, _lastDrag;
-    bool _dragged;
+    bool _dragged, _touchPress;
     DateTime _lastMove;
+    readonly Dictionary<IPointer, Point> _touches = [];
+    double _pinchDistance;
+    Point _pinchMid;
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
@@ -849,25 +853,75 @@ public sealed class MapView : Control
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
         StopAnimation();
-        _pressAt = _lastDrag = e.GetPosition(this);
+        var p = e.GetPosition(this);
+        e.Pointer.Capture(this);
+        e.Handled = true;
+        _touchPress = e.Pointer.Type == PointerType.Touch;
+        if (_touchPress)
+        {
+            _touches[e.Pointer] = p;
+            if (_touches.Count >= 2)
+            {
+                StartPinch();
+                return;
+            }
+        }
+        _pressAt = _lastDrag = p;
         _lastMove = DateTime.UtcNow;
         _dragged = false;
-        e.Pointer.Capture(this);
         if (e.ClickCount == 2)
         {
-            AnimateZoom(_zoom, 1, e.GetPosition(this));
+            AnimateZoom(_zoom, 1, p);
             _pressAt = null;
         }
-        e.Handled = true;
     }
+
+    void StartPinch()
+    {
+        var (a, b) = PinchFingers();
+        _pinchDistance = Math.Max(1, Distance(a, b));
+        _pinchMid = (a + b) / 2;
+        _pressAt = _lastDrag = null; // no tap or glide from here
+        _velocity = default;
+    }
+
+    (Point A, Point B) PinchFingers()
+    {
+        using var fingers = _touches.Values.GetEnumerator();
+        fingers.MoveNext();
+        var a = fingers.Current;
+        fingers.MoveNext();
+        return (a, fingers.Current);
+    }
+
+    static double Distance(Point a, Point b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
 
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
         var p = e.GetPosition(this);
+        if (_touches.ContainsKey(e.Pointer))
+        {
+            _touches[e.Pointer] = p;
+            if (_touches.Count >= 2)
+            {
+                var (a, b) = PinchFingers();
+                var distance = Math.Max(1, Distance(a, b));
+                var mid = (a + b) / 2;
+                // Move with the fingers, then zoom around the point between them.
+                _centerX -= (mid.X - _pinchMid.X) / WorldSize;
+                _centerY -= (mid.Y - _pinchMid.Y) / WorldSize;
+                ZoomAt(_zoom + Math.Log2(distance / _pinchDistance), mid);
+                _pinchDistance = distance;
+                _pinchMid = mid;
+                e.Handled = true;
+                return;
+            }
+        }
         if (_lastDrag is { } last && _pressAt is { } start)
         {
-            if (!_dragged && Math.Abs(p.X - start.X) + Math.Abs(p.Y - start.Y) > 4)
+            // Fingers wobble more than a mouse; a tap shouldn't turn into a drag.
+            if (!_dragged && Math.Abs(p.X - start.X) + Math.Abs(p.Y - start.Y) > (_touchPress ? 12 : 4))
                 _dragged = true;
             if (_dragged)
             {
@@ -885,14 +939,33 @@ public sealed class MapView : Control
                 InvalidateVisual();
             }
         }
-        Cursor = HitCluster(p) is not null ? new Cursor(StandardCursorType.Hand) : Cursor.Default;
+        if (e.Pointer.Type != PointerType.Touch)
+            Cursor = HitCluster(p, 3) is not null ? new Cursor(StandardCursorType.Hand) : Cursor.Default;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
         var p = e.GetPosition(this);
-        if (_pressAt is not null && !_dragged && HitCluster(p) is { } cluster)
+        var wasPinching = _touches.Count >= 2;
+        _touches.Remove(e.Pointer);
+        e.Pointer.Capture(null);
+        if (wasPinching)
+        {
+            if (_touches.Count == 1)
+            {
+                // One finger left on the map: carry on moving it from where it is, without a jump.
+                _pressAt = _lastDrag = _touches.Values.First();
+                _lastMove = DateTime.UtcNow;
+                _dragged = true;
+            }
+            else if (_touches.Count >= 2)
+                StartPinch();
+            if (_touches.Count < 2)
+                ViewChanged?.Invoke();
+            return;
+        }
+        if (_pressAt is not null && !_dragged && HitCluster(p, _touchPress ? 14 : 3) is { } cluster)
         {
             ClusterOpened?.Invoke(cluster.Members.Select(i => (Markers ?? [])[i]).ToList());
         }
@@ -911,7 +984,12 @@ public sealed class MapView : Control
             }
         }
         _pressAt = _lastDrag = null;
-        e.Pointer.Capture(null);
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        _touches.Remove(e.Pointer);
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
@@ -921,14 +999,15 @@ public sealed class MapView : Control
         e.Handled = true;
     }
 
-    Cluster? HitCluster(Point p)
+    /// <param name="slop">How far outside a marker still counts (more for a finger than a mouse).</param>
+    Cluster? HitCluster(Point p, double slop)
     {
         Cluster? best = null;
         var bestDistance = double.MaxValue;
         foreach (var (c, at, radius) in _visible)
         {
             var d = Math.Sqrt((at.X - p.X) * (at.X - p.X) + (at.Y - p.Y) * (at.Y - p.Y));
-            if (d <= radius + 3 && d < bestDistance)
+            if (d <= radius + slop && d < bestDistance)
             {
                 best = c;
                 bestDistance = d;

@@ -1,16 +1,21 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using Microsoft.Win32;
 
 namespace ImmichSplash.Core.Platform;
 
 /// <summary>
 /// Sets the desktop background. Windows: the standard wallpaper setting, filling the screen.
-/// Linux: GNOME (and GNOME-based desktops) through gsettings.
+/// Linux: KDE Plasma through its scripting interface; elsewhere the desktop portal in the Flatpak,
+/// or gsettings on GNOME (and GNOME-based desktops).
 /// </summary>
 public static partial class DesktopWallpaper
 {
-    public static bool IsSupported => OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && HasGsettings);
+    public static bool IsSupported => OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && (IsKde || Flatpak.IsRunning || HasGsettings));
+
+    static bool IsKde =>
+        (Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP") ?? "").Split(':').Contains("KDE", StringComparer.OrdinalIgnoreCase);
 
     static bool HasGsettings =>
         (Environment.GetEnvironmentVariable("PATH") ?? "").Split(':').Any(dir => File.Exists(Path.Combine(dir, "gsettings")));
@@ -31,6 +36,16 @@ public static partial class DesktopWallpaper
         if (OperatingSystem.IsLinux())
         {
             var uri = new Uri(imagePath).AbsoluteUri;
+            if (IsKde)
+            {
+                LinuxDBus.Wait(SetOnPlasmaAsync(uri));
+                return;
+            }
+            if (Flatpak.IsRunning) // gsettings in the sandbox only changes the sandbox's own copy
+            {
+                LinuxDBus.Wait(SetThroughPortalAsync(uri));
+                return;
+            }
             Gsettings("picture-options", "zoom");
             Gsettings("picture-uri", uri);
             Gsettings("picture-uri-dark", uri);
@@ -38,6 +53,41 @@ public static partial class DesktopWallpaper
         }
         throw new PlatformNotSupportedException();
     }
+
+    /// <summary>Every desktop (screen and activity) shows the picture, filling it (FillMode 2: scaled and cropped).</summary>
+    static Task<bool> SetOnPlasmaAsync(string uri)
+    {
+        var script = $$"""
+            desktops().forEach(function (d) {
+                d.wallpaperPlugin = "org.kde.image";
+                d.currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
+                d.writeConfig("Image", {{JsonSerializer.Serialize(uri)}});
+                d.writeConfig("FillMode", 2);
+            });
+            """;
+        return LinuxDBus.CallAsync(LinuxDBus.Session, "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "evaluateScript", "s",
+            w => w.WriteString(script), static (_, _) => true);
+    }
+
+    /// <summary>
+    /// The desktop portal's wallpaper service (GNOME and others). It may ask once whether the app can change the background.
+    /// The picture is in the app's data folder, which the desktop can read (~/.var/app/…).
+    /// </summary>
+    static Task<bool> SetThroughPortalAsync(string uri) =>
+        LinuxDBus.CallAsync(LinuxDBus.Session, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+            "org.freedesktop.portal.Wallpaper", "SetWallpaperURI", "ssa{sv}", w =>
+            {
+                w.WriteString(""); // no parent window
+                w.WriteString(uri);
+                var options = w.WriteDictionaryStart();
+                w.WriteDictionaryEntryStart();
+                w.WriteString("show-preview");
+                w.WriteVariantBool(false);
+                w.WriteDictionaryEntryStart();
+                w.WriteString("set-on");
+                w.WriteVariantString("background");
+                w.WriteDictionaryEnd(options);
+            }, static (_, _) => true);
 
     static void Gsettings(string key, string value)
     {
