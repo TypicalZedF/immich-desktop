@@ -42,6 +42,15 @@ One-time SSH setup for `-LinuxHost`:
 
 Without SSH, `-Linux` leaves `artifacts/dev/ImmichDesktop-dev-linux-x64.tar.gz`; copy it over, extract it and run `./immich-desktop/install.sh`.
 
+### For maintainers: betas and releases
+
+These need the [GitHub CLI](https://cli.github.com) (`gh auth login`). Each prints a few lines; if a check fails, it shows the failed step and its errors.
+
+- `./build/status.ps1`: where `beta` and `main` are, the latest releases, and the checks on `beta`.
+- `./build/beta.ps1`: syncs with `origin/beta`, runs the tests, pushes, then waits for CI and the beta release (`-NoWait` to skip waiting, `-Message "..."` to commit everything first).
+- `./build/watch.ps1 [-Ref vX.Y.Z]`: waits for the checks on `beta` or on a release tag.
+- `./build/release.ps1`: makes a stable release from `beta`. It checks CI, moves `main` up, tags the next version (`-Minor`, `-Major`, `-Version`), and waits for the release and the Flatpak repository. Run it with `-DryRun` first to see what would ship.
+
 ## Before you open a pull request
 
 - Keep each PR focused on a single change. Smaller PRs are reviewed faster.
