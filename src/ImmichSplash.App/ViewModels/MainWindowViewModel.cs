@@ -13,7 +13,12 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         var setUp = AppServices.Account.IsSignedIn && AppServices.Settings.Current.IsConfigured;
         if (!setUp)
-            Content = new OnboardingViewModel(this, resumeSignIn: false);
+        {
+            // Signed out with folders already chosen (e.g. the server dropped the sign-in): straight to signing in
+            // to the server it knows, not the whole setup again.
+            var s = AppServices.Settings.Current;
+            Content = new OnboardingViewModel(this, resumeSignIn: s.Folders.Count > 0 && !string.IsNullOrEmpty(s.WebUrl));
+        }
         else if (IsLockEnabled)
             Content = new LockViewModel(this, Unlock);
         else
@@ -99,6 +104,17 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>Back to setup. With <paramref name="resumeSignIn"/>, jumps straight to signing in to the known server.</summary>
     public void ShowOnboarding(bool resumeSignIn) => Replace(new OnboardingViewModel(this, resumeSignIn));
+
+    /// <summary>
+    /// "Sign in again" after the server stopped accepting the sign-in: let go of the rejected one first (folders,
+    /// settings and the app lock stay), then sign in to the same server, the same way as a fresh sign-in.
+    /// </summary>
+    public async Task SignInAgainAsync()
+    {
+        if (AppServices.Account.IsSignedIn)
+            await AppServices.Account.SignOutAsync(keepAppLock: true);
+        ShowOnboarding(resumeSignIn: true);
+    }
 
     public void Navigate(ShellPage page)
     {

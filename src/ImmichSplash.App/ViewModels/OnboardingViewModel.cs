@@ -16,7 +16,6 @@ namespace ImmichSplash.App.ViewModels;
 public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
 {
     readonly MainWindowViewModel _main;
-    readonly bool _resumeSignIn;
     readonly CancellationTokenSource _lifetime = new();
     ServerInfo? _server;
     OAuthSession? _oauth;
@@ -24,7 +23,6 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
     public OnboardingViewModel(MainWindowViewModel main, bool resumeSignIn)
     {
         _main = main;
-        _resumeSignIn = resumeSignIn;
         var settings = AppServices.Settings.Current;
         ServerUrl = settings.WebUrl?.TrimEnd('/') ?? "";
         Email = settings.UserEmail ?? "";
@@ -46,7 +44,8 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
     public bool IsFoldersStep => Step == 2;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(SignInCommand), nameof(FinishCommand))]
+    // Every button that waits for the screen not to be busy (the SSO one stayed greyed out after connecting on its own).
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(SignInCommand), nameof(SignInWithSsoCommand), nameof(FinishCommand))]
     public partial bool IsBusy { get; set; }
 
     // ---- Step 1: server ----
@@ -176,7 +175,10 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
     {
         var session = _oauth;
         if (session is null || _server is null)
+        {
+            Log.Info($"SSO callback not for this sign-in screen (waiting: {session is not null}, server: {_server is not null})");
             return;
+        }
         if (!session.Matches(url))
         {
             Log.Warn("Ignored an SSO callback that doesn't match the current sign-in");
@@ -212,7 +214,8 @@ public sealed partial class OnboardingViewModel : ViewModelBase, IDisposable
         ApiKey = "";
 
         var settings = AppServices.Settings.Current;
-        if (_resumeSignIn && settings.Folders.Count > 0)
+        // Folders already chosen (signing in again, however you got here): back to the app, backup carries on.
+        if (settings.Folders.Count > 0)
         {
             AppServices.Engine.SyncNow();
             _main.ShowShell();

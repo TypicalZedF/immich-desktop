@@ -12,12 +12,19 @@ public static class Program
     /// <summary>Held for the lifetime of the process; null in design/preview tools.</summary>
     public static SingleInstance? Instance { get; private set; }
 
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
+
     /// <summary>Set when Windows launched us to deliver an SSO callback link and no other copy was running.</summary>
     public static string? StartupLink { get; private set; }
 
     [STAThread]
     public static int Main(string[] args)
     {
+        // Windows ties notifications (and the taskbar button) to an app ID; an app that isn't packaged has to say which.
+        if (OperatingSystem.IsWindows())
+            SetCurrentProcessExplicitAppUserModelID(DesktopNotifications.WindowsAppId);
+
         // Commands used by the installer/uninstaller.
         if (args.Contains("--quit"))
         {

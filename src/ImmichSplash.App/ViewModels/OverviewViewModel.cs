@@ -218,7 +218,7 @@ public sealed partial class OverviewViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
-    void SignIn() => _shell.Main.ShowOnboarding(resumeSignIn: true);
+    Task SignInAsync() => _shell.Main.SignInAgainAsync();
 
     [RelayCommand]
     void ShowProblems() => _shell.Navigate(ShellPage.Activity);

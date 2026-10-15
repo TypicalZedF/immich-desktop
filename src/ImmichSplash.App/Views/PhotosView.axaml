@@ -718,7 +718,8 @@
 
         <Panel>
           <!-- The photo: scroll to zoom, drag to move when zoomed, double-click to zoom in/out -->
-          <Panel Name="ViewerStage" Margin="64,64,64,20" ClipToBounds="True" Background="Transparent">
+          <!-- The bottom margin keeps the picture clear of the date underneath it. -->
+          <Panel Name="ViewerStage" Margin="64,64,64,50" ClipToBounds="True" Background="Transparent">
             <Panel.ContextMenu>
               <ContextMenu Opening="OnViewerMenuOpening">
                 <MenuItem l:Tr.Header="Copy picture" Command="{Binding CopyImageCommand}" IsVisible="{Binding !IsVideo}"><MenuItem.Icon><mi:MaterialIcon Kind="ContentCopy" /></MenuItem.Icon></MenuItem>
@@ -923,8 +924,15 @@
           </Grid>
 
           <!-- Date (and for files only on this PC, their backup status), under the photo -->
+          <!-- The date, under the picture. Not while a video plays: its controls go there (the date is in Info). -->
           <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,10" Padding="12,5" CornerRadius="10" Background="#99000000"
-                  IsHitTestVisible="False" IsVisible="{Binding DateText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                  IsHitTestVisible="False">
+            <Border.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="DateText" Converter="{x:Static StringConverters.IsNotNullOrEmpty}" />
+                <Binding Path="!IsVideoStarted" />
+              </MultiBinding>
+            </Border.IsVisible>
             <StackPanel Orientation="Horizontal" Spacing="10">
               <TextBlock Text="{Binding DateText}" Foreground="White" FontWeight="Medium" FontSize="13" />
               <StackPanel Orientation="Horizontal" Spacing="5" IsVisible="{Binding IsLocalOnly}">

@@ -886,6 +886,10 @@ public sealed class ImmichClient : IDisposable
         };
         var http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
         http.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
+        // Immich names a sign-in's device from these when it doesn't recognise the user agent (like its mobile apps
+        // send them): "Immich Splash" on "Windows" in Account Settings → Authorized devices, instead of "Unknown".
+        http.DefaultRequestHeaders.Add("deviceModel", AppInfo.Name);
+        http.DefaultRequestHeaders.Add("deviceType", AppInfo.OsName);
         return http;
     }
 
@@ -937,7 +941,7 @@ public sealed class ImmichClient : IDisposable
         try
         {
             using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-            await EnsureSuccessAsync(response, cts.Token);
+            await ThrowIfFailedAsync(response, cts.Token);
             return await response.Content.ReadFromJsonAsync<T>(Json, cts.Token);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
@@ -946,7 +950,26 @@ public sealed class ImmichClient : IDisposable
         }
     }
 
-    static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
+    /// <summary>
+    /// Raised (on any thread) when the server says this client's sign-in is no longer valid, whatever was being
+    /// done at the time: browsing the library notices it as well as a backup run.
+    /// </summary>
+    public event Action? SignedOut;
+
+    async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            await ThrowIfFailedAsync(response, ct);
+        }
+        catch (ImmichApiException ex) when (ex.IsSignedOut && Credential is not null)
+        {
+            SignedOut?.Invoke();
+            throw;
+        }
+    }
+
+    static async Task ThrowIfFailedAsync(HttpResponseMessage response, CancellationToken ct)
     {
         if (response.IsSuccessStatusCode)
             return;
@@ -974,7 +997,7 @@ public sealed class ImmichClient : IDisposable
             HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout => Loc.T("The server is temporarily unavailable."),
             _ => detail ?? Loc.T("The server returned an error ({0}).", (int)response.StatusCode),
         };
-        throw new ImmichApiException(response.StatusCode, message);
+        throw new ImmichApiException(response.StatusCode, message) { ServerMessage = detail };
     }
 
     internal static string? ParseErrorMessage(string body)

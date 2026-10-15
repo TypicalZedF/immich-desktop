@@ -83,6 +83,8 @@ public sealed partial class SyncEngine : IAsyncDisposable
         _activity = activity;
         _debounceTimer = new Timer(_ => { Interlocked.Exchange(ref _firstDirtyTick, 0); Wake(); });
         _progressTimer = new Timer(_ => Publish());
+        // From the start (not only once running): the library may find the sign-in revoked before any backup run.
+        _account.SessionRejected += OnSessionRejected;
     }
 
     /// <summary>Files modified more recently than this are assumed to still be copying and are retried later.</summary>
@@ -241,6 +243,7 @@ public sealed partial class SyncEngine : IAsyncDisposable
     {
         _settings.Changed -= OnSettingsChanged;
         _account.SessionChanged -= OnSessionChanged;
+        _account.SessionRejected -= OnSessionRejected;
         await _shutdown.CancelAsync();
         if (_holdWatch is not null)
             await _holdWatch.DisposeAsync();
@@ -349,6 +352,28 @@ public sealed partial class SyncEngine : IAsyncDisposable
         }
     }
 
+    /// <summary>Something in the app found the sign-in revoked: show "signed out" (and notify) right away.</summary>
+    void OnSessionRejected()
+    {
+        try
+        {
+            _runCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // That run has already finished.
+        }
+        MarkSignedOut();
+    }
+
+    void MarkSignedOut()
+    {
+        if (_state == SyncState.AuthError)
+            return;
+        SetState(SyncState.AuthError, Loc.T("Your sign-in has expired or was revoked. Sign in again to keep backing up."));
+        _activity.Add(ActivityKind.Error, Loc.T("Signed out by the server. Sign in again to keep backing up."));
+    }
+
     void OnSessionChanged()
     {
         _runCts?.Cancel();
@@ -428,6 +453,11 @@ public sealed partial class SyncEngine : IAsyncDisposable
             SetState(SyncState.NotConfigured);
             return null;
         }
+        if (_account.IsRejected)
+        {
+            MarkSignedOut(); // stays signed out until you sign in again
+            return null;
+        }
         if (settings.Paused && settings.PausedUntil is { } until && until <= DateTimeOffset.Now)
         {
             Resume();
@@ -470,6 +500,11 @@ public sealed partial class SyncEngine : IAsyncDisposable
 
             _lastSync = DateTimeOffset.Now;
             RefreshCounts(settings);
+            if (_account.IsRejected)
+            {
+                MarkSignedOut(); // found out while this run was going (nothing in it needed the server)
+                return null;
+            }
             SetState(SyncState.Idle);
             return NextRetryDelay(settings);
         }
@@ -497,8 +532,7 @@ public sealed partial class SyncEngine : IAsyncDisposable
         catch (ImmichApiException ex) when (ex.IsUnauthorized)
         {
             Log.Warn("Server rejected our credentials", ex);
-            SetState(SyncState.AuthError, Loc.T("Your sign-in has expired or was revoked. Sign in again to keep backing up."));
-            _activity.Add(ActivityKind.Error, Loc.T("Signed out by the server. Sign in again to keep backing up."));
+            MarkSignedOut();
             return null;
         }
         catch (Exception ex) when (NetworkErrors.IsConnectivity(ex) && !shutdown.IsCancellationRequested)
@@ -521,6 +555,9 @@ public sealed partial class SyncEngine : IAsyncDisposable
     async Task PrepareClientAsync(ImmichClient client, CancellationToken ct)
     {
         await client.PingAsync(ct);
+        // The ping needs no sign-in: ask who we are, so a sign-in revoked on the server shows up on every run, even
+        // one with nothing to upload while only the tray is running (it throws "unauthorized" like any other call).
+        await client.GetMeAsync(ct);
         if (ReferenceEquals(_preparedClient, client))
             return;
 

@@ -24,6 +24,9 @@ public sealed partial class SyncEngine
 
     void SetState(SyncState state, string? detail = null)
     {
+        // Signed out by the server: a run still going (or one with nothing to upload) can't make it look fine again.
+        if (_account.IsRejected && state is not (SyncState.AuthError or SyncState.NotConfigured))
+            (state, detail) = (SyncState.AuthError, Loc.T("Your sign-in has expired or was revoked. Sign in again to keep backing up."));
         _state = state;
         _detail = detail;
         Publish();

@@ -109,6 +109,8 @@ sealed class FakeImmichServer : HttpMessageHandler
             case ("GET", _) when path.StartsWith("/api/assets/", StringComparison.Ordinal) && (path.EndsWith("/thumbnail", StringComparison.Ordinal) || path.EndsWith("/original", StringComparison.Ordinal)):
                 MediaRequests.Enqueue(path + request.RequestUri!.Query);
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([0xFF, 0xD8, 0xFF, 0xD9]) };
+            case ("GET", "/api/users/me"):
+                return Json(HttpStatusCode.OK, new { id = "user-1", name = "Test User", email = "test@example.com", quotaSizeInBytes = (long?)null, quotaUsageInBytes = 0L });
             case ("GET", "/api/auth/status"):
                 return Json(HttpStatusCode.OK, new { pinCode = Pin is not null, password = true, isElevated = Elevated });
             case (_, "/api/auth/pin-code"):

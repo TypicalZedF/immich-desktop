@@ -379,7 +379,9 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     {
         var recent = AppServices.Settings.Current.RecentAlbumIds.Where(_albumCache.ContainsKey).Take(RecentAlbumCount).ToList();
         AlbumsNav.HasChildren = recent.Count > 0; // no chevron when there is nothing to show
-        var key = AlbumsNav.IsExpanded ? string.Join(",", recent) : "-";
+        // Only which albums are listed matters, not their order: opening one of them puts it first in the settings,
+        // and moving it to the top under the pointer would turn picking from the list into a chase.
+        var key = AlbumsNav.IsExpanded ? string.Join(",", recent.Order(StringComparer.Ordinal)) : "-";
         if (key == _recentKey)
             return;
         _recentKey = key;

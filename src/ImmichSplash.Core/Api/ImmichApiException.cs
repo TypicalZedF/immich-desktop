@@ -11,6 +11,15 @@ public sealed class ImmichApiException(HttpStatusCode statusCode, string message
 
     public bool IsUnauthorized => StatusCode == HttpStatusCode.Unauthorized;
 
+    /// <summary>What the server said, if anything (its "message").</summary>
+    public string? ServerMessage { get; init; }
+
+    /// <summary>
+    /// The sign-in itself is no longer accepted (logged out on the server, token expired, API key deleted), as
+    /// opposed to a 401 for something else, like a wrong password when signing in.
+    /// </summary>
+    public bool IsSignedOut => IsUnauthorized && ServerMessage is null or "Invalid user token" or "Invalid API key" or "Authentication required";
+
     /// <summary>Server-side or rate-limit errors that are worth retrying later.</summary>
     public bool IsTransient =>
         (int)StatusCode >= 500 || StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests;

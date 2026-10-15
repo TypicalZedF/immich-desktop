@@ -59,6 +59,14 @@ Uninstall from **Settings → Apps → Installed apps → Immich Splash**. You'l
 
 **Linux:** download **`ImmichSplash-linux-x64.tar.gz`**, extract it and run `./install.sh`. It installs to `~/.local/opt/immich-splash` and adds a menu entry; `./install.sh --uninstall` removes it. For videos to play in the app, install mpv's library (`sudo dnf install mpv-libs`, `sudo apt install libmpv2`, …). Linux installs don't update themselves yet: download the new tarball and run `./install.sh` again.
 
+**Linux (Flatpak), with updates:** add the app's own Flatpak repository in one step (it pulls the runtime from Flathub):
+
+```sh
+flatpak install --user https://typicalzedf.github.io/immich-splash/io.github.TypicalZedF.ImmichSplash.flatpakref
+```
+
+Then start it from your app menu or with `flatpak run io.github.TypicalZedF.ImmichSplash`; `flatpak update` gets new versions. No repository wanted? Each release also has **`ImmichSplash.flatpak`**: `flatpak install --user ImmichSplash.flatpak` (no updates that way).
+
 > Until the installer is code-signed, Windows SmartScreen shows "Windows protected your PC". Click **More info → Run anyway**.
 
 ## Security & privacy

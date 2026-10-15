@@ -21,6 +21,7 @@ public static class DesktopNotifications
 
     public static void Show(Notice notice)
     {
+        Log.Info($"Notification: {notice.Kind} \"{notice.Title}\"");
         try
         {
             if (OperatingSystem.IsWindows())

@@ -47,6 +47,48 @@ public class SyncEngineTests
     }
 
     [Fact]
+    public async Task A_revoked_sign_in_seen_anywhere_in_the_app_shows_as_signed_out_even_with_nothing_to_back_up()
+    {
+        await using var h = new Harness();
+        await h.RunAsync();
+        Assert.Equal(SyncState.Idle, h.Engine.Status.State);
+
+        // The session is logged out on the server; the next thing to talk to it is the library, not a backup.
+        h.Server.RejectAuth = true;
+        await Assert.ThrowsAsync<ImmichApiException>(() => h.Account.Client!.GetAlbumsAsync(TestContext.Current.CancellationToken));
+
+        Assert.True(h.Account.IsRejected);
+        Assert.Equal(SyncState.AuthError, h.Engine.Status.State);
+        // And it stays that way: a backup run with nothing to upload doesn't flip it back to "backed up".
+        await h.RunAsync();
+        Assert.Equal(SyncState.AuthError, h.Engine.Status.State);
+    }
+
+    [Fact]
+    public async Task A_backup_run_with_nothing_to_upload_still_notices_a_revoked_sign_in()
+    {
+        // Only the tray is running (no library asking the server for anything) and nothing new to back up.
+        await using var h = new Harness();
+        await h.RunAsync();
+        h.Server.RejectAuth = true;
+
+        h.Engine.SyncNow();
+        await h.RunAsync();
+
+        Assert.Equal(SyncState.AuthError, h.Engine.Status.State);
+    }
+
+    [Fact]
+    public async Task A_wrong_password_is_not_a_revoked_sign_in()
+    {
+        await using var h = new Harness();
+        var ex = new ImmichApiException(System.Net.HttpStatusCode.Unauthorized, "Incorrect email or password") { ServerMessage = "Incorrect email or password" };
+
+        Assert.False(ex.IsSignedOut);
+        Assert.False(h.Account.IsRejected);
+    }
+
+    [Fact]
     public async Task Uploads_new_media_skips_duplicates_and_other_files()
     {
         await using var h = new Harness();

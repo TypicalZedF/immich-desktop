@@ -69,12 +69,18 @@ public partial class App : Application
                 if (BackupNotifier.OnRunFinished(run, AppServices.Settings.Current) is { } notice)
                     DesktopNotifications.Show(notice);
             };
-            DesktopNotifications.Clicked += kind => Dispatcher.UIThread.Post(() => ShowMainWindow(kind switch
+            DesktopNotifications.Clicked += kind => Dispatcher.UIThread.Post(() =>
             {
-                NoticeKind.Failed => ShellPage.Activity,
-                NoticeKind.BackedUp => ShellPage.Overview,
-                _ => null,
-            }));
+                ShowMainWindow(kind switch
+                {
+                    NoticeKind.Failed => ShellPage.Activity,
+                    NoticeKind.BackedUp => ShellPage.Overview,
+                    _ => null,
+                });
+                // "Sign in to Immich again": straight to signing in (not behind the app lock, which shows first if on).
+                if (kind == NoticeKind.SignInNeeded && _window?.DataContext is MainWindowViewModel { IsLocked: false } main && AppServices.Account.IsRejected)
+                    _ = main.SignInAgainAsync();
+            });
             AppServices.Settings.Changed += OnSettingsChanged;
 
             AppServices.Updates.QuitApp = Quit;
@@ -125,6 +131,7 @@ public partial class App : Application
                 ShowMainWindow();
                 break;
             case SingleInstance.Command.OpenLink when argument is not null:
+                Log.Info($"Link from the browser: {Core.Services.OAuthSession.Describe(argument)}");
                 OAuthCallbacks.Deliver(argument);
                 ShowMainWindow();
                 break;
@@ -164,6 +171,8 @@ public partial class App : Application
         Notice? notice;
         lock (_notifier)
             notice = _notifier.OnStatus(status, AppServices.Settings.Current);
+        if (status.State == SyncState.AuthError && notice is null)
+            Log.Info("Signed out, no notification (already signed out, or sign-in notifications are off)");
         if (notice is not null)
             DesktopNotifications.Show(notice);
         var busy = status.IsBusy;

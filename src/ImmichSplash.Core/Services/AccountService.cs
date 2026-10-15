@@ -10,7 +10,35 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
 {
     const string AccountMetaKey = "account";
 
-    public ImmichClient? Client { get; private set; }
+    ImmichClient? _client;
+
+    public ImmichClient? Client
+    {
+        get => _client;
+        private set
+        {
+            if (_client is not null)
+                _client.SignedOut -= OnSignedOut;
+            _client = value;
+            if (value is not null)
+                value.SignedOut += OnSignedOut;
+        }
+    }
+
+    /// <summary>The server stopped accepting this sign-in (until you sign in again).</summary>
+    public bool IsRejected { get; private set; }
+
+    /// <summary>Raised once (on any thread) when the server stops accepting the sign-in.</summary>
+    public event Action? SessionRejected;
+
+    void OnSignedOut()
+    {
+        if (IsRejected)
+            return;
+        IsRejected = true;
+        Log.Warn("The server no longer accepts this sign-in (logged out, expired or revoked)");
+        SessionRejected?.Invoke();
+    }
 
     public bool IsSignedIn => Client is not null;
 
@@ -92,6 +120,7 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
             });
 
             var previous = Client;
+            IsRejected = false;
             Client = client;
             previous?.Dispose();
             Log.Info($"Signed in as {me.Email} on {server.Host} ({server.Version})");
@@ -105,10 +134,15 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
         }
     }
 
-    public async Task SignOutAsync()
+    /// <param name="keepAppLock">
+    /// Signing in again after the server dropped the sign-in: the app lock stays as it is. (A plain sign-out also
+    /// turns it off: that's the "forgot my app password" way out.)
+    /// </param>
+    public async Task SignOutAsync(bool keepAppLock = false)
     {
         var client = Client;
         Client = null;
+        IsRejected = false;
         SessionChanged?.Invoke();
 
         if (client is not null)
@@ -133,6 +167,8 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
         {
             s.UserId = null;
             s.UserName = null;
+            if (keepAppLock)
+                return; // signing in again (the email stays filled in too)
             s.UserEmail = null;
             // The app lock belongs to the signed-in user; signing out is also the "forgot my password" path.
             s.AppLock = AppLockMode.Off;
@@ -161,9 +197,15 @@ public sealed class AccountService(SettingsStore settings, StateDatabase db) : I
     /// <summary>For tests: use a pre-built client without touching disk.</summary>
     internal void UseClient(ImmichClient client)
     {
+        IsRejected = false;
         Client = client;
         SessionChanged?.Invoke();
     }
 
-    public void Dispose() => Client?.Dispose();
+    public void Dispose()
+    {
+        var client = Client;
+        Client = null;
+        client?.Dispose();
+    }
 }
