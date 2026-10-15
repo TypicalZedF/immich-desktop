@@ -54,6 +54,11 @@ public partial class App : Application
             AppServices.Network.Start();
             AppServices.Engine.Start();
             AppServices.Engine.StatusChanged += OnEngineStatus;
+            AppServices.Engine.RunFinished += run =>
+            {
+                if (BackupNotifier.OnRunFinished(run, AppServices.Settings.Current) is { } notice)
+                    DesktopNotifications.Show(notice);
+            };
             DesktopNotifications.Clicked += kind => Dispatcher.UIThread.Post(() => ShowMainWindow(kind switch
             {
                 NoticeKind.Failed => ShellPage.Activity,
@@ -148,8 +153,8 @@ public partial class App : Application
     {
         Notice? notice;
         lock (_notifier)
-            notice = _notifier.OnStatus(status, DateTimeOffset.Now);
-        if (notice is not null && AppServices.Settings.Current.Notifications)
+            notice = _notifier.OnStatus(status, AppServices.Settings.Current);
+        if (notice is not null)
             DesktopNotifications.Show(notice);
         var busy = status.IsBusy;
         if (_wasBusy && !busy)

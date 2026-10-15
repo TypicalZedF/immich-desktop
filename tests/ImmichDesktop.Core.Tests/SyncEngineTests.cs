@@ -298,4 +298,23 @@ public class SyncEngineTests
         await h.RunAsync();
         Assert.Equal(["a.jpg"], h.Server.UploadedFileNames);
     }
+
+    [Fact]
+    public async Task Each_run_reports_exactly_what_it_did()
+    {
+        await using var h = new Harness();
+        var runs = new List<RunSummary>();
+        h.Engine.RunFinished += runs.Add;
+        h.Temp.File("Photos/a.jpg");
+        h.Temp.File("Photos/b.jpg");
+        h.Server.Preload(h.Temp.File("Photos/already.jpg"));
+
+        await h.RunAsync();
+        var first = Assert.Single(runs);
+        Assert.Equal((2, 1, 0), (first.Uploaded, first.AlreadyThere, first.Failed));
+
+        // Nothing new: no run to report (so no "Backup complete" after starting the app).
+        await h.RunAsync();
+        Assert.Single(runs);
+    }
 }

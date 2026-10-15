@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ImmichDesktop.Core.Api;
 using ImmichDesktop.Core.Settings;
 
@@ -12,9 +13,11 @@ public sealed partial class SyncEngine
         var folderIds = EnabledFolderIds(settings);
         _runTotal = _db.CountCandidates(folderIds);
         _runDone = 0;
+        _runFailed = 0;
         if (_runTotal == 0)
             return;
         StartEstimate(folderIds);
+        var started = Stopwatch.StartNew();
 
         var uploaded = 0;
         var alreadyThere = 0;
@@ -119,6 +122,14 @@ public sealed partial class SyncEngine
                     message += $" · {Format.Count(alreadyThere)} already on the server";
                 _activity.Add(ActivityKind.Success, message);
             }
+            try
+            {
+                RunFinished?.Invoke(new RunSummary(uploaded, alreadyThere, _runFailed, started.Elapsed));
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Run listener failed", ex);
+            }
         }
     }
 
@@ -165,6 +176,7 @@ public sealed partial class SyncEngine
                 {
                     _db.MarkFailed(record.Path, Loc.T("Couldn't read the file: {0}", ex.Message), NextAttempt(record.Attempts + 1));
                     Interlocked.Increment(ref _runDone);
+                    Interlocked.Increment(ref _runFailed);
                     continue;
                 }
             }
@@ -259,6 +271,7 @@ public sealed partial class SyncEngine
         Log.Warn($"Upload failed for {record.Path}: {reason}");
         _db.MarkFailed(record.Path, reason, NextAttempt(record.Attempts + 1));
         Interlocked.Increment(ref _runDone);
+        Interlocked.Increment(ref _runFailed);
         _activity.Add(ActivityKind.Error, Loc.T("Couldn't upload {0}: {1}", Path.GetFileName(record.Path), reason), record.Path);
     }
 

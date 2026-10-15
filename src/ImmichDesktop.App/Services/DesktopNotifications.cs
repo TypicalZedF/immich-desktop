@@ -44,7 +44,9 @@ public static class DesktopNotifications
         }
         static string Text(string s) => System.Security.SecurityElement.Escape(s) ?? "";
         var xml = new Windows.Data.Xml.Dom.XmlDocument();
-        xml.LoadXml($"""<toast launch="{notice.Kind}"><visual><binding template="ToastGeneric"><text>{Text(notice.Title)}</text><text>{Text(notice.Body)}</text></binding></visual></toast>""");
+        // The logo is also in the notification itself: Windows caches the registered icon.
+        var logo = new Uri(IconPath).AbsoluteUri;
+        xml.LoadXml($"""<toast launch="{notice.Kind}"><visual><binding template="ToastGeneric"><text>{Text(notice.Title)}</text><text>{Text(notice.Body)}</text><image placement="appLogoOverride" src="{Text(logo)}"/></binding></visual></toast>""");
         var toast = new Windows.UI.Notifications.ToastNotification(xml);
         toast.Activated += (_, _) => Clicked?.Invoke(notice.Kind);
         Windows.UI.Notifications.ToastNotificationManager.CreateToastNotifier(WindowsAppId).Show(toast);

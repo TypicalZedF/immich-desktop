@@ -33,6 +33,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         LaunchAtStartup = Autostart.IsEnabled();
         GpuRendering = s.GpuRendering;
         Notifications = s.Notifications;
+        NotifyBackupsIndex = (int)s.NotifyBackups;
+        NotifyFailures = s.NotifyFailures;
+        NotifySignIn = s.NotifySignIn;
         _theme = s.Theme;
         LanguageOptions = [new Option<string?>(Tr.T("System ({0})", Tr.Languages.First(l => l.Code == Tr.SystemLanguage).Name), null),
             .. Tr.Languages.Select(l => new Option<string?>(l.Name, l.Code))];
@@ -400,6 +403,37 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     {
         if (!_loading)
             AppServices.Settings.Update(s => s.Notifications = value);
+    }
+
+    /// <summary>When a finished backup gets a notification (Never, Only big backups, Every backup).</summary>
+    public IReadOnlyList<string> BackupNoticeChoices { get; } =
+        [Tr.T("Never"), Tr.T("Only big backups"), Tr.T("Every backup")];
+
+    [ObservableProperty]
+    public partial int NotifyBackupsIndex { get; set; }
+
+    partial void OnNotifyBackupsIndexChanged(int value)
+    {
+        if (!_loading && value >= 0)
+            AppServices.Settings.Update(s => s.NotifyBackups = (Core.Settings.BackupNotice)value);
+    }
+
+    [ObservableProperty]
+    public partial bool NotifyFailures { get; set; }
+
+    partial void OnNotifyFailuresChanged(bool value)
+    {
+        if (!_loading)
+            AppServices.Settings.Update(s => s.NotifyFailures = value);
+    }
+
+    [ObservableProperty]
+    public partial bool NotifySignIn { get; set; }
+
+    partial void OnNotifySignInChanged(bool value)
+    {
+        if (!_loading)
+            AppServices.Settings.Update(s => s.NotifySignIn = value);
     }
 
     partial void OnGpuRenderingChanged(bool value)

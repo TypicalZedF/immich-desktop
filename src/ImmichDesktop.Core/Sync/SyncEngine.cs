@@ -67,6 +67,7 @@ public sealed partial class SyncEngine : IAsyncDisposable
     StatusCounts _counts;
     int _runTotal;
     int _runDone;
+    int _runFailed;
     long _bytesSent;
     long _speedSampleBytes;
     long _speedSampleTimestamp;
@@ -98,6 +99,9 @@ public sealed partial class SyncEngine : IAsyncDisposable
 
     /// <summary>Latest snapshot. Raised on a background thread; marshal to the UI thread before touching controls.</summary>
     public event Action<SyncStatus>? StatusChanged;
+
+    /// <summary>Raised (on the engine's thread) after each upload run that had something to do.</summary>
+    public event Action<RunSummary>? RunFinished;
 
     public SyncStatus Status => _status;
 

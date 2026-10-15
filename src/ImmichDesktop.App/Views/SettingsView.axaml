@@ -129,9 +129,24 @@
           <Grid Classes="row" ColumnDefinitions="*,Auto">
             <StackPanel>
               <TextBlock Classes="title" l:Tr.Text="Notifications" />
-              <TextBlock Classes="caption" l:Tr.Text="Let you know when a big backup finishes, when files can't be backed up, or when you need to sign in again." TextWrapping="Wrap" />
+              <TextBlock Classes="caption" l:Tr.Text="Desktop notifications about your backup. Choose which below." TextWrapping="Wrap" />
             </StackPanel>
             <ToggleSwitch Grid.Column="1" IsChecked="{Binding Notifications}" />
+          </Grid>
+          <Grid Classes="row" ColumnDefinitions="*,Auto" Margin="20,0,0,0" IsVisible="{Binding Notifications}">
+            <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="When a backup finishes" />
+              <TextBlock Classes="caption" l:Tr.Text="Big backups are 20 or more photos and videos, or ones that take a few minutes." TextWrapping="Wrap" />
+            </StackPanel>
+            <ComboBox Grid.Column="1" MinWidth="180" ItemsSource="{Binding BackupNoticeChoices}" SelectedIndex="{Binding NotifyBackupsIndex}" />
+          </Grid>
+          <Grid Classes="row" ColumnDefinitions="*,Auto" Margin="20,0,0,0" IsVisible="{Binding Notifications}">
+            <TextBlock Classes="title" l:Tr.Text="When files can't be backed up" VerticalAlignment="Center" />
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding NotifyFailures}" />
+          </Grid>
+          <Grid Classes="row" ColumnDefinitions="*,Auto" Margin="20,0,0,0" IsVisible="{Binding Notifications}">
+            <TextBlock Classes="title" l:Tr.Text="When you need to sign in again" VerticalAlignment="Center" />
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding NotifySignIn}" />
           </Grid>
           <Border Classes="divider" IsVisible="{Binding AutostartSupported}" />
           <Grid Classes="row" ColumnDefinitions="*,Auto" IsVisible="{Binding AutostartSupported}">

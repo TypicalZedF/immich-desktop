@@ -122,8 +122,17 @@ public sealed class AppSettings
     /// <summary>Draw the app with the graphics card (smoother). Off: the processor draws it. Applies after a restart.</summary>
     public bool GpuRendering { get; set; } = true;
 
-    /// <summary>Desktop notifications when a big backup finishes, files fail, or you need to sign in again.</summary>
+    /// <summary>Desktop notifications at all; the kinds below choose which.</summary>
     public bool Notifications { get; set; } = true;
+
+    /// <summary>When a finished backup is worth a notification.</summary>
+    public BackupNotice NotifyBackups { get; set; } = BackupNotice.BigBackups;
+
+    /// <summary>Notify when files can't be backed up.</summary>
+    public bool NotifyFailures { get; set; } = true;
+
+    /// <summary>Notify when the server signs the app out.</summary>
+    public bool NotifySignIn { get; set; } = true;
 
     /// <summary>Photo grid thumbnail size in pixels (the zoom slider in Photos).</summary>
     public int ThumbnailSize { get; set; } = 168;
@@ -195,3 +204,14 @@ public sealed class AppSettings
 
     public bool IsConfigured => !string.IsNullOrEmpty(ServerUrl) && !string.IsNullOrEmpty(UserId);
 }
+
+/// <summary>Which finished backups get a notification.</summary>
+public enum BackupNotice
+{
+    Never,
+    /// <summary>Only big ones (many files, or a long run), so a photo or two stays quiet.</summary>
+    BigBackups,
+    /// <summary>Every backup that uploaded something.</summary>
+    Every,
+}
+
