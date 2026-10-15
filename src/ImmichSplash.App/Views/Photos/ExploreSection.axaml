@@ -6,8 +6,24 @@
              xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="ImmichSplash.App.Views.Photos.ExploreSection"
              x:DataType="vm:PhotosViewModel">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="28,4,10,24">
-    <StackPanel Spacing="10">
+  <UserControl.Styles>
+    <!-- The face's discard button: small, round, only while the pointer is over the face (or it has focus). -->
+    <Style Selector="Button.discard">
+      <Setter Property="Width" Value="26" />
+      <Setter Property="Height" Value="26" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,2,2,0" />
+      <Setter Property="Background" Value="{DynamicResource AppCardBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector="StackPanel.person:pointerover Button.discard, Button.discard:focus-visible">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+  </UserControl.Styles>
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="28,4,10,24" Spacing="10">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Classes="h3" l:Tr.Text="People" />
         <Button Grid.Column="1" Classes="link" l:Tr.Content="Show all" Command="{Binding ShowAllPeopleCommand}" IsVisible="{Binding HasMorePeople}" />
@@ -18,28 +34,33 @@
         <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:PersonCardViewModel">
-            <StackPanel Width="120" Spacing="4" Margin="0,0,8,8">
-              <Button Classes="cover" Width="120" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Title}">
-                <Button.ContextMenu>
-                  <ContextMenu>
-                    <MenuItem l:Tr.Header="Open" Command="{Binding OpenCommand}" />
-                    <MenuItem Header="{Binding NameActionText}" Command="{Binding NameCommand}" />
-                    <MenuItem l:Tr.Header="Discard this face" Command="{Binding DiscardCommand}" />
-                  </ContextMenu>
-                </Button.ContextMenu>
-                <Border Classes="coverImage" Width="120" Height="120" CornerRadius="60" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
-                  <Panel>
-                    <mi:MaterialIcon Kind="AccountOutline" Width="40" Height="40" Foreground="{DynamicResource AppTextTertiaryBrush}" />
-                    <Image Source="{Binding Cover}" Stretch="UniformToFill" />
-                  </Panel>
-                </Border>
-              </Button>
-              <!-- Named: the name. Unnamed: a way to give one (the tile itself opens their photos). -->
+            <!-- A face, and under it the name (or a way to give one). Discard: the x on hover, or right-click. -->
+            <StackPanel Classes="person" Width="120" Spacing="8" Margin="0,0,16,20">
+              <Panel>
+                <Button Classes="cover" Margin="0" Width="120" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Title}">
+                  <Button.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem l:Tr.Header="Open" Command="{Binding OpenCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="ImageMultipleOutline" /></MenuItem.Icon></MenuItem>
+                      <MenuItem Header="{Binding NameActionText}" Command="{Binding NameCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="PencilOutline" /></MenuItem.Icon></MenuItem>
+                      <MenuItem l:Tr.Header="Merge with someone…" Command="{Binding MergeCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="CallMerge" /></MenuItem.Icon></MenuItem>
+                      <Separator />
+                      <MenuItem l:Tr.Header="Discard this face" Command="{Binding DiscardCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="CloseCircleOutline" /></MenuItem.Icon></MenuItem>
+                    </ContextMenu>
+                  </Button.ContextMenu>
+                  <Border Classes="coverImage" Width="120" Height="120" CornerRadius="60" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
+                    <Panel>
+                      <mi:MaterialIcon Kind="AccountOutline" Width="40" Height="40" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                      <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                    </Panel>
+                  </Border>
+                </Button>
+                <Button Classes="discard" HorizontalAlignment="Right" VerticalAlignment="Top" Command="{Binding DiscardCommand}"
+                        l:Tr.Tip="Forget this face (the photos stay)" AutomationProperties.Name="Discard this face">
+                  <mi:MaterialIcon Kind="Close" Width="14" Height="14" />
+                </Button>
+              </Panel>
               <TextBlock Text="{Binding Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" IsVisible="{Binding IsNamed}" />
-              <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center" IsVisible="{Binding !IsNamed}">
-                <Button Classes="link" Command="{Binding NameCommand}" l:Tr.Content="Add a name" />
-                <Button Classes="link" Command="{Binding DiscardCommand}" l:Tr.Content="Discard" l:Tr.Tip="Forget this face (the photos stay)" />
-              </StackPanel>
+              <Button Classes="link" HorizontalAlignment="Center" FontSize="13" Command="{Binding NameCommand}" l:Tr.Content="Add a name" IsVisible="{Binding !IsNamed}" />
             </StackPanel>
           </DataTemplate>
         </ItemsControl.ItemTemplate>

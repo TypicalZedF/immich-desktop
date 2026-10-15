@@ -22,8 +22,8 @@
                   </StackPanel>
                 </Button>
               </Grid>
-              <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="28,0,12,24">
-                <ItemsControl ItemsSource="{Binding Groups}">
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl Margin="28,0,12,24" ItemsSource="{Binding Groups}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:DuplicateGroupViewModel">
                       <Border Classes="card" Padding="16" Margin="0,0,0,14" CornerRadius="18">

@@ -260,7 +260,7 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsVideo), nameof(IsFavorite), nameof(DurationText), nameof(IsMissing), nameof(CanOpen),
         nameof(CanSelect), nameof(SyncIcon), nameof(SyncText), nameof(HasSyncIcon), nameof(SyncFailed), nameof(IsLocalOnly), nameof(SizeText), nameof(HasSizeText), nameof(ShowLocalPlaceholder),
-        nameof(IsLivePhoto), nameof(IsStack), nameof(StackText), nameof(AccessibleName))]
+        nameof(IsLivePhoto), nameof(IsStack), nameof(StackText), nameof(IsShared), nameof(HasMenu), nameof(CanTrash), nameof(FavoriteText), nameof(AccessibleName))]
     public partial TimelineAsset? Asset { get; set; }
 
     [ObservableProperty]
@@ -299,12 +299,23 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
                 parts.Add(DurationText);
             if (a.IsFavorite)
                 parts.Add(Tr.T("Favorite"));
+            if (IsShared)
+                parts.Add(Tr.T("Shared by link"));
             if (SyncText.Length > 0)
                 parts.Add(SyncText);
             return string.Join(", ", parts);
         }
     }
     public bool IsStack => Asset is { IsStack: true };
+
+    /// <summary>It has a public link of its own.</summary>
+    public bool IsShared => Asset is { } a && owner.IsAssetShared(a.Id);
+
+    internal void RefreshShared()
+    {
+        OnPropertyChanged(nameof(IsShared));
+        OnPropertyChanged(nameof(AccessibleName));
+    }
     public string StackText => Asset is { IsStack: true } a ? a.StackCount.ToString(System.Globalization.CultureInfo.CurrentCulture) : "";
 
     /// <summary>Videos can't be picked as a profile picture.</summary>
@@ -416,6 +427,13 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
 
     bool _ownsThumbnail;
 
+    /// <summary>Fetches the picture again (the photo was edited); only for a tile that's on screen.</summary>
+    internal void ReloadThumbnail()
+    {
+        Release();
+        _ = LoadThumbnailAsync(CancellationToken.None);
+    }
+
     internal void Release()
     {
         var bitmap = Thumbnail;
@@ -445,6 +463,43 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
         if (CanSelect && Asset is not null)
             owner.ToggleSelection(this);
     }
+
+    // ---- Right-click menu (one photo; selecting several uses the selection bar) ----
+
+    /// <summary>The menu has things to do: a photo in Immich, in the library (not the profile picture picker).</summary>
+    public bool HasMenu => CanSelect && Asset is not null;
+    public bool CanTrash => HasMenu && !owner.IsTrash;
+    public string FavoriteText => IsFavorite ? Tr.T("Remove from favorites") : Tr.T("Add to favorites");
+
+    [RelayCommand]
+    async Task ToggleFavoriteAsync()
+    {
+        if (Asset is not { } a)
+            return;
+        if (await owner.SetFavoriteAsync([a.Id], !a.IsFavorite))
+            Asset = a with { IsFavorite = !a.IsFavorite };
+        OnPropertyChanged(nameof(FavoriteText));
+    }
+
+    [RelayCommand]
+    void AddToAlbum()
+    {
+        if (Asset is { } a)
+            owner.ShowAlbumPicker([a.Id]);
+    }
+
+    [RelayCommand]
+    void Share()
+    {
+        if (Asset is { } a)
+            owner.ShowShare([a.Id]);
+    }
+
+    [RelayCommand]
+    Task DownloadAsync() => Asset is { } a ? owner.DownloadAsync([a.Id]) : Task.CompletedTask;
+
+    [RelayCommand]
+    Task TrashAsync() => Asset is { } a ? owner.TrashAsync([a.Id]) : Task.CompletedTask;
 
     internal static string FormatDuration(long ms)
     {

@@ -33,6 +33,17 @@ sealed class FakeImmichServer : HttpMessageHandler
     public ConcurrentQueue<string> SharedLinkPatches { get; } = new();
     public ConcurrentDictionary<string, List<(string UserId, string Role)>> AlbumMembers { get; } = new();
     public ConcurrentQueue<string> PeopleUpdates { get; } = new();
+
+    /// <summary>Merges asked for: "path body". With <see cref="LegacyMergeOnly"/> the new route answers 404 (servers before 3.2.1).</summary>
+    public ConcurrentQueue<string> PeopleMerges { get; } = new();
+    public bool LegacyMergeOnly { get; set; }
+
+    /// <summary>Picture requests (path and query), e.g. "/api/assets/a1/thumbnail?size=preview&amp;edited=true".</summary>
+    public ConcurrentQueue<string> MediaRequests { get; } = new();
+
+    /// <summary>The account's locked-folder PIN (null: none yet), and whether this session is unlocked.</summary>
+    public string? Pin { get; set; }
+    public bool Elevated { get; set; }
     public ConcurrentQueue<string> SmartSearches { get; } = new();
     public bool RejectAuth { get; set; }
 
@@ -94,6 +105,61 @@ sealed class FakeImmichServer : HttpMessageHandler
                 Events.Enqueue("upload");
                 AfterUpload?.Invoke(UploadedFileNames.Count);
                 return Json(HttpStatusCode.Created, new { id, status = "created" });
+            }
+            case ("GET", _) when path.StartsWith("/api/assets/", StringComparison.Ordinal) && (path.EndsWith("/thumbnail", StringComparison.Ordinal) || path.EndsWith("/original", StringComparison.Ordinal)):
+                MediaRequests.Enqueue(path + request.RequestUri!.Query);
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([0xFF, 0xD8, 0xFF, 0xD9]) };
+            case ("GET", "/api/auth/status"):
+                return Json(HttpStatusCode.OK, new { pinCode = Pin is not null, password = true, isElevated = Elevated });
+            case (_, "/api/auth/pin-code"):
+            case ("POST", "/api/auth/session/unlock"):
+            {
+                // Like Immich (v3): PINs are exactly 6 digits; the current one must match to change, remove or unlock.
+                using var doc = request.Content is null ? JsonDocument.Parse("{}") : JsonDocument.Parse(await request.Content.ReadAsStringAsync(ct));
+                string? Field(string name) => doc.RootElement.TryGetProperty(name, out var v) ? v.GetString() : null;
+                static bool Valid(string? pin) => pin is { Length: 6 } && pin.All(char.IsAsciiDigit);
+                var current = Field("pinCode");
+                var bad = Json(HttpStatusCode.BadRequest, new { message = "Wrong PIN code", statusCode = 400 });
+                switch (request.Method.Method)
+                {
+                    case "POST" when path == "/api/auth/session/unlock":
+                        if (Pin is null || current != Pin)
+                            return bad;
+                        Elevated = true;
+                        return Json(HttpStatusCode.OK, new { });
+                    case "POST":
+                        if (Pin is not null || !Valid(current))
+                            return Json(HttpStatusCode.BadRequest, new { message = "User already has a PIN code", statusCode = 400 });
+                        Pin = current;
+                        return new HttpResponseMessage(HttpStatusCode.NoContent);
+                    case "PUT":
+                        var next = Field("newPinCode");
+                        if (Pin is null || current != Pin || !Valid(next))
+                            return bad;
+                        Pin = next;
+                        return new HttpResponseMessage(HttpStatusCode.NoContent);
+                    case "DELETE":
+                        if (Pin is null || current != Pin)
+                            return bad;
+                        Pin = null;
+                        Elevated = false;
+                        return new HttpResponseMessage(HttpStatusCode.NoContent);
+                }
+                return Json(HttpStatusCode.MethodNotAllowed, new { });
+            }
+            case ("POST", "/api/people/merge"):
+            case ("POST", _) when path.StartsWith("/api/people/", StringComparison.Ordinal) && path.EndsWith("/merge", StringComparison.Ordinal):
+            {
+                if (LegacyMergeOnly && path == "/api/people/merge")
+                    return Json(HttpStatusCode.NotFound, new { message = "Cannot POST /api/people/merge", statusCode = 404 });
+                // Like Immich (zod): "ids", a list of uuids.
+                var body = await request.Content!.ReadAsStringAsync(ct);
+                using var doc = JsonDocument.Parse(body);
+                if (!doc.RootElement.TryGetProperty("ids", out var ids) || ids.ValueKind != JsonValueKind.Array || ids.GetArrayLength() == 0
+                    || ids.EnumerateArray().Any(i => !Guid.TryParse(i.GetString(), out _)))
+                    return Json(HttpStatusCode.BadRequest, new { message = "Validation failed", statusCode = 400 });
+                PeopleMerges.Enqueue(path + " " + body);
+                return Json(HttpStatusCode.OK, ids.EnumerateArray().Select(i => new { id = i.GetString(), success = true }).ToList());
             }
             case ("DELETE", _) when path.StartsWith("/api/people/", StringComparison.Ordinal):
                 PeopleUpdates.Enqueue("DELETE " + path);

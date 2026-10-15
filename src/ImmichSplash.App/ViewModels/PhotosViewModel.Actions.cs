@@ -25,6 +25,7 @@ public sealed partial class PhotosViewModel
         // A PIN prompt closed some other way (Esc) counts as cancelled.
         if (oldValue is PinPanelViewModel pin && newValue is null)
             pin.CloseCommand.Execute(null);
+        (oldValue as IDisposable)?.Dispose();
     }
 
     internal void ShowShare(IReadOnlyList<string> assetIds) =>

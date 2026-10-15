@@ -70,6 +70,22 @@ public class ImageEditTests
     }
 
     [Fact]
+    public async Task Pictures_are_asked_for_as_edited_unless_the_original_is_wanted()
+    {
+        // Immich serves the unedited picture unless asked for the edited one ("edited" defaults to false).
+        var server = new FakeImmichServer();
+        using var client = Client(server);
+        var ct = TestContext.Current.CancellationToken;
+
+        await client.GetAssetImageAsync("a1", AssetImageSize.Thumbnail, ct);
+        await client.GetAssetImageAsync("a1", AssetImageSize.Preview, ct, edited: false);
+        await client.DownloadOriginalAsync("a1", Stream.Null, ct);
+
+        Assert.Equal(["/api/assets/a1/thumbnail?size=thumbnail&edited=true", "/api/assets/a1/thumbnail?size=preview&edited=false", "/api/assets/a1/original?edited=true"],
+            server.MediaRequests.ToArray());
+    }
+
+    [Fact]
     public async Task Edits_can_be_taken_off_again()
     {
         var server = new FakeImmichServer();

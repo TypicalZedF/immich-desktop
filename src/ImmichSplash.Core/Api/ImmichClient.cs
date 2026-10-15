@@ -333,7 +333,8 @@ public sealed class ImmichClient : IDisposable
     }
 
     /// <summary>Thumbnail (~250px) or preview (~1440px) image bytes for an asset.</summary>
-    /// <param name="edited">False: the picture as it was before any edits.</param>
+    /// <param name="edited">False: the picture as it was before any edits. Immich itself defaults to the unedited
+    /// picture, so this always says which one it wants.</param>
     public async Task<byte[]> GetAssetImageAsync(string assetId, AssetImageSize size, CancellationToken ct, bool edited = true)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -346,7 +347,7 @@ public sealed class ImmichClient : IDisposable
         };
         try
         {
-            using var response = await _http.GetAsync($"assets/{Uri.EscapeDataString(assetId)}/thumbnail?size={sizeName}{(edited ? "" : "&edited=false")}", HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            using var response = await _http.GetAsync($"assets/{Uri.EscapeDataString(assetId)}/thumbnail?size={sizeName}&edited={(edited ? "true" : "false")}", HttpCompletionOption.ResponseHeadersRead, cts.Token);
             await EnsureSuccessAsync(response, cts.Token);
             return await response.Content.ReadAsByteArrayAsync(cts.Token);
         }
@@ -435,10 +436,10 @@ public sealed class ImmichClient : IDisposable
         return (url, headers);
     }
 
-    /// <summary>Saves the original file of an asset to <paramref name="destination"/>.</summary>
+    /// <summary>Saves the full-quality file of an asset to <paramref name="destination"/>, with its edits (crop, turn) if it has any.</summary>
     public async Task DownloadOriginalAsync(string assetId, Stream destination, CancellationToken ct)
     {
-        using var response = await _http.GetAsync($"assets/{Uri.EscapeDataString(assetId)}/original", HttpCompletionOption.ResponseHeadersRead, ct);
+        using var response = await _http.GetAsync($"assets/{Uri.EscapeDataString(assetId)}/original?edited=true", HttpCompletionOption.ResponseHeadersRead, ct);
         await EnsureSuccessAsync(response, ct);
         await using var source = await response.Content.ReadAsStreamAsync(ct);
         await source.CopyToAsync(destination, ct);
@@ -513,6 +514,22 @@ public sealed class ImmichClient : IDisposable
     /// </summary>
     public Task DeletePersonAsync(string personId, CancellationToken ct) =>
         SendAsync(HttpMethod.Delete, $"people/{Uri.EscapeDataString(personId)}", null, ct);
+
+    /// <summary>
+    /// Merges people into <paramref name="targetId"/> (the same person found more than once). Can't be undone.
+    /// Immich 3.2.1 and newer take an ordered list (the first one's name wins); older servers the target in the path.
+    /// </summary>
+    public async Task MergePeopleAsync(string targetId, IReadOnlyList<string> ids, CancellationToken ct)
+    {
+        try
+        {
+            await SendAsync(HttpMethod.Post, "people/merge", new MergePeopleRequestDto([targetId, .. ids]), ct);
+        }
+        catch (ImmichApiException ex) when (ex.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.MethodNotAllowed)
+        {
+            await SendAsync(HttpMethod.Post, $"people/{Uri.EscapeDataString(targetId)}/merge", new MergePeopleRequestDto(ids), ct);
+        }
+    }
 
     public async Task<byte[]> GetPersonThumbnailAsync(string personId, CancellationToken ct)
     {
@@ -735,6 +752,20 @@ public sealed class ImmichClient : IDisposable
 
     public Task LockSessionAsync(CancellationToken ct) => SendAsync(HttpMethod.Post, "auth/session/lock", null, ct);
 
+    // The locked folder's PIN (6 digits). SSO accounts have no password, so changing or removing it
+    // always takes the current PIN here; a forgotten one can only be reset by a server admin.
+
+    /// <summary>Creates the PIN (only while the account has none).</summary>
+    public Task SetupPinAsync(string pin, CancellationToken ct) =>
+        SendAsync(HttpMethod.Post, "auth/pin-code", new PinCodeSetupDto(pin), ct);
+
+    public Task ChangePinAsync(string currentPin, string newPin, CancellationToken ct) =>
+        SendAsync(HttpMethod.Put, "auth/pin-code", new PinCodeChangeDto(currentPin, newPin), ct);
+
+    /// <summary>Removes the PIN (the locked folder then can't be opened until a new one is made).</summary>
+    public Task RemovePinAsync(string currentPin, CancellationToken ct) =>
+        SendAsync(HttpMethod.Delete, "auth/pin-code", new PinCodeResetDto(currentPin), ct);
+
     // ---- Sharing -----------------------------------------------------------------------------
 
     /// <summary>Links you've shared, newest first.</summary>
@@ -749,7 +780,8 @@ public sealed class ImmichClient : IDisposable
                 : isAlbum ? l.Album?.AlbumName ?? ""
                 : "";
             var cover = isAlbum ? l.Album?.AlbumThumbnailAssetId : l.Assets?.FirstOrDefault()?.Id;
-            return new SharedLinkSummary(l.Id, l.Key, isAlbum, title, cover, count, l.CreatedAt, l.ExpiresAt, l.AllowDownload, isAlbum ? l.Album?.Id : null);
+            return new SharedLinkSummary(l.Id, l.Key, isAlbum, title, cover, count, l.CreatedAt, l.ExpiresAt, l.AllowDownload, isAlbum ? l.Album?.Id : null,
+                isAlbum ? null : l.Assets?.Select(a => a.Id).ToList());
         }).OrderByDescending(l => l.CreatedAt).ToList();
     }
 

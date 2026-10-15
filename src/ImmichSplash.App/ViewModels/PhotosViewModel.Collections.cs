@@ -36,7 +36,7 @@ public sealed partial class PhotosViewModel
                 {
                     await client.UpdatePersonAsync(person.Id, name, CancellationToken.None);
                     ShowNotice(Tr.T("Named them {0}", name));
-                    _ = LoadPeopleAsync();
+                    ReplacePerson(person.Id, person with { Name = name });
                     return null;
                 }
                 catch (Exception ex)
@@ -63,12 +63,71 @@ public sealed partial class PhotosViewModel
         {
             await client.DeletePersonAsync(person.Id, CancellationToken.None);
             ShowNotice(Tr.T("Discarded {0}", who));
-            _ = LoadPeopleAsync();
+            ReplacePerson(person.Id, null);
         }
         catch (Exception ex)
         {
             ShowNotice(Tr.T("Couldn't discard that. {0}", NetworkErrors.Describe(ex)));
         }
+    }
+
+    /// <summary>Merges a person into someone else (picked on a dialog that warns it can't be undone).</summary>
+    internal void MergePerson(PersonInfo person)
+    {
+        if (_main is null)
+            return;
+        var people = (_allPeople.Count > 0 ? _allPeople : People.ToList()).Select(p => p.Person);
+        _main.ShowOverlay(new MergePeopleViewModel(this, _main, person, people, Thumbnails));
+    }
+
+    internal void OnPeopleMerged(PersonInfo merged, PersonInfo into)
+    {
+        ShowNotice(Tr.T("Merged into {0}", into.Name.Length > 0 ? $"“{into.Name}”" : Tr.T("the other face")));
+        ReplacePerson(merged.Id, null);
+    }
+
+    /// <summary>
+    /// Changes one person's card where it is (or takes it away with null), without reloading the list: it stays
+    /// expanded after "Show all" and nothing jumps.
+    /// </summary>
+    void ReplacePerson(string personId, PersonInfo? updated)
+    {
+        PersonCardViewModel? old = null;
+        PersonCardViewModel? fresh = null;
+        if (updated is not null)
+            fresh = new PersonCardViewModel(this, updated);
+        foreach (var list in new IList<PersonCardViewModel>[] { People, _allPeople })
+        {
+            var index = -1;
+            for (var i = 0; i < list.Count; i++)
+                if (list[i].Person.Id == personId)
+                    index = i;
+            if (index < 0)
+                continue;
+            old ??= list[index];
+            if (fresh is null)
+                list.RemoveAt(index);
+            else
+                list[index] = fresh;
+        }
+        if (old is null)
+            return;
+        if (fresh is not null)
+        {
+            fresh.Cover = old.Cover; // same face: keep the picture
+            old.Cover = null;
+        }
+        old.Dispose();
+        // Discarding from the preview pulls the next face in.
+        if (fresh is null && HasMorePeople && People.Count < ExplorePreview && _allPeople.Count > People.Count)
+        {
+            var next = _allPeople[People.Count];
+            People.Add(next);
+            LoadCovers([next]);
+            HasMorePeople = _allPeople.Count > People.Count;
+        }
+        if (_allPeople.Count == 0)
+            PeopleMessage = Tr.T("No people yet. Immich finds faces when machine learning is turned on in your server settings.");
     }
 
     [ObservableProperty]
@@ -131,12 +190,13 @@ public sealed partial class PhotosViewModel
         try
         {
             var items = await load(client);
+            var expanded = all is { Count: > ExplorePreview } && shown.Count == all.Count;
             foreach (var old in shown.Concat(all ?? []).Distinct())
                 old.Dispose();
             shown.Clear();
             all?.Clear();
             all?.AddRange(items);
-            var preview = all is null ? items : items.Take(ExplorePreview).ToList();
+            var preview = all is null || expanded ? items : items.Take(ExplorePreview).ToList();
             foreach (var item in preview)
                 shown.Add(item);
             setHasMore?.Invoke(items.Count > preview.Count);
@@ -294,6 +354,7 @@ public sealed partial class PhotosViewModel
         try
         {
             await client.DeleteSharedLinkAsync(link.Link.Id, CancellationToken.None);
+            ForgetLink(link.Link.Id);
             SharedLinks.Remove(link);
             link.Dispose();
             if (SharedLinks.Count == 0)

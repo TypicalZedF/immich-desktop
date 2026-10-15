@@ -84,7 +84,9 @@ public partial class PhotosView : UserControl
         var layer = this.FindControl<Panel>("ViewerLayer")!;
         layer.AddHandler(PointerMovedEvent, (_, _) => WakeVideoControls(), RoutingStrategies.Tunnel, handledEventsToo: true);
         layer.AddHandler(PointerPressedEvent, (_, _) => WakeVideoControls(), RoutingStrategies.Tunnel, handledEventsToo: true);
-        _controlsIdle = new Avalonia.Threading.DispatcherTimer(TimeSpan.FromMilliseconds(2500), Avalonia.Threading.DispatcherPriority.Background, (_, _) => HideVideoControls());
+        // Playing video: the controls fade out soon after the pointer stops, and at once when it leaves the viewer.
+        _controlsIdle = new Avalonia.Threading.DispatcherTimer(TimeSpan.FromMilliseconds(1400), Avalonia.Threading.DispatcherPriority.Background, (_, _) => HideVideoControls());
+        layer.PointerExited += (_, _) => HideVideoControls();
 
         // The "..." button opens its menu on a click.
         var more = this.FindControl<Button>("ViewerMoreButton")!;
@@ -489,6 +491,20 @@ public partial class PhotosView : UserControl
     /// <summary>The video bitmap is redrawn in place; tell the image to repaint.</summary>
     void OnVideoFrame() => _videoSurface.InvalidateVisual();
 
+    /// <summary>The viewer's right-click menu: only for photos you can act on (not files only on this PC, not read-only reviews).</summary>
+    void OnViewerMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (sender is ContextMenu { DataContext: not ViewModels.PhotoViewerViewModel { CanEdit: true } })
+            e.Cancel = true;
+    }
+
+    /// <summary>A tile's right-click menu: not for files only on this PC, nor while picking a profile picture.</summary>
+    void OnTileMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (sender is ContextMenu { DataContext: not ViewModels.AssetCellViewModel { HasMenu: true } })
+            e.Cancel = true;
+    }
+
     Avalonia.Threading.DispatcherTimer? _controlsIdle;
 
     void WakeVideoControls()
@@ -504,9 +520,14 @@ public partial class PhotosView : UserControl
     void HideVideoControls()
     {
         _controlsIdle?.Stop();
-        // Not while the pointer is on the controls or the bar is being dragged.
-        if (_viewer is null || !_viewer.IsVideoPlaying || _viewer.IsScrubbing || this.FindControl<Border>("VideoControls")?.IsPointerOver == true)
+        if (_viewer is null || !_viewer.IsVideoPlaying)
             return;
+        // Not while the pointer is on the controls or the bar is being dragged: look again a moment later.
+        if (_viewer.IsScrubbing || this.FindControl<Border>("VideoControls")?.IsPointerOver == true)
+        {
+            _controlsIdle?.Start();
+            return;
+        }
         _viewer.ControlsAwake = false;
         this.FindControl<Panel>("ViewerLayer")!.Cursor = new Cursor(StandardCursorType.None);
     }

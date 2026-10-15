@@ -61,6 +61,29 @@ public sealed partial class PhotosViewModel
         Thumbnails?.Forget(assetId);
         ShowNotice(message);
         _ = LoadGridAsync();
+        _ = RefreshEditedAsync(assetId);
+    }
+
+    /// <summary>
+    /// Immich makes the edited thumbnails in a background job, so just after saving it can still hand out the old
+    /// ones: fetch that photo's pictures again a little later (twice, for a busy server).
+    /// </summary>
+    async Task RefreshEditedAsync(string assetId)
+    {
+        foreach (var wait in new[] { TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(10) })
+        {
+            try
+            {
+                await Task.Delay(wait, _lifetime.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            Thumbnails?.Forget(assetId);
+            foreach (var cell in VisibleCells.Where(c => c.Asset?.Id == assetId && c.Thumbnail is not null).ToList())
+                cell.ReloadThumbnail();
+        }
     }
 
     /// <summary>Shows photos that look like this one.</summary>

@@ -131,6 +131,9 @@ public sealed class PersonCardViewModel(PhotosViewModel owner, PersonInfo person
 
     public IRelayCommand DiscardCommand => _discard ??= new AsyncRelayCommand(() => Owner.DiscardPersonAsync(Person));
     IRelayCommand? _discard;
+
+    public IRelayCommand MergeCommand => _merge ??= new RelayCommand(() => Owner.MergePerson(Person));
+    IRelayCommand? _merge;
 }
 
 public sealed class PlaceCardViewModel(PhotosViewModel owner, PlaceInfo place) : LibraryCardViewModel(owner)
@@ -208,6 +211,7 @@ public sealed partial class SharePanelViewModel : ViewModelBase
             var web = AppServices.Settings.Current.WebUrl ?? client.ApiUrl.ToString();
             var baseUrl = await client.GetShareBaseUrlAsync(web, CancellationToken.None);
             Link = $"{baseUrl}/share/{link.Key}";
+            _owner.OnLinkCreated();
             await CopyAsync();
         }
         catch (ImmichApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
@@ -245,11 +249,50 @@ public sealed partial class SharePanelViewModel : ViewModelBase
     void Close() => _owner.ClosePanel(this);
 }
 
-/// <summary>Adds photos to an existing album or a new one.</summary>
-public sealed partial class AlbumPickerViewModel : ViewModelBase
+/// <summary>An album on the "Add to album" list, with its cover.</summary>
+public sealed partial class AlbumChoiceViewModel(AlbumInfo album, bool isRecent) : ObservableObject, IDisposable
+{
+    public AlbumInfo Album { get; } = album;
+    public bool IsRecent { get; } = isRecent;
+    public string Count => Format.Plural(Album.AssetCount, "item");
+
+    [ObservableProperty]
+    public partial Bitmap? Cover { get; set; }
+
+    internal async Task LoadCoverAsync(ThumbnailLoader loader, CancellationToken ct)
+    {
+        if (Album.AlbumThumbnailAssetId is not { } id)
+            return;
+        try
+        {
+            Cover = await loader.LoadAsync(id, AssetImageSize.Thumbnail, 80, ct);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Log.Info($"Album cover failed: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        Cover?.Dispose();
+        Cover = null;
+    }
+}
+
+/// <summary>
+/// Adds photos to an album: one box both searches your albums and names a new one (the list offers to create it
+/// when nothing is called that yet). Albums you used lately come first.
+/// </summary>
+public sealed partial class AlbumPickerViewModel : ViewModelBase, IDisposable
 {
     readonly PhotosViewModel _owner;
     readonly IReadOnlyList<string> _assetIds;
+    readonly List<AlbumChoiceViewModel> _all = [];
+    readonly CancellationTokenSource _lifetime = new();
 
     public AlbumPickerViewModel(PhotosViewModel owner, IReadOnlyList<string> assetIds)
     {
@@ -260,10 +303,31 @@ public sealed partial class AlbumPickerViewModel : ViewModelBase
 
     public string What => Format.Plural(_assetIds.Count, "photo");
 
-    public ObservableCollection<AlbumInfo> Albums { get; } = [];
+    /// <summary>Recently used albums (when not searching).</summary>
+    public ObservableCollection<AlbumChoiceViewModel> Recent { get; } = [];
+
+    /// <summary>All albums, or the ones matching the search.</summary>
+    public ObservableCollection<AlbumChoiceViewModel> Albums { get; } = [];
 
     [ObservableProperty]
-    public partial string NewAlbumName { get; set; } = "";
+    [NotifyPropertyChangedFor(nameof(CanCreate), nameof(CreateText), nameof(IsSearching))]
+    public partial string SearchText { get; set; } = "";
+
+    partial void OnSearchTextChanged(string value) => Filter();
+
+    public bool IsSearching => SearchText.Trim().Length > 0;
+
+    /// <summary>Offer "Create “name”" when no album is called exactly that.</summary>
+    public bool CanCreate => SearchText.Trim() is { Length: > 0 } name
+        && !_all.Any(a => string.Equals(a.Album.AlbumName, name, StringComparison.CurrentCultureIgnoreCase));
+
+    public string CreateText => Tr.T("Create “{0}”", SearchText.Trim());
+
+    [ObservableProperty]
+    public partial bool HasRecent { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsEmpty { get; set; }
 
     [ObservableProperty]
     public partial bool IsWorking { get; set; } = true;
@@ -276,8 +340,22 @@ public sealed partial class AlbumPickerViewModel : ViewModelBase
         try
         {
             if (AppServices.Account.Client is { } client)
-                foreach (var album in (await client.GetAlbumsAsync(CancellationToken.None)).OrderBy(a => a.AlbumName, StringComparer.CurrentCultureIgnoreCase))
-                    Albums.Add(album);
+            {
+                var albums = await client.GetAlbumsAsync(_lifetime.Token);
+                var recentIds = AppServices.Settings.Current.RecentAlbumIds.Take(4).ToList();
+                foreach (var album in albums.OrderBy(a => a.AlbumName, StringComparer.CurrentCultureIgnoreCase))
+                    _all.Add(new AlbumChoiceViewModel(album, recentIds.Contains(album.Id)));
+                if (_owner.Thumbnails is { } loader)
+                    foreach (var choice in _all)
+                        _ = choice.LoadCoverAsync(loader, _lifetime.Token);
+                foreach (var id in recentIds)
+                    if (_all.FirstOrDefault(a => a.Album.Id == id) is { } recent)
+                        Recent.Add(recent);
+                Filter();
+            }
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex)
         {
@@ -289,18 +367,42 @@ public sealed partial class AlbumPickerViewModel : ViewModelBase
         }
     }
 
-    [RelayCommand]
-    Task AddTo(AlbumInfo album) => RunAsync(async client =>
+    void Filter()
     {
-        await client.AddAssetsToAlbumAsync(album.Id, _assetIds, CancellationToken.None);
-        PhotosViewModel.RememberAlbum(album.Id);
-        return album.AlbumName;
+        var text = SearchText.Trim();
+        Albums.Clear();
+        foreach (var a in _all.Where(a => text.Length == 0 || a.Album.AlbumName.Contains(text, StringComparison.CurrentCultureIgnoreCase)))
+            Albums.Add(a);
+        HasRecent = text.Length == 0 && Recent.Count > 0;
+        IsEmpty = Albums.Count == 0 && !CanCreate && !IsWorking;
+        OnPropertyChanged(nameof(CanCreate));
+    }
+
+    /// <summary>Enter in the box: the only match, or a new album by that name.</summary>
+    [RelayCommand]
+    Task Submit()
+    {
+        if (CanCreate)
+            return Create();
+        if (IsSearching && Albums.Count == 1)
+            return AddTo(Albums[0]);
+        if (IsSearching && Albums.FirstOrDefault(a => string.Equals(a.Album.AlbumName, SearchText.Trim(), StringComparison.CurrentCultureIgnoreCase)) is { } exact)
+            return AddTo(exact);
+        return Task.CompletedTask;
+    }
+
+    [RelayCommand]
+    Task AddTo(AlbumChoiceViewModel choice) => RunAsync(async client =>
+    {
+        await client.AddAssetsToAlbumAsync(choice.Album.Id, _assetIds, CancellationToken.None);
+        PhotosViewModel.RememberAlbum(choice.Album.Id);
+        return choice.Album.AlbumName;
     });
 
     [RelayCommand]
     Task Create()
     {
-        var name = NewAlbumName.Trim();
+        var name = SearchText.Trim();
         if (name.Length == 0)
             return Task.CompletedTask;
         return RunAsync(async client =>
@@ -310,6 +412,13 @@ public sealed partial class AlbumPickerViewModel : ViewModelBase
             AppServices.RaiseAlbumsChanged();
             return name;
         });
+    }
+
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        foreach (var choice in _all)
+            choice.Dispose();
     }
 
     async Task RunAsync(Func<ImmichClient, Task<string>> action)

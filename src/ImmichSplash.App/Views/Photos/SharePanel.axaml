@@ -124,28 +124,73 @@
                   <mi:MaterialIcon Kind="Close" Width="20" Height="20" />
                 </Button>
               </Grid>
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBox Text="{Binding NewAlbumName}" l:Tr.Watermark="New album name">
-                  <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding CreateCommand}" /></TextBox.KeyBindings>
-                </TextBox>
-                <Button Grid.Column="1" Classes="primary" Margin="8,0,0,0" l:Tr.Content="Create" Command="{Binding CreateCommand}" IsEnabled="{Binding !IsWorking}" />
-              </Grid>
-              <TextBlock Classes="section" l:Tr.Text="YOUR ALBUMS" Margin="0,6,0,0" />
-              <ScrollViewer MaxHeight="300" HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl ItemsSource="{Binding Albums}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="api:AlbumInfo">
-                      <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,8"
-                              Command="{Binding $parent[ItemsControl].((vm:AlbumPickerViewModel)DataContext).AddToCommand}" CommandParameter="{Binding}">
-                        <Grid ColumnDefinitions="Auto,*,Auto">
-                          <mi:MaterialIcon Kind="ImageAlbum" Width="18" Height="18" Margin="0,0,10,0" />
-                          <TextBlock Grid.Column="1" Text="{Binding AlbumName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                          <TextBlock Grid.Column="2" Classes="caption" Text="{Binding AssetCount}" VerticalAlignment="Center" Margin="10,0,0,0" />
+              <TextBox Name="AlbumSearch" Text="{Binding SearchText}" l:Tr.Watermark="Search or create an album" AutomationProperties.Name="Search or create an album">
+                <TextBox.InnerLeftContent>
+                  <mi:MaterialIcon Kind="Magnify" Width="18" Height="18" Margin="10,0,0,0" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                </TextBox.InnerLeftContent>
+                <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding SubmitCommand}" /></TextBox.KeyBindings>
+              </TextBox>
+              <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="4">
+                  <!-- New album named after what you typed -->
+                  <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8,6" CornerRadius="12"
+                          Command="{Binding CreateCommand}" IsVisible="{Binding CanCreate}">
+                    <Grid ColumnDefinitions="Auto,*">
+                      <Border Width="40" Height="40" CornerRadius="8" Background="{DynamicResource AppPrimarySoftBrush}">
+                        <mi:MaterialIcon Kind="Plus" Width="20" Height="20" Foreground="{DynamicResource AppPrimaryBrush}" />
+                      </Border>
+                      <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding CreateText}" FontWeight="Medium"
+                                 Foreground="{DynamicResource AppPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                  </Button>
+                  <TextBlock Classes="section" l:Tr.Text="RECENT" Margin="8,4,0,2" IsVisible="{Binding HasRecent}" />
+                  <ItemsControl ItemsSource="{Binding Recent}" IsVisible="{Binding HasRecent}">
+                    <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AlbumChoiceViewModel">
+                      <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8,6" CornerRadius="12"
+                              Command="{Binding $parent[ItemsControl].((vm:AlbumPickerViewModel)DataContext).AddToCommand}" CommandParameter="{Binding}"
+                              AutomationProperties.Name="{Binding Album.AlbumName}">
+                        <Grid ColumnDefinitions="Auto,*">
+                          <Border Width="40" Height="40" CornerRadius="8" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
+                            <Panel>
+                              <mi:MaterialIcon Kind="ImageAlbum" Width="18" Height="18" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                              <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                            </Panel>
+                          </Border>
+                          <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock Text="{Binding Album.AlbumName}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Classes="caption" Text="{Binding Count}" />
+                          </StackPanel>
                         </Grid>
                       </Button>
                     </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Classes="section" l:Tr.Text="ALL ALBUMS" Margin="8,8,0,2" IsVisible="{Binding !IsSearching}" />
+                  <ItemsControl ItemsSource="{Binding Albums}">
+                    <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AlbumChoiceViewModel">
+                      <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8,6" CornerRadius="12"
+                              Command="{Binding $parent[ItemsControl].((vm:AlbumPickerViewModel)DataContext).AddToCommand}" CommandParameter="{Binding}"
+                              AutomationProperties.Name="{Binding Album.AlbumName}">
+                        <Grid ColumnDefinitions="Auto,*">
+                          <Border Width="40" Height="40" CornerRadius="8" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
+                            <Panel>
+                              <mi:MaterialIcon Kind="ImageAlbum" Width="18" Height="18" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                              <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                            </Panel>
+                          </Border>
+                          <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock Text="{Binding Album.AlbumName}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Classes="caption" Text="{Binding Count}" />
+                          </StackPanel>
+                        </Grid>
+                      </Button>
+                    </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Classes="secondary" Margin="8" l:Tr.Text="No albums yet. Type a name to create one." IsVisible="{Binding IsEmpty}" />
+                </StackPanel>
               </ScrollViewer>
               <mi:MaterialIcon Kind="Loading" Classes="spin" Width="22" Height="22" IsVisible="{Binding IsWorking}" HorizontalAlignment="Center" />
               <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding Error}" TextWrapping="Wrap"

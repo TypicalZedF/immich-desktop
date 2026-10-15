@@ -99,6 +99,7 @@ public sealed partial class PhotosViewModel
 
         _gridLoad?.Cancel();
         var cts = _gridLoad = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _ = LoadShareIndexAsync();
         var query = CurrentQuery;
         IsLoading = true;
         IsEmpty = false;

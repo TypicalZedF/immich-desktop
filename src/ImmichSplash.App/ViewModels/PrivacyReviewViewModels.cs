@@ -501,7 +501,7 @@ public sealed partial class PrivacyReviewViewModel : ViewModelBase, IDisposable
         {
             if (!(await client.GetAuthStatusAsync(CancellationToken.None)).HasPin)
             {
-                _owner.ShowNotice(Tr.T("Set up a PIN code in Immich first (Account settings → PIN code), then come back here."));
+                _owner.ShowNotice(Tr.T("Open the Locked folder first to create a PIN, then try again."));
                 return;
             }
         }

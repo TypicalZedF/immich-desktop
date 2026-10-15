@@ -6,8 +6,8 @@
              xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="ImmichSplash.App.Views.Photos.UtilitiesSection"
              x:DataType="vm:PhotosViewModel">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="28,4,10,24">
-    <StackPanel Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="28,4,10,24" Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
       <Border Classes="card" Padding="8,14,8,8" CornerRadius="20">
         <StackPanel Spacing="2">
           <TextBlock Classes="caption" l:Tr.Text="Organize your library" Margin="14,0,0,6" />

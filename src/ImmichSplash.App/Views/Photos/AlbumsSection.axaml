@@ -15,8 +15,8 @@
     </Style>
   </UserControl.Styles>
   <DockPanel>
-    <!-- Toolbar: what you look at on the left (filter, search); what you do and how it's arranged on the right.
-         On a narrow window the right side drops to its own line, still on the right. -->
+    <!-- Toolbar: what you look at on the left (filter, search); how it's arranged on the right ("Create album"
+         is in the page header). When both don't fit on one line, the right side drops to its own line. -->
     <Grid Name="Toolbar" DockPanel.Dock="Top" Margin="28,4,10,10" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
       <StackPanel Name="ToolbarLeft" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="0,0,16,0">
         <Border Classes="segmented" VerticalAlignment="Center">
@@ -26,19 +26,14 @@
             <RadioButton Classes="segment" GroupName="albumFilter" l:Tr.Content="Shared" IsChecked="{Binding IsFilterShared, Mode=OneWay}" Command="{Binding ShowSharedAlbumsCommand}" />
           </StackPanel>
         </Border>
-        <TextBox Width="240" Text="{Binding AlbumSearchText}" l:Tr.Watermark="Search albums" VerticalAlignment="Center" AutomationProperties.Name="Search albums" />
+        <TextBox Width="260" Text="{Binding AlbumSearchText}" l:Tr.Watermark="Search albums" VerticalAlignment="Center" AutomationProperties.Name="Search albums">
+          <TextBox.InnerLeftContent>
+            <mi:MaterialIcon Kind="Magnify" Width="18" Height="18" Margin="10,0,0,0" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+          </TextBox.InnerLeftContent>
+        </TextBox>
       </StackPanel>
 
       <StackPanel Name="ToolbarRight" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Right">
-        <Button Classes="secondary" Command="{Binding CreateAlbumCommand}" VerticalAlignment="Center">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <mi:MaterialIcon Kind="Plus" Width="16" Height="16" />
-            <TextBlock l:Tr.Text="Create album" />
-          </StackPanel>
-        </Button>
-
-        <Border Classes="toolbarDivider" />
-
         <Button Classes="ghost icon" Command="{Binding ToggleAlbumSortDirectionCommand}" l:Tr.Tip="Reverse the order" AutomationProperties.Name="Reverse the order">
           <mi:MaterialIcon Kind="{Binding AlbumSortIcon}" Width="18" Height="18" />
         </Button>
@@ -74,8 +69,8 @@
     <TextBlock DockPanel.Dock="Top" Classes="secondary" Margin="28,12,10,0" Text="{Binding AlbumsEmptyText}"
                IsVisible="{Binding AlbumsEmptyText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="28,0,10,24">
-      <ItemsControl ItemsSource="{Binding AlbumGroups}">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <ItemsControl Margin="28,0,10,24" ItemsSource="{Binding AlbumGroups}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:AlbumGroupViewModel">
             <StackPanel Spacing="8" Margin="0,0,0,14">
@@ -97,11 +92,12 @@
                     <Button Classes="cover" Width="196" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Title}">
                       <Button.ContextMenu>
                         <ContextMenu>
-                          <MenuItem l:Tr.Header="Open" Command="{Binding OpenCommand}" />
-                          <MenuItem l:Tr.Header="Edit album" Command="{Binding EditCommand}" IsVisible="{Binding CanDelete}" />
-                          <MenuItem l:Tr.Header="Share" Command="{Binding ShareCommand}" IsVisible="{Binding CanDelete}" />
-                          <MenuItem l:Tr.Header="Download" Command="{Binding DownloadCommand}" />
-                          <MenuItem l:Tr.Header="Delete album" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" />
+                          <MenuItem l:Tr.Header="Open" Command="{Binding OpenCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="FolderOpenOutline" /></MenuItem.Icon></MenuItem>
+                          <MenuItem l:Tr.Header="Edit album" Command="{Binding EditCommand}" IsVisible="{Binding CanDelete}"><MenuItem.Icon><mi:MaterialIcon Kind="PencilOutline" /></MenuItem.Icon></MenuItem>
+                          <MenuItem l:Tr.Header="Share" Command="{Binding ShareCommand}" IsVisible="{Binding CanDelete}"><MenuItem.Icon><mi:MaterialIcon Kind="ShareVariantOutline" /></MenuItem.Icon></MenuItem>
+                          <MenuItem l:Tr.Header="Download" Command="{Binding DownloadCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="TrayArrowDown" /></MenuItem.Icon></MenuItem>
+                          <Separator IsVisible="{Binding CanDelete}" />
+                          <MenuItem l:Tr.Header="Delete album" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}"><MenuItem.Icon><mi:MaterialIcon Kind="TrashCanOutline" /></MenuItem.Icon></MenuItem>
                         </ContextMenu>
                       </Button.ContextMenu>
                       <StackPanel Spacing="8">
@@ -134,11 +130,12 @@
                             AutomationProperties.Name="{Binding Title}">
                       <Button.ContextMenu>
                         <ContextMenu>
-                          <MenuItem l:Tr.Header="Open" Command="{Binding OpenCommand}" />
-                          <MenuItem l:Tr.Header="Edit album" Command="{Binding EditCommand}" IsVisible="{Binding CanDelete}" />
-                          <MenuItem l:Tr.Header="Share" Command="{Binding ShareCommand}" IsVisible="{Binding CanDelete}" />
-                          <MenuItem l:Tr.Header="Download" Command="{Binding DownloadCommand}" />
-                          <MenuItem l:Tr.Header="Delete album" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" />
+                          <MenuItem l:Tr.Header="Open" Command="{Binding OpenCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="FolderOpenOutline" /></MenuItem.Icon></MenuItem>
+                          <MenuItem l:Tr.Header="Edit album" Command="{Binding EditCommand}" IsVisible="{Binding CanDelete}"><MenuItem.Icon><mi:MaterialIcon Kind="PencilOutline" /></MenuItem.Icon></MenuItem>
+                          <MenuItem l:Tr.Header="Share" Command="{Binding ShareCommand}" IsVisible="{Binding CanDelete}"><MenuItem.Icon><mi:MaterialIcon Kind="ShareVariantOutline" /></MenuItem.Icon></MenuItem>
+                          <MenuItem l:Tr.Header="Download" Command="{Binding DownloadCommand}"><MenuItem.Icon><mi:MaterialIcon Kind="TrayArrowDown" /></MenuItem.Icon></MenuItem>
+                          <Separator IsVisible="{Binding CanDelete}" />
+                          <MenuItem l:Tr.Header="Delete album" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}"><MenuItem.Icon><mi:MaterialIcon Kind="TrashCanOutline" /></MenuItem.Icon></MenuItem>
                         </ContextMenu>
                       </Button.ContextMenu>
                       <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="2,4">

@@ -140,10 +140,30 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     public string? Place => Details?.Place;
     public string? Description => Details?.Description;
     public string? People => Details is { People.Count: > 0 } d ? string.Join(", ", d.People) : null;
+    public IReadOnlyList<string> PeopleList => Details?.People ?? [];
+
+    // ---- Public links to this photo ----
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsShared), nameof(SharedText))]
+    public partial IReadOnlyList<SharedLinkViewModel> ShareLinks { get; set; } = [];
+
+    public bool IsShared => ShareLinks.Count > 0;
+    public string SharedText => ShareLinks.Count == 1 ? Tr.T("Shared") : Tr.T("Shared · {0} links", ShareLinks.Count);
+
+    internal void RefreshSharing() => ShareLinks = _readOnly || Asset.IsLocalOnly ? [] : _owner.LinksFor(Asset.Id);
+
+    /// <summary>The "Shared" chip: shows the links in the info panel.</summary>
+    [RelayCommand]
+    void ShowSharing()
+    {
+        if (!ShowInfo)
+            ToggleInfo();
+    }
 
     partial void OnDetailsChanged(AssetDetails? value)
     {
-        foreach (var name in new[] { nameof(FileName), nameof(Dimensions), nameof(Camera), nameof(Lens), nameof(Exposure), nameof(Place), nameof(Description), nameof(People) })
+        foreach (var name in new[] { nameof(FileName), nameof(Dimensions), nameof(Camera), nameof(Lens), nameof(Exposure), nameof(Place), nameof(Description), nameof(People), nameof(PeopleList) })
             OnPropertyChanged(name);
     }
 
@@ -156,6 +176,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
             : "";
         Error = null;
         Details = null;
+        RefreshSharing();
         VideoProgress = null;
         VideoError = null;
         StopVideo();

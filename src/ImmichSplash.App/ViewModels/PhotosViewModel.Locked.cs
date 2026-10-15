@@ -37,7 +37,66 @@ public sealed partial class PhotosViewModel
         }
         OnPropertyChanged(nameof(PinBoxes));
         if (digits.Length == PinLength && CanEnterPin && !IsUnlocking)
-            _ = UnlockAsync();
+            _ = IsCreatingPin ? CreatePinStepAsync() : UnlockAsync();
+    }
+
+    // ---- No PIN yet: make one right here (typed twice), then the folder opens ----
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PinPrompt))]
+    public partial bool IsCreatingPin { get; set; }
+
+    string? _firstPin;
+
+    public string PinPrompt => !IsCreatingPin ? Tr.T("Enter your PIN code to access the locked folder")
+        : _firstPin is null ? Tr.T("Create a 6-digit PIN for the locked folder")
+        : Tr.T("Type the same PIN again to confirm");
+
+    async Task CreatePinStepAsync()
+    {
+        if (_firstPin is null)
+        {
+            _firstPin = Pin;
+            Pin = "";
+            LockedMessage = null;
+            OnPropertyChanged(nameof(PinPrompt));
+            return;
+        }
+        if (Pin != _firstPin)
+        {
+            _firstPin = null;
+            Pin = "";
+            LockedMessage = Tr.T("Those didn't match. Start again.");
+            OnPropertyChanged(nameof(PinPrompt));
+            return;
+        }
+        if (Client is not { } client)
+            return;
+        IsUnlocking = true;
+        try
+        {
+            var pin = Pin;
+            await client.SetupPinAsync(pin, CancellationToken.None);
+            await client.UnlockSessionAsync(pin, CancellationToken.None);
+            _firstPin = null;
+            Pin = "";
+            IsCreatingPin = false;
+            ShowNotice(Tr.T("PIN created. You can change it in Settings."));
+            IsUnlocked = true;
+            await LoadGridAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Could not create the PIN", ex);
+            _firstPin = null;
+            Pin = "";
+            LockedMessage = Tr.T("Couldn't create the PIN. {0}", NetworkErrors.Describe(ex));
+            OnPropertyChanged(nameof(PinPrompt));
+        }
+        finally
+        {
+            IsUnlocking = false;
+        }
     }
 
     partial void OnCanEnterPinChanged(bool value) => OnPropertyChanged(nameof(PinBoxes));
@@ -50,6 +109,8 @@ public sealed partial class PhotosViewModel
     [RelayCommand]
     void CancelPin()
     {
+        _firstPin = null;
+        OnPropertyChanged(nameof(PinPrompt));
         Pin = "";
         LockedMessage = null;
         LeaveRequested?.Invoke();
@@ -71,11 +132,7 @@ public sealed partial class PhotosViewModel
         try
         {
             var status = await client.GetAuthStatusAsync(_lifetime.Token);
-            if (!status.HasPin)
-            {
-                LockedMessage = Tr.T("Set up a PIN code in Immich first (Account settings → PIN code), then come back here.");
-                return;
-            }
+            IsCreatingPin = !status.HasPin;
             if (status.IsElevated)
             {
                 IsUnlocked = true;
@@ -161,7 +218,7 @@ public sealed partial class PhotosViewModel
                 return true;
             if (!status.HasPin)
             {
-                ShowNotice(Tr.T("Set up a PIN code in Immich first (Account settings → PIN code), then come back here."));
+                ShowNotice(Tr.T("Open the Locked folder first to create a PIN, then try again."));
                 return false;
             }
         }

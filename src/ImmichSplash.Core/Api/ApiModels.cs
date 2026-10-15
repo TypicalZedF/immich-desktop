@@ -101,7 +101,7 @@ public sealed record TimelineFilter(string? AlbumId = null, string? PersonId = n
 
 /// <summary>A public link you created (to photos or an album).</summary>
 public sealed record SharedLinkSummary(string Id, string Key, bool IsAlbum, string Title, string? CoverAssetId, int AssetCount,
-    DateTimeOffset? CreatedAt, DateTimeOffset? ExpiresAt, bool AllowDownload, string? AlbumId = null)
+    DateTimeOffset? CreatedAt, DateTimeOffset? ExpiresAt, bool AllowDownload, string? AlbumId = null, IReadOnlyList<string>? AssetIds = null)
 {
     public bool IsExpired => ExpiresAt is { } e && e < DateTimeOffset.Now;
 }
@@ -229,6 +229,7 @@ internal sealed record TimeBucketAssetsDto(
 internal sealed record WellKnownDto(WellKnownApiDto? Api);
 internal sealed record PeopleResponseDto(List<PersonDto>? People, bool? HasNextPage);
 internal sealed record UpdatePersonRequestDto(string Name);
+internal sealed record MergePeopleRequestDto(IReadOnlyList<string> Ids);
 internal sealed record AssetEditItemDto(string Action, object Parameters);
 internal sealed record AssetEditsRequestDto(List<AssetEditItemDto> Edits);
 internal sealed record AssetSizeDto(int? Width, int? Height, bool? IsEdited, AssetSizeExifDto? ExifInfo);
@@ -311,4 +312,7 @@ internal sealed record DuplicateGroupDto(string DuplicateId, List<AssetDto> Asse
 internal sealed record ClearDuplicateDto(IReadOnlyList<string> Ids,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)] string? DuplicateId);
 internal sealed record SessionUnlockDto(string PinCode);
+internal sealed record PinCodeSetupDto(string PinCode);
+internal sealed record PinCodeChangeDto(string PinCode, string NewPinCode);
+internal sealed record PinCodeResetDto(string PinCode);
 internal sealed record WellKnownApiDto(string? Endpoint);

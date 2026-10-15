@@ -19,6 +19,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     readonly ShellViewModel _shell;
     readonly bool _loading;
 
+    /// <summary>The locked folder's PIN (Security).</summary>
+    public LockedPinSettingsViewModel LockedPin { get; } = new();
+
     public SettingsViewModel(ShellViewModel shell)
     {
         _shell = shell;

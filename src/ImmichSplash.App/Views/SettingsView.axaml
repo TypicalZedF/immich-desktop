@@ -363,6 +363,57 @@
               </StackPanel>
             </Button>
           </Grid>
+
+          <!-- The locked folder's PIN (the Immich account's, so it works in the web and mobile apps too) -->
+          <Border Classes="divider" />
+          <StackPanel DataContext="{Binding LockedPin}" x:DataType="vm:LockedPinSettingsViewModel">
+            <Grid Classes="row" ColumnDefinitions="*,Auto">
+              <StackPanel>
+                <TextBlock Classes="title" l:Tr.Text="Locked folder PIN" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding StatusText}" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Classes="secondary" Command="{Binding StartCreateCommand}" IsVisible="{Binding CanCreate}">
+                  <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="LockPlusOutline" /><TextBlock l:Tr.Text="Create PIN" /></StackPanel>
+                </Button>
+                <Button Classes="secondary" Command="{Binding StartChangeCommand}" IsVisible="{Binding CanChange}">
+                  <StackPanel Orientation="Horizontal" Spacing="8"><mi:MaterialIcon Kind="LockReset" /><TextBlock l:Tr.Text="Change PIN" /></StackPanel>
+                </Button>
+                <Button Classes="ghost" Command="{Binding StartRemoveCommand}" IsVisible="{Binding CanChange}" l:Tr.Content="Remove" />
+              </StackPanel>
+            </Grid>
+
+            <Border Classes="banner" Margin="0,4,0,10" Padding="18,16" IsVisible="{Binding IsEditing}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="{Binding EditTitle}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding IsRemoving}"
+                           l:Tr.Text="Without a PIN the locked folder can't be opened (here, on the web or on your phone) until you make a new one. The photos in it stay locked away." />
+                <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding NeedsNew}"
+                           l:Tr.Text="6 digits. Forgot it later? Your Immich password can reset it; if you sign in with SSO, only a server admin can." />
+                <TextBox Text="{Binding CurrentPin}" PasswordChar="&#x2022;" MaxLength="6" l:Tr.Watermark="Current PIN" IsVisible="{Binding NeedsCurrent}"
+                         AutomationProperties.Name="Current PIN" Width="200" HorizontalAlignment="Left" />
+                <Grid ColumnDefinitions="200,12,200" HorizontalAlignment="Left" IsVisible="{Binding NeedsNew}">
+                  <TextBox Text="{Binding NewPin}" PasswordChar="&#x2022;" MaxLength="6" l:Tr.Watermark="New PIN" AutomationProperties.Name="New PIN" />
+                  <TextBox Grid.Column="2" Text="{Binding ConfirmPin}" PasswordChar="&#x2022;" MaxLength="6" l:Tr.Watermark="New PIN again" AutomationProperties.Name="New PIN again">
+                    <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding SaveCommand}" /></TextBox.KeyBindings>
+                  </TextBox>
+                </Grid>
+                <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding Error}" TextWrapping="Wrap"
+                           IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="ghost" l:Tr.Content="Cancel" Command="{Binding CancelCommand}" />
+                  <Button Classes="primary" Classes.danger="{Binding IsRemoving}" Command="{Binding SaveCommand}" IsEnabled="{Binding !IsSaving}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <mi:MaterialIcon Kind="Loading" Classes="spin" Width="16" Height="16" IsVisible="{Binding IsSaving}" />
+                      <TextBlock Text="{Binding ConfirmText}" />
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+            <TextBlock Classes="caption" Margin="0,0,0,8" Text="{Binding Message}" TextWrapping="Wrap"
+                       IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          </StackPanel>
         </StackPanel>
       </Border>
 

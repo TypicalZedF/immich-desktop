@@ -15,26 +15,49 @@
       <Setter Property="Background" Value="{DynamicResource AppInputBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource AppCardBorderBrush}" />
     </Style>
-    <Style Selector="Border.pinBox.active">
+    <!-- While typing: the next box is outlined and has a blinking caret (only while the PIN field has focus). -->
+    <Style Selector="ItemsControl.typing Border.pinBox.active">
       <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryBrush}" />
+    </Style>
+    <Style Selector="Rectangle.caret">
+      <Setter Property="Width" Value="2" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Fill" Value="{DynamicResource AppPrimaryBrush}" />
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="ItemsControl.typing Border.pinBox.active Rectangle.caret">
+      <Setter Property="IsVisible" Value="True" />
+      <Style.Animations>
+        <Animation Duration="0:0:1" IterationCount="INFINITE">
+          <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+          <KeyFrame Cue="49%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+          <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0" /></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0" /></KeyFrame>
+        </Animation>
+      </Style.Animations>
     </Style>
   </UserControl.Styles>
   <Border Classes="card" Width="520" Padding="32,34,32,30" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center"
           IsVisible="{Binding ShowLockedPrompt}">
     <StackPanel Spacing="22">
       <mi:MaterialIcon Kind="LockOutline" Width="64" Height="64" Foreground="{DynamicResource AppPrimaryBrush}" HorizontalAlignment="Center" />
-      <TextBlock l:Tr.Text="Enter your PIN code to access the locked folder" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding PinPrompt}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+      <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center" IsVisible="{Binding IsCreatingPin}"
+                 l:Tr.Text="You'll use it here and in Immich's web and mobile apps. Forgot it? Your Immich password can reset it; if you sign in with SSO, only a server admin can." />
       <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center" IsVisible="{Binding !CanEnterPin}"
                  l:Tr.Text="Photos here are hidden from your timeline, albums and search." />
 
       <!-- Six boxes to look at; an invisible text box on top takes the typing. -->
       <Panel HorizontalAlignment="Center" IsVisible="{Binding CanEnterPin}">
-        <ItemsControl ItemsSource="{Binding PinBoxes}" IsHitTestVisible="False">
+        <ItemsControl Name="PinBoxes" ItemsSource="{Binding PinBoxes}" IsHitTestVisible="False">
           <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="10" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:PinBox">
               <Border Classes="pinBox" Classes.active="{Binding Active}">
-                <Ellipse Width="10" Height="10" Fill="{DynamicResource AppTextBrush}" IsVisible="{Binding Filled}" />
+                <Panel>
+                  <Ellipse Width="10" Height="10" Fill="{DynamicResource AppTextBrush}" IsVisible="{Binding Filled}" />
+                  <Rectangle Classes="caret" />
+                </Panel>
               </Border>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
