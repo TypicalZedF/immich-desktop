@@ -47,6 +47,9 @@ sealed class FakeImmichServer : HttpMessageHandler
     public ConcurrentQueue<string> SmartSearches { get; } = new();
     public bool RejectAuth { get; set; }
 
+    /// <summary>Signed-in sessions by token (null: any token works). POST /auth/logout ends the caller's.</summary>
+    public ConcurrentDictionary<string, bool>? Sessions { get; set; }
+
     /// <summary>Order of uploads and album additions, to check albums fill during a long upload.</summary>
     public ConcurrentQueue<string> Events { get; } = new();
 
@@ -60,6 +63,14 @@ sealed class FakeImmichServer : HttpMessageHandler
 
         if (RejectAuth && path != "/api/server/ping")
             return Json(HttpStatusCode.Unauthorized, new { message = "Invalid user token" });
+        if (Sessions is not null && path != "/api/server/ping" &&
+            request.Headers.TryGetValues("x-immich-user-token", out var tokens) && !Sessions.ContainsKey(tokens.First()))
+            return Json(HttpStatusCode.Unauthorized, new { message = "Invalid user token" });
+        if (Sessions is not null && (method, path) == ("POST", "/api/auth/logout"))
+        {
+            Sessions.TryRemove(request.Headers.GetValues("x-immich-user-token").First(), out _);
+            return Json(HttpStatusCode.OK, new { successful = true });
+        }
 
         switch (method, path)
         {
