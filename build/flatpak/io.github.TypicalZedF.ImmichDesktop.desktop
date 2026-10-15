@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Immich Desktop
+Name=Immich Splash
 Comment=Back up photos and videos to your Immich server
 Exec=immich-desktop %u
 Icon=io.github.TypicalZedF.ImmichDesktop

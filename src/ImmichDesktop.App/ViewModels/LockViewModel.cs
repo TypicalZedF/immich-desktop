@@ -78,7 +78,7 @@ public sealed partial class LockViewModel : ViewModelBase
         IsBusy = true;
         try
         {
-            var result = await WindowsHello.VerifyAsync(_main.GetWindowHandle?.Invoke() ?? IntPtr.Zero, Tr.T("Unlock Immich Desktop"));
+            var result = await WindowsHello.VerifyAsync(_main.GetWindowHandle?.Invoke() ?? IntPtr.Zero, Tr.T("Unlock Immich Splash"));
             switch (result)
             {
                 case HelloResult.Verified:

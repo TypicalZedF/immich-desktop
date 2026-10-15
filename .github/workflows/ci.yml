@@ -33,9 +33,9 @@ jobs:
       - name: Smoke test - silent install, launch, uninstall
         shell: pwsh
         run: |
-          $setup = "artifacts/installer/ImmichDesktop-Setup.exe"
+          $setup = "artifacts/installer/ImmichSplash-Setup.exe"
           Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CURRENTUSER", "/NORESTART" -Wait
-          $dir = "$env:LOCALAPPDATA\Programs\Immich Desktop"
+          $dir = "$env:LOCALAPPDATA\Programs\Immich Splash"
           if (-not (Test-Path "$dir\ImmichDesktop.exe")) { throw "App was not installed to $dir" }
           if (-not (Test-Path "$dir\unins000.exe")) { throw "Uninstaller missing" }
           Write-Host "Installed OK"

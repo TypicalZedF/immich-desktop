@@ -13,7 +13,7 @@ on:
 
 env:
   APP_ID: io.github.TypicalZedF.ImmichDesktop
-  REPO_URL: https://typicalzedf.github.io/immich-desktop/repo/
+  REPO_URL: https://typicalzedf.github.io/immich-splash/repo/
 
 jobs:
   flatpak:
@@ -78,7 +78,7 @@ jobs:
         run: |
           EXTRA=()
           if [[ -n "${GPG_KEY_ID:-}" ]]; then
-            flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" --gpg-homedir="$GNUPGHOME" --title="Immich Desktop" repo
+            flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" --gpg-homedir="$GNUPGHOME" --title="Immich Splash" repo
             EXTRA=(--repo-url="$REPO_URL" --gpg-keys=build/flatpak/repo-key.gpg stable)
           fi
           mkdir -p artifacts
@@ -96,9 +96,9 @@ jobs:
         run: |
           KEY=$(base64 -w0 build/flatpak/repo-key.gpg)
           mkdir -p site && cp -r repo site/repo
-          printf '%s\n' "[Flatpak Repo]" "Title=Immich Desktop" "Url=$REPO_URL" "Homepage=https://github.com/TypicalZedF/immich-desktop" \
+          printf '%s\n' "[Flatpak Repo]" "Title=Immich Splash" "Url=$REPO_URL" "Homepage=https://github.com/TypicalZedF/immich-splash" \
             "Comment=Unofficial desktop companion for Immich" "GPGKey=$KEY" > site/immich-desktop.flatpakrepo
-          printf '%s\n' "[Flatpak Ref]" "Name=$APP_ID" "Branch=stable" "Title=Immich Desktop" "Url=$REPO_URL" "IsRuntime=false" \
+          printf '%s\n' "[Flatpak Ref]" "Name=$APP_ID" "Branch=stable" "Title=Immich Splash" "Url=$REPO_URL" "IsRuntime=false" \
             "SuggestRemoteName=immich-desktop" "RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo" "GPGKey=$KEY" > site/$APP_ID.flatpakref
           cp build/flatpak/index.html site/index.html
 

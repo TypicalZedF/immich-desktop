@@ -5,9 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <Version Condition="'$(Version)' == ''">1.0.0</Version>
-    <Product>Immich Desktop</Product>
-    <Company>Immich Desktop</Company>
-    <Copyright>Copyright © Immich Desktop contributors</Copyright>
+    <Product>Immich Splash</Product>
+    <Company>Immich Splash</Company>
+    <Copyright>Copyright © Immich Splash contributors</Copyright>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <!-- Building the Windows app (on Windows, unless publishing for Linux with -r linux-x64, e.g. build/dev.ps1 -Linux). -->

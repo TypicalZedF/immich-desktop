@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Only the latest stable release and the latest beta release of Immich Desktop receive security fixes. Please update before reporting.
+Only the latest stable release and the latest beta release of Immich Splash receive security fixes. Please update before reporting.
 
 ## Reporting a vulnerability
 

@@ -87,7 +87,7 @@ public class UpdateCheckerTests
                 var body = JsonSerializer.Serialize(new
                 {
                     tag_name = tag,
-                    name = $"Immich Desktop {tag}",
+                    name = $"Immich Splash {tag}",
                     body = "notes",
                     html_url = "https://github.com/x/y/releases/tag/" + tag,
                     assets = new[]
@@ -157,7 +157,7 @@ public class UpdateCheckerTests
         static object Release(string tag, bool prerelease, bool draft = false) => new
         {
             tag_name = tag,
-            name = $"Immich Desktop {tag}",
+            name = $"Immich Splash {tag}",
             body = "notes",
             html_url = "https://github.com/x/y/releases/tag/" + tag,
             draft,

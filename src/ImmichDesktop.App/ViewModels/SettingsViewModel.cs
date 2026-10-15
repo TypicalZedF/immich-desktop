@@ -755,7 +755,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Where updates come from, so it's clear nothing else is involved.</summary>
     public string UpdateSourceText => Tr.T(
-        "Updates come only from the official GitHub releases of Immich Desktop ({0}). Every download is checked against the fingerprint GitHub publishes for it before it's installed.",
+        "Updates come only from the official GitHub releases of Immich Splash ({0}). Every download is checked against the fingerprint GitHub publishes for it before it's installed.",
         "github.com/" + AppInfo.UpdateRepository);
 
     /// <summary>

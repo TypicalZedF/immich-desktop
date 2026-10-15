@@ -244,7 +244,7 @@ static class InstallerArt
                 Children =
                 {
                     new AppLogo { Width = W(96), Height = W(96), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 0, W(40)) },
-                    new TextBlock { Text = "Immich Desktop", FontSize = W(15), FontWeight = FontWeight.Medium, Foreground = new SolidColorBrush(Color.Parse("#1F2430")), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, W(30)) },
+                    new TextBlock { Text = "Immich Splash", FontSize = W(15), FontWeight = FontWeight.Medium, Foreground = new SolidColorBrush(Color.Parse("#1F2430")), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, W(30)) },
                 },
             };
             Render.SaveBmp(large, W(164), W(314), Path.Combine(dir, $"wizard-large-{suffix}.bmp"));

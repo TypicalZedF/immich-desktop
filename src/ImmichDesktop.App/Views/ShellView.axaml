@@ -13,7 +13,7 @@
     <Grid ColumnDefinitions="256,*,Auto" Background="{DynamicResource AppPageBrush}">
       <StackPanel Orientation="Horizontal" Spacing="10" Margin="24,0,0,0" VerticalAlignment="Center">
         <c:AppLogo Width="36" Height="36" />
-        <TextBlock Text="Immich Desktop" FontSize="19" FontWeight="Medium" VerticalAlignment="Center" />
+        <TextBlock Text="Immich Splash" FontSize="19" FontWeight="Medium" VerticalAlignment="Center" />
       </StackPanel>
 
       <!-- Search, like the web app's top bar -->

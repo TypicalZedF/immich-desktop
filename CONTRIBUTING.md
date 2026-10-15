@@ -1,6 +1,6 @@
-# Contributing to Immich Desktop
+# Contributing to Immich Splash
 
-Thanks for your interest in improving Immich Desktop! This is an unofficial, community-built desktop backup client for [Immich](https://immich.app). It is not affiliated with or endorsed by the Immich project or FUTO.
+Thanks for your interest in improving Immich Splash! This is an unofficial, community-built desktop backup client for [Immich](https://immich.app). It is not affiliated with or endorsed by the Immich project or FUTO.
 
 By participating you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md). By contributing you agree your work is licensed under the project's [AGPL-3.0 license](LICENSE).
 
@@ -23,7 +23,7 @@ You don't need a beta release to test a change. `build/dev.ps1` builds what you 
 
 Dev builds are versioned like `1.5.2-dev.10151342`. They count as newer than the current betas, so the app won't switch back by itself; the next stable release or a newer beta replaces them as usual.
 
-On Linux the dev build installs like the tarball, to `~/.local/opt/immich-desktop`. It closes the Flatpak copy if one is running. It keeps its own settings (`~/.local/share/immich-desktop`), so sign in once. Videos need `mpv-libs` (Fedora) or `libmpv2` (Debian/Ubuntu).
+On Linux the dev build installs like the tarball, to `~/.local/opt/immich-splash`. It closes the Flatpak copy if one is running. It keeps its own settings (`~/.local/share/immich-splash`), so sign in once. Videos need `mpv-libs` (Fedora) or `libmpv2` (Debian/Ubuntu).
 
 One-time SSH setup for `-LinuxHost`:
 
@@ -40,7 +40,7 @@ One-time SSH setup for `-LinuxHost`:
    type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh you@laptop.local "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
    ```
 
-Without SSH, `-Linux` leaves `artifacts/dev/ImmichDesktop-dev-linux-x64.tar.gz`; copy it over, extract it and run `./immich-desktop/install.sh`.
+Without SSH, `-Linux` leaves `artifacts/dev/ImmichSplash-dev-linux-x64.tar.gz`; copy it over, extract it and run `./immich-splash/install.sh`.
 
 ### For maintainers: betas and releases
 

@@ -2,7 +2,7 @@
   <img src="src/ImmichDesktop.App/Assets/logo-256.png" width="96" alt="" />
 </p>
 
-<h1 align="center">Immich Desktop</h1>
+<h1 align="center">Immich Splash</h1>
 
 <p align="center">
   Automatic photo &amp; video backup from your Windows PC to your own <a href="https://immich.app">Immich</a> server.<br/>
@@ -44,15 +44,15 @@
 
 ## Install
 
-1. Go to **[Releases](../../releases/latest)** and download **`ImmichDesktop-Setup.exe`**.
+1. Go to **[Releases](../../releases/latest)** and download **`ImmichSplash-Setup.exe`**.
 2. Run it and follow the wizard: choose *just me* (no admin) or *everyone*, pick the install folder, optional desktop shortcut.
 3. Sign in to your Immich server and pick folders. Done. The app keeps running in the tray.
 
-No-install option: **`ImmichDesktop-Portable.zip`**: unzip anywhere and run `ImmichDesktop.exe` (no auto-updates).
+No-install option: **`ImmichSplash-Portable.zip`**: unzip anywhere and run `ImmichDesktop.exe` (no auto-updates).
 
-Uninstall from **Settings → Apps → Installed apps → Immich Desktop**. You'll be asked whether to keep your settings; nothing is ever removed from your Immich server.
+Uninstall from **Settings → Apps → Installed apps → Immich Splash**. You'll be asked whether to keep your settings; nothing is ever removed from your Immich server.
 
-**Linux:** download **`ImmichDesktop-linux-x64.tar.gz`**, extract it and run `./install.sh`. It installs to `~/.local/opt/immich-desktop` and adds a menu entry; `./install.sh --uninstall` removes it. For videos to play in the app, install mpv's library (`sudo dnf install mpv-libs`, `sudo apt install libmpv2`, …). Linux installs don't update themselves yet: download the new tarball and run `./install.sh` again.
+**Linux:** download **`ImmichSplash-linux-x64.tar.gz`**, extract it and run `./install.sh`. It installs to `~/.local/opt/immich-splash` and adds a menu entry; `./install.sh --uninstall` removes it. For videos to play in the app, install mpv's library (`sudo dnf install mpv-libs`, `sudo apt install libmpv2`, …). Linux installs don't update themselves yet: download the new tarball and run `./install.sh` again.
 
 > Until the installer is code-signed, Windows SmartScreen shows "Windows protected your PC". Click **More info → Run anyway**.
 
@@ -85,7 +85,7 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-GitHub Actions tests, builds `ImmichDesktop-Setup.exe`, the portable zip and the Linux tarball, and publishes the release.
+GitHub Actions tests, builds `ImmichSplash-Setup.exe`, the portable zip and the Linux tarball, and publishes the release.
 
 **Betas:** push to the `beta` branch. Each push publishes a pre-release numbered after the latest stable version (e.g. `v1.3.1-beta.42` after `v1.3.0`), which Beta-channel installs pick up. Merge `beta` into `main` and tag it to ship it to everyone. Every push also runs CI, which installs, launches, quits and uninstalls the app on a clean Windows machine, and renders every screen against a demo server to catch broken pages.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds a Linux release as a tarball with an install script.
 #   ./build/publish.sh 1.2.0
-# Output: artifacts/installer/ImmichDesktop-linux-x64.tar.gz
+# Output: artifacts/installer/ImmichSplash-linux-x64.tar.gz
 # Users extract it and run ./install.sh (installs to ~/.local, adds a menu entry; ./install.sh --uninstall removes it).
 set -euo pipefail
 
@@ -10,7 +10,7 @@ RUNTIME="${2:-linux-x64}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PUBLISH_DIR="$ROOT/artifacts/publish/$RUNTIME"
 OUT_DIR="$ROOT/artifacts/installer"
-STAGE="$ROOT/artifacts/stage/immich-desktop"
+STAGE="$ROOT/artifacts/stage/immich-splash"
 
 dotnet test "$ROOT/tests/ImmichDesktop.Core.Tests" -c Release --nologo
 
@@ -20,9 +20,9 @@ dotnet publish "$ROOT/src/ImmichDesktop.App/ImmichDesktop.App.csproj" -c Release
 
 mkdir -p "$STAGE" "$OUT_DIR"
 cp -r "$PUBLISH_DIR" "$STAGE/app"
-cp "$ROOT/src/ImmichDesktop.App/Assets/logo-512.png" "$STAGE/immich-desktop.png"
+cp "$ROOT/src/ImmichDesktop.App/Assets/logo-512.png" "$STAGE/immich-splash.png"
 cp "$ROOT/build/linux-install.sh" "$STAGE/install.sh"
 chmod +x "$STAGE/install.sh"
 
-tar -C "$ROOT/artifacts/stage" -czf "$OUT_DIR/ImmichDesktop-$RUNTIME.tar.gz" immich-desktop
+tar -C "$ROOT/artifacts/stage" -czf "$OUT_DIR/ImmichDesktop-$RUNTIME.tar.gz" immich-splash
 echo "Ready: $OUT_DIR/ImmichDesktop-$RUNTIME.tar.gz"

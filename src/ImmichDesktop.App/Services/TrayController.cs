@@ -66,7 +66,7 @@ public sealed class TrayController : IDisposable
         _menu = new NativeMenu();
         _menu.Items.Add(_statusItem);
         _menu.Items.Add(new NativeMenuItemSeparator());
-        _menu.Items.Add(Item(Tr.T("Open Immich Desktop"), () => _app.ShowMainWindow()));
+        _menu.Items.Add(Item(Tr.T("Open Immich Splash"), () => _app.ShowMainWindow()));
         _menu.Items.Add(Item(Tr.T("Open Immich in browser"), OpenWeb));
         _menu.Items.Add(new NativeMenuItemSeparator());
         foreach (var item in _pauseItems)

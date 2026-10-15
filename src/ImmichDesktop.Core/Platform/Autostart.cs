@@ -17,16 +17,18 @@ public static class Autostart
     static string? ExecutablePath =>
         Environment.GetEnvironmentVariable("APPIMAGE") is { Length: > 0 } appImage ? appImage : Environment.ProcessPath;
 
-    static string LinuxEntryPath
+    static string LinuxEntryPath => LinuxEntry("immich-splash.desktop");
+
+    /// <summary>Entry written by versions before the rename; removed so the app doesn't start twice.</summary>
+    static string LegacyLinuxEntryPath => LinuxEntry("immich-desktop.desktop");
+
+    static string LinuxEntry(string fileName)
     {
-        get
-        {
-            // In a Flatpak, XDG_CONFIG_HOME is the sandbox's own folder: autostart lives in the real ~/.config.
-            var config = Flatpak.IsRunning ? null : Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
-            if (string.IsNullOrWhiteSpace(config))
-                config = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
-            return Path.Combine(config, "autostart", "immich-desktop.desktop");
-        }
+        // In a Flatpak, XDG_CONFIG_HOME is the sandbox's own folder: autostart lives in the real ~/.config.
+        var config = Flatpak.IsRunning ? null : Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        if (string.IsNullOrWhiteSpace(config))
+            config = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+        return Path.Combine(config, "autostart", fileName);
     }
 
     public static bool IsEnabled()
@@ -39,7 +41,7 @@ public static class Autostart
                 return key?.GetValue(AppInfo.Id) is string;
             }
             if (OperatingSystem.IsLinux())
-                return File.Exists(LinuxEntryPath);
+                return File.Exists(LinuxEntryPath) || File.Exists(LegacyLinuxEntryPath);
         }
         catch (Exception ex)
         {
@@ -64,6 +66,8 @@ public static class Autostart
             else if (OperatingSystem.IsLinux())
             {
                 var entry = LinuxEntryPath;
+                if (File.Exists(LegacyLinuxEntryPath))
+                    File.Delete(LegacyLinuxEntryPath);
                 if (enabled && exe is not null)
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(entry)!);
@@ -73,7 +77,7 @@ public static class Autostart
                         Name={AppInfo.Name}
                         Comment=Back up photos and videos to Immich
                         Exec={(Flatpak.IsRunning ? Flatpak.LaunchCommand : $"\"{exe}\"")} {BackgroundArgument}
-                        Icon={Flatpak.AppId ?? "immich-desktop"}
+                        Icon={Flatpak.AppId ?? "immich-splash"}
                         Terminal=false
                         X-GNOME-Autostart-enabled=true
                         """);

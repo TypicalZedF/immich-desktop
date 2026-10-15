@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for Immich Desktop
+about: Suggest an idea for Immich Splash
 title: "[Feature] "
 labels: enhancement
 assignees: ''

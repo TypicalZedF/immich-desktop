@@ -36,7 +36,7 @@ public static class Log
                 {
                     _writer?.Dispose();
                     _day = day;
-                    var path = Path.Combine(AppPaths.LogsDir, $"immich-desktop-{now:yyyyMMdd}.log");
+                    var path = Path.Combine(AppPaths.LogsDir, $"immich-splash-{now:yyyyMMdd}.log");
                     _writer = new StreamWriter(new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
                     DeleteOldLogs();
                 }
@@ -54,7 +54,7 @@ public static class Log
 
     static void DeleteOldLogs()
     {
-        foreach (var file in Directory.EnumerateFiles(AppPaths.LogsDir, "immich-desktop-*.log"))
+        foreach (var file in Directory.EnumerateFiles(AppPaths.LogsDir, "*.log").Where(f => Path.GetFileName(f).StartsWith("immich-", StringComparison.Ordinal)))
         {
             if (File.GetLastWriteTime(file) < DateTime.Now.AddDays(-7))
             {

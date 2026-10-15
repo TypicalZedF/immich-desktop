@@ -4,8 +4,8 @@
 
 .DESCRIPTION
   Produces, in artifacts/installer:
-    ImmichDesktop-Setup.exe      setup wizard (choose install location, shortcuts, launch)
-    ImmichDesktop-Portable.zip   no-install version
+    ImmichSplash-Setup.exe      setup wizard (choose install location, shortcuts, launch)
+    ImmichSplash-Portable.zip   no-install version
 
   Needs Inno Setup 6 for the installer: winget install JRSoftware.InnoSetup
 
@@ -59,7 +59,7 @@ if ($LASTEXITCODE -ne 0) { throw "Publish failed" }
 New-Item -ItemType Directory -Force $outputDir | Out-Null
 
 Write-Host "==> Portable zip" -ForegroundColor Cyan
-$zip = Join-Path $outputDir "ImmichDesktop-Portable.zip"
+$zip = Join-Path $outputDir "ImmichSplash-Portable.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $zip -CompressionLevel Optimal
 

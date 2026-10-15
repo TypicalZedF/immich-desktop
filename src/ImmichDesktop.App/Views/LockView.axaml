@@ -18,7 +18,7 @@
       </Panel>
 
       <StackPanel Spacing="6">
-        <TextBlock Classes="h1" l:Tr.Text="Immich Desktop is locked" HorizontalAlignment="Center" />
+        <TextBlock Classes="h1" l:Tr.Text="Immich Splash is locked" HorizontalAlignment="Center" />
         <TextBlock Classes="secondary" Text="{Binding Subtitle}" TextAlignment="Center" TextWrapping="Wrap" />
       </StackPanel>
 

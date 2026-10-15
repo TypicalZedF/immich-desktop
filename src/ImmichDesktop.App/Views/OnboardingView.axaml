@@ -24,7 +24,7 @@
           <StackPanel Spacing="20" IsVisible="{Binding IsServerStep}">
             <c:AppLogo Width="84" Height="84" HorizontalAlignment="Center" />
             <StackPanel Spacing="8">
-              <TextBlock Classes="display" l:Tr.Text="Welcome to Immich Desktop" TextAlignment="Center" TextWrapping="Wrap" />
+              <TextBlock Classes="display" l:Tr.Text="Welcome to Immich Splash" TextAlignment="Center" TextWrapping="Wrap" />
               <TextBlock Classes="secondary" TextAlignment="Center" TextWrapping="Wrap" LineHeight="21"
                          l:Tr.Text="Automatically back up the photos and videos on this computer to your own Immich server." />
             </StackPanel>
@@ -165,7 +165,7 @@
                   <TextBlock Classes="h3" l:Tr.Text="Finish signing in in your browser" VerticalAlignment="Center" />
                 </StackPanel>
                 <TextBlock Classes="caption" TextWrapping="Wrap" LineHeight="19"
-                           l:Tr.Text="We opened your sign-in page in your default browser. When you're done, your browser will ask to open Immich Desktop. Allow it and you'll be signed in here." />
+                           l:Tr.Text="We opened your sign-in page in your default browser. When you're done, your browser will ask to open Immich Splash. Allow it and you'll be signed in here." />
                 <TextBlock Classes="caption tertiary" TextWrapping="Wrap" LineHeight="19"
                            l:Tr.Text="Seeing a redirect URI error? Ask your Immich admin to allow app.immich:///oauth-callback, the same one the mobile app uses." />
                 <Button Classes="secondary" HorizontalAlignment="Left" l:Tr.Content="Cancel" Command="{Binding CancelSsoCommand}" />
@@ -226,7 +226,7 @@
                 <mi:MaterialIcon Kind="InformationOutline" Width="18" Height="18" VerticalAlignment="Top"
                                  Foreground="{DynamicResource AppPrimaryBrush}" />
                 <TextBlock TextWrapping="Wrap" MaxWidth="390" LineHeight="20"
-                           l:Tr.Text="Immich Desktop runs quietly in the system tray and backs up new photos as they arrive. Close this window anytime." />
+                           l:Tr.Text="Immich Splash runs quietly in the system tray and backs up new photos as they arrive. Close this window anytime." />
               </StackPanel>
             </Border>
 

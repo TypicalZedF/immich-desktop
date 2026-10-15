@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = "Stop"
 $script:Root = Split-Path $PSScriptRoot -Parent
-$script:Repo = "TypicalZedF/immich-desktop"
+$script:Repo = "TypicalZedF/immich-splash"
 
 function Step([string]$text) { Write-Host "==> $text" -ForegroundColor Cyan }
 function Ok([string]$text) { Write-Host "    $text" -ForegroundColor Green }

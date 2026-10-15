@@ -36,7 +36,10 @@ public static class UrlProtocol
             {
                 var apps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "applications");
                 Directory.CreateDirectory(apps);
-                File.WriteAllText(Path.Combine(apps, "immich-desktop-url.desktop"), $"""
+                var legacy = Path.Combine(apps, "immich-desktop-url.desktop");
+                if (File.Exists(legacy))
+                    File.Delete(legacy);
+                File.WriteAllText(Path.Combine(apps, "immich-splash-url.desktop"), $"""
                     [Desktop Entry]
                     Type=Application
                     Name={AppInfo.Name}
@@ -44,7 +47,7 @@ public static class UrlProtocol
                     NoDisplay=true
                     MimeType=x-scheme-handler/{OAuthSession.Scheme};
                     """);
-                Process.Start(new ProcessStartInfo("xdg-mime", $"default immich-desktop-url.desktop x-scheme-handler/{OAuthSession.Scheme}") { UseShellExecute = false })?.WaitForExit(5000);
+                Process.Start(new ProcessStartInfo("xdg-mime", $"default immich-splash-url.desktop x-scheme-handler/{OAuthSession.Scheme}") { UseShellExecute = false })?.WaitForExit(5000);
             }
         }
         catch (Exception ex)
@@ -60,7 +63,11 @@ public static class UrlProtocol
             if (OperatingSystem.IsWindows())
                 Registry.CurrentUser.DeleteSubKeyTree(WindowsKey, throwOnMissingSubKey: false);
             else if (OperatingSystem.IsLinux())
-                File.Delete(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "applications", "immich-desktop-url.desktop"));
+            {
+                var apps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "applications");
+                File.Delete(Path.Combine(apps, "immich-splash-url.desktop"));
+                File.Delete(Path.Combine(apps, "immich-desktop-url.desktop"));
+            }
         }
         catch (Exception ex)
         {

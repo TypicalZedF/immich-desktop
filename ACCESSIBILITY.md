@@ -1,6 +1,6 @@
 # Accessibility Statement
 
-We want Immich Desktop to be usable by as many people as possible, including people who use keyboards, screen readers, or other assistive technology.
+We want Immich Splash to be usable by as many people as possible, including people who use keyboards, screen readers, or other assistive technology.
 
 ## Commitment
 

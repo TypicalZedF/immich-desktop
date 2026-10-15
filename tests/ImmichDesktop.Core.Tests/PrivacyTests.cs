@@ -178,7 +178,7 @@ public class OnDeviceModelTests
     public void Source_link_points_at_the_commit_this_was_built_from()
     {
         var url = AppInfo.SourceUrl("src/ImmichDesktop.Core/Privacy");
-        Assert.StartsWith("https://github.com/TypicalZedF/immich-desktop/tree/", url);
+        Assert.StartsWith("https://github.com/TypicalZedF/immich-splash/tree/", url);
         Assert.Matches("/tree/([0-9a-f]{7,40}|beta)/src/ImmichDesktop.Core/Privacy$", url);
     }
 

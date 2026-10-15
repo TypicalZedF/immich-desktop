@@ -4,7 +4,7 @@ This project follows the spirit of the [Contributor Covenant, version 2.1](https
 
 ## Our pledge
 
-We want participation in Immich Desktop to be a harassment-free experience for everyone, regardless of age, body size, disability, ethnicity, gender identity and expression, level of experience, nationality, appearance, race, religion, or sexual identity and orientation.
+We want participation in Immich Splash to be a harassment-free experience for everyone, regardless of age, body size, disability, ethnicity, gender identity and expression, level of experience, nationality, appearance, race, religion, or sexual identity and orientation.
 
 ## Expected behavior
 

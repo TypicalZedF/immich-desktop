@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>io.github.TypicalZedF.ImmichDesktop</id>
-  <name>Immich Desktop</name>
+  <name>Immich Splash</name>
   <summary>Back up photos and videos to your Immich server</summary>
   <developer id="io.github.TypicalZedF">
     <name>TypicalZedF</name>
@@ -15,12 +15,12 @@
       your library: photos, albums, people, places, a map, sharing and the locked folder.
     </p>
     <p>
-      Immich Desktop is not affiliated with or endorsed by the Immich project.
+      Immich Splash is not affiliated with or endorsed by the Immich project.
     </p>
   </description>
   <launchable type="desktop-id">io.github.TypicalZedF.ImmichDesktop.desktop</launchable>
-  <url type="homepage">https://github.com/TypicalZedF/immich-desktop</url>
-  <url type="bugtracker">https://github.com/TypicalZedF/immich-desktop/issues</url>
+  <url type="homepage">https://github.com/TypicalZedF/immich-splash</url>
+  <url type="bugtracker">https://github.com/TypicalZedF/immich-splash/issues</url>
   <content_rating type="oars-1.1" />
   <categories>
     <category>Graphics</category>

@@ -4,7 +4,7 @@
              xmlns:views="using:ImmichDesktop.App.Views"
              xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="ImmichDesktop.App.App"
-             Name="Immich Desktop"
+             Name="Immich Splash"
              RequestedThemeVariant="Default">
 
   <Application.DataTemplates>

@@ -12,9 +12,9 @@ param(
     [int]$Max = 20,
     [string]$Grep
 )
-$dir = Join-Path $env:LOCALAPPDATA "Immich Desktop\logs"
+$dir = Join-Path $env:LOCALAPPDATA "Immich Splash\logs"
 if (-not (Test-Path $dir)) { Write-Host "No logs at $dir"; exit 0 }
-$files = Get-ChildItem $dir -Filter "immich-desktop-*.log" | Sort-Object Name | Select-Object -Last $Days
+$files = Get-ChildItem $dir -Filter "immich-*.log" | Sort-Object Name | Select-Object -Last $Days
 if (-not $files) { Write-Host "No log files in $dir"; exit 0 }
 $lines = $files | ForEach-Object { Get-Content $_.FullName }
 Write-Host "Log: $($files.Name -join ', ')  ($($lines.Count) lines)"

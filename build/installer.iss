@@ -1,4 +1,4 @@
-; Immich Desktop — Windows installer (Inno Setup 6)
+; Immich Splash — Windows installer (Inno Setup 6)
 ;
 ; A classic setup wizard: choose "just me" or "all users", pick the install folder, optional desktop
 ; shortcut, launch at the end. Also used silently by the in-app updater (/VERYSILENT /relaunch=1).
@@ -6,9 +6,9 @@
 ; Built by build/publish.ps1, e.g.:
 ;   ISCC.exe /DAppVersion=1.2.0 /DSourceDir=..\artifacts\publish\win-x64 build\installer.iss
 
-#define AppName "Immich Desktop"
+#define AppName "Immich Splash"
 #define AppExe "ImmichDesktop.exe"
-#define AppUrl "https://github.com/TypicalZedF/immich-desktop"
+#define AppUrl "https://github.com/TypicalZedF/immich-splash"
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
@@ -40,7 +40,7 @@ VersionInfoProductName={#AppName}
 VersionInfoDescription={#AppName} Setup
 
 ; Install location: per-user by default (no admin), or Program Files when installing for everyone.
-DefaultDirName={autopf}\{#AppName}
+DefaultDirName={autopf}\Immich Splash
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 DisableDirPage=no
@@ -62,7 +62,7 @@ UninstallDisplayName={#AppName}
 
 ; Output
 OutputDir={#OutputDir}
-OutputBaseFilename=ImmichDesktop-Setup
+OutputBaseFilename=ImmichSplash-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 LZMANumBlockThreads=4
@@ -83,7 +83,7 @@ SetupLogging=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-WelcomeLabel2=This will install [name/ver] on your computer.%n%nImmich Desktop backs up the photos and videos on this PC to your own Immich server, quietly, from the system tray.
+WelcomeLabel2=This will install [name/ver] on your computer.%n%nImmich Splash backs up the photos and videos on this PC to your own Immich server, quietly, from the system tray.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
@@ -137,9 +137,9 @@ var
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    DataDir := ExpandConstant('{localappdata}\Immich Desktop');
+    DataDir := ExpandConstant('{localappdata}\Immich Splash');
     if DirExists(DataDir) and (not UninstallSilent) then
-      if MsgBox('Do you also want to remove your Immich Desktop settings and backup history from this PC?' + #13#10#13#10 +
+      if MsgBox('Do you also want to remove your Immich Splash settings and backup history from this PC?' + #13#10#13#10 +
                 'Choose No if you plan to reinstall later. Nothing is ever removed from your Immich server.',
                 mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
         DelTree(DataDir, True, True, True);

@@ -1,6 +1,6 @@
 # Third-party notices
 
-Immich Desktop includes or uses the following components.
+Immich Splash includes or uses the following components.
 
 ## libmpv (video playback)
 

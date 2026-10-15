@@ -54,7 +54,7 @@ public sealed class BackupNotifier
         _state = status.State;
         return status.State == SyncState.AuthError && previous != SyncState.AuthError && settings is { Notifications: true, NotifySignIn: true }
             ? new Notice(NoticeKind.SignInNeeded, Loc.T("Sign in to Immich again"),
-                Loc.T("Your sign-in has expired, so backup has stopped. Open Immich Desktop to sign in."))
+                Loc.T("Your sign-in has expired, so backup has stopped. Open Immich Splash to sign in."))
             : null;
     }
 }

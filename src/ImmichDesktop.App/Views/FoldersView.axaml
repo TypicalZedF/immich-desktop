@@ -37,7 +37,7 @@
           </Border>
           <TextBlock Classes="h2" l:Tr.Text="No folders yet" HorizontalAlignment="Center" />
           <TextBlock Classes="secondary" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="380"
-                     l:Tr.Text="Add a folder with photos or videos and Immich Desktop will keep it backed up automatically." />
+                     l:Tr.Text="Add a folder with photos or videos and Immich Splash will keep it backed up automatically." />
           <Button Classes="primary" HorizontalAlignment="Center" Margin="0,6,0,0" Command="{Binding AddFolderCommand}">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <mi:MaterialIcon Kind="FolderPlusOutline" />

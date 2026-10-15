@@ -329,7 +329,7 @@
             <StackPanel Spacing="10">
               <TextBlock Classes="h3" l:Tr.Text="Choose an app password" />
               <TextBlock Classes="caption" TextWrapping="Wrap"
-                         l:Tr.Text="This only unlocks Immich Desktop on this PC. It's stored as a secure hash, never as plain text." />
+                         l:Tr.Text="This only unlocks Immich Splash on this PC. It's stored as a secure hash, never as plain text." />
               <Grid ColumnDefinitions="*,12,*">
                 <TextBox Text="{Binding NewPassword}" PasswordChar="&#x2022;" l:Tr.Watermark="New password" />
                 <TextBox Grid.Column="2" Text="{Binding ConfirmPassword}" PasswordChar="&#x2022;" l:Tr.Watermark="Confirm password">

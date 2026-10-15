@@ -22,7 +22,7 @@ What you expected to happen.
 
 ## Environment
 
-- Immich Desktop version:
+- Immich Splash version:
 - Operating system (and version):
 - Immich server version:
 - Sign-in method (email/password, SSO, API key):
