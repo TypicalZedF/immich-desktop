@@ -229,6 +229,12 @@ internal sealed record TimeBucketAssetsDto(
 internal sealed record WellKnownDto(WellKnownApiDto? Api);
 internal sealed record PeopleResponseDto(List<PersonDto>? People, bool? HasNextPage);
 internal sealed record UpdatePersonRequestDto(string Name);
+internal sealed record AssetEditItemDto(string Action, object Parameters);
+internal sealed record AssetEditsRequestDto(List<AssetEditItemDto> Edits);
+internal sealed record AssetSizeDto(int? Width, int? Height, bool? IsEdited);
+
+/// <summary>How big a photo is (as Immich sees it) and whether it already has edits.</summary>
+public sealed record AssetSize(int Width, int Height, bool IsEdited);
 internal sealed record PersonDto(string Id, string? Name, bool IsHidden);
 internal sealed record ExifDto(
     string? Make, string? Model, string? LensModel, double? FNumber, string? ExposureTime, double? Iso, double? FocalLength,

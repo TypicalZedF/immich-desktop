@@ -26,6 +26,7 @@ sealed class FakeImmichServer : HttpMessageHandler
 
     /// <summary>Jobs asked for with POST /assets/jobs, and the kinds of smart search made.</summary>
     public ConcurrentQueue<string> AssetJobs { get; } = new();
+    public ConcurrentQueue<string> AssetEdits { get; } = new();
     public ConcurrentQueue<string> SharedLinkPatches { get; } = new();
     public ConcurrentDictionary<string, List<(string UserId, string Role)>> AlbumMembers { get; } = new();
     public ConcurrentQueue<string> PeopleUpdates { get; } = new();
@@ -103,6 +104,34 @@ sealed class FakeImmichServer : HttpMessageHandler
                 PeopleUpdates.Enqueue(path + " " + doc.RootElement.GetRawText());
                 return Json(HttpStatusCode.OK, new { id = path.Split('/')[^1] });
             }
+            case ("GET", _) when path.StartsWith("/api/assets/", StringComparison.Ordinal) && path.Count(c => c == '/') == 3:
+                return Json(HttpStatusCode.OK, new { id = path.Split('/')[^1], width = 4000, height = 3000, isEdited = false });
+            case ("PUT", _) when path.StartsWith("/api/assets/", StringComparison.Ordinal) && path.EndsWith("/edits", StringComparison.Ordinal):
+            {
+                // Like Immich v3 (zod): at least one edit, a known action and the right parameters for it.
+                using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+                var edits = doc.RootElement.GetProperty("edits");
+                var ok = edits.GetArrayLength() > 0;
+                foreach (var edit in edits.EnumerateArray())
+                {
+                    var parameters = edit.GetProperty("parameters");
+                    ok &= edit.GetProperty("action").GetString() switch
+                    {
+                        "crop" => parameters.TryGetProperty("x", out _) && parameters.TryGetProperty("y", out _)
+                                  && parameters.TryGetProperty("width", out var cw) && cw.GetInt32() >= 1 && parameters.TryGetProperty("height", out var ch) && ch.GetInt32() >= 1,
+                        "rotate" => parameters.TryGetProperty("angle", out var angle) && angle.GetInt32() is 0 or 90 or 180 or 270,
+                        "mirror" => parameters.TryGetProperty("axis", out var axis) && axis.GetString() is "horizontal" or "vertical",
+                        _ => false,
+                    };
+                }
+                if (!ok)
+                    return Json(HttpStatusCode.BadRequest, new { message = "Validation failed", statusCode = 400 });
+                AssetEdits.Enqueue(doc.RootElement.GetRawText());
+                return Json(HttpStatusCode.OK, new { assetId = path.Split('/')[3], edits = Array.Empty<object>() });
+            }
+            case ("DELETE", _) when path.StartsWith("/api/assets/", StringComparison.Ordinal) && path.EndsWith("/edits", StringComparison.Ordinal):
+                AssetEdits.Enqueue("removed");
+                return Json(HttpStatusCode.NoContent, new { });
             case ("GET", "/api/users"):
                 return Json(HttpStatusCode.OK, new[] { new { id = "u1", name = "Alex", email = "alex@x.test" }, new { id = "u2", name = "Sam", email = "sam@x.test" }, new { id = "u3", name = "Riley", email = "riley@x.test" } });
             case ("GET", _) when path.StartsWith("/api/albums/", StringComparison.Ordinal) && path.Count(c => c == '/') == 3:

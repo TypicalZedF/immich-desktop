@@ -333,7 +333,8 @@ public sealed class ImmichClient : IDisposable
     }
 
     /// <summary>Thumbnail (~250px) or preview (~1440px) image bytes for an asset.</summary>
-    public async Task<byte[]> GetAssetImageAsync(string assetId, AssetImageSize size, CancellationToken ct)
+    /// <param name="edited">False: the picture as it was before any edits.</param>
+    public async Task<byte[]> GetAssetImageAsync(string assetId, AssetImageSize size, CancellationToken ct, bool edited = true)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(60));
@@ -345,7 +346,7 @@ public sealed class ImmichClient : IDisposable
         };
         try
         {
-            using var response = await _http.GetAsync($"assets/{Uri.EscapeDataString(assetId)}/thumbnail?size={sizeName}", HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            using var response = await _http.GetAsync($"assets/{Uri.EscapeDataString(assetId)}/thumbnail?size={sizeName}{(edited ? "" : "&edited=false")}", HttpCompletionOption.ResponseHeadersRead, cts.Token);
             await EnsureSuccessAsync(response, cts.Token);
             return await response.Content.ReadAsByteArrayAsync(cts.Token);
         }
@@ -663,6 +664,29 @@ public sealed class ImmichClient : IDisposable
     // ---- Archive, locked folder, trash -------------------------------------------------------
 
     /// <summary>Moves assets to the timeline ("timeline"), the archive ("archive") or the locked folder ("locked").</summary>
+    // ---- Editing (Immich 2.5 and newer): crop, turn and flip, applied by the server to the original ----
+
+    public async Task<AssetSize> GetAssetSizeAsync(string assetId, CancellationToken ct)
+    {
+        var asset = await SendAsync<AssetSizeDto>(HttpMethod.Get, $"assets/{Uri.EscapeDataString(assetId)}", null, ct);
+        return new AssetSize(asset.Width ?? 0, asset.Height ?? 0, asset.IsEdited == true);
+    }
+
+    /// <summary>Replaces the photo's edits with these (always described from the original photo).</summary>
+    public Task ApplyEditsAsync(string assetId, IReadOnlyList<ImageEdit> edits, CancellationToken ct) =>
+        SendAsync(HttpMethod.Put, $"assets/{Uri.EscapeDataString(assetId)}/edits",
+            new AssetEditsRequestDto(edits.Select(e => new AssetEditItemDto(e.Action, e switch
+            {
+                CropEdit c => new { x = c.X, y = c.Y, width = c.Width, height = c.Height },
+                RotateEdit r => new { angle = r.Angle },
+                MirrorEdit m => (object)new { axis = m.Axis },
+                _ => throw new ArgumentException("Unknown edit"),
+            })).ToList()), ct);
+
+    /// <summary>Puts the photo back as it was: removes all its edits.</summary>
+    public Task RemoveEditsAsync(string assetId, CancellationToken ct) =>
+        SendAsync(HttpMethod.Delete, $"assets/{Uri.EscapeDataString(assetId)}/edits", null, ct);
+
     /// <summary>Photos that look like this one, most similar first (needs machine learning on the server).</summary>
     public async Task<List<TimelineAsset>> SimilarSearchAsync(string assetId, int size, CancellationToken ct)
     {

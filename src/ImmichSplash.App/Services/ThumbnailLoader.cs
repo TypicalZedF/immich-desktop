@@ -138,6 +138,30 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
         }
     }
 
+    /// <summary>A photo was edited: whatever is cached for it is out of date.</summary>
+    public void Forget(string assetId)
+    {
+        lock (_gate)
+        {
+            foreach (var key in _index.Keys.Where(k => k.StartsWith(assetId + ":", StringComparison.Ordinal)).ToList())
+            {
+                _cachedBytes -= _index[key].Value.Data.Length;
+                _lru.Remove(_index[key]);
+                _index.Remove(key);
+            }
+            foreach (var key in _decoded.Keys.Where(k => k.StartsWith(assetId + ":", StringComparison.Ordinal)).ToList())
+            {
+                var node = _decoded[key];
+                _decodedOrder.Remove(node);
+                _decoded.Remove(key);
+                _decodedBytes -= node.Value.Bytes;
+                node.Value.Evicted = true;
+                if (node.Value.Leases == 0)
+                    node.Value.Bitmap.Dispose();
+            }
+        }
+    }
+
     /// <summary>Frees the cached pictures nobody is showing (memory is running high).</summary>
     public void TrimMemory()
     {

@@ -36,6 +36,12 @@ public sealed partial class PhotoViewerViewModel
             Close();
     }
 
+    /// <summary>Photos in Immich can be turned, flipped and cropped (the server does it on the original).</summary>
+    public bool CanEditPicture => CanEdit && Asset.IsImage;
+
+    [RelayCommand]
+    void EditPicture() => _owner.OpenEditor(Asset);
+
     [RelayCommand]
     void ViewSimilar()
     {

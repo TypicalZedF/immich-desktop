@@ -442,6 +442,17 @@ static class Screens
             Pump(TimeSpan.FromSeconds(2));
             Shot(main, outDir, $"19a4-share-manager-{suffix}", height: 760, settle: TimeSpan.FromMilliseconds(600));
             main.CloseOverlay(main.Overlay);
+            // The editor: turn, flip and crop.
+            ((PhotosViewModel)Page(shell, ShellPage.Photos)).OpenEditor(new ImmichSplash.Core.Api.TimelineAsset("202609-1", true, false, 1.5, null, null));
+            Pump(TimeSpan.FromSeconds(3));
+            if (main.Overlay is PhotoEditorViewModel editor)
+            {
+                editor.RotateRightCommand.Execute(null);
+                editor.SelectAspectCommand.Execute(editor.Aspects[4]);
+                Pump(TimeSpan.FromMilliseconds(600));
+            }
+            Shot(main, outDir, $"19a5-editor-{suffix}", height: 760, settle: TimeSpan.FromMilliseconds(400));
+            main.CloseOverlay(main.Overlay);
             // Toasts: small messages over the page.
             var toastPage = (PhotosViewModel)Page(shell, ShellPage.Albums);
             toastPage.ShowNotice(Tr.T("Copied to clipboard"));

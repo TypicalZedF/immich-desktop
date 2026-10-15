@@ -763,6 +763,9 @@
               <Button Classes="viewerNav" Command="{Binding TrashCommand}" IsVisible="{Binding CanEdit}" l:Tr.Tip="Move to trash (Delete)">
                 <mi:MaterialIcon Kind="TrashCanOutline" />
               </Button>
+              <Button Classes="viewerNav" Command="{Binding EditPictureCommand}" IsVisible="{Binding CanEditPicture}" l:Tr.Tip="Edit" AutomationProperties.Name="Edit">
+                <mi:MaterialIcon Kind="TuneVariant" />
+              </Button>
               <Button Name="ViewerMoreButton" Classes="viewerNav" IsVisible="{Binding CanEdit}" l:Tr.Tip="More" AutomationProperties.Name="More">
                 <mi:MaterialIcon Kind="DotsVertical" />
                 <Button.ContextMenu>

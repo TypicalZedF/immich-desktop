@@ -46,6 +46,23 @@ public sealed partial class PhotosViewModel
         }
     }
 
+    /// <summary>Opens the editor (turn, flip, crop) for a photo.</summary>
+    internal void OpenEditor(TimelineAsset asset)
+    {
+        if (_main is null)
+            return;
+        Viewer = null;
+        _main.ShowOverlay(new PhotoEditorViewModel(this, _main, asset));
+    }
+
+    /// <summary>The server edited a photo: show the new version.</summary>
+    internal void OnAssetEdited(string assetId, string message)
+    {
+        Thumbnails?.Forget(assetId);
+        ShowNotice(message);
+        _ = LoadGridAsync();
+    }
+
     /// <summary>Shows photos that look like this one.</summary>
     internal void ShowSimilar(string assetId)
     {
