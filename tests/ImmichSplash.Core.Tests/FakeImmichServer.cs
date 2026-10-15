@@ -26,6 +26,7 @@ sealed class FakeImmichServer : HttpMessageHandler
 
     /// <summary>Jobs asked for with POST /assets/jobs, and the kinds of smart search made.</summary>
     public ConcurrentQueue<string> AssetJobs { get; } = new();
+    public ConcurrentQueue<string> PeopleUpdates { get; } = new();
     public ConcurrentQueue<string> SmartSearches { get; } = new();
     public bool RejectAuth { get; set; }
 
@@ -87,6 +88,15 @@ sealed class FakeImmichServer : HttpMessageHandler
                 Events.Enqueue("upload");
                 AfterUpload?.Invoke(UploadedFileNames.Count);
                 return Json(HttpStatusCode.Created, new { id, status = "created" });
+            }
+            case ("PUT", _) when path.StartsWith("/api/people/", StringComparison.Ordinal):
+            {
+                // Like Immich v3 (zod): optional fields may be left out but not null.
+                using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+                if (doc.RootElement.EnumerateObject().Any(p => p.Value.ValueKind == JsonValueKind.Null))
+                    return Json(HttpStatusCode.BadRequest, new { message = "Validation failed", statusCode = 400 });
+                PeopleUpdates.Enqueue(path + " " + doc.RootElement.GetRawText());
+                return Json(HttpStatusCode.OK, new { id = path.Split('/')[^1] });
             }
             case ("POST", "/api/assets/jobs"):
             {

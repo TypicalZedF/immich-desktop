@@ -228,6 +228,7 @@ internal sealed record TimeBucketAssetsDto(
     List<List<string>?>? Stack = null);
 internal sealed record WellKnownDto(WellKnownApiDto? Api);
 internal sealed record PeopleResponseDto(List<PersonDto>? People, bool? HasNextPage);
+internal sealed record UpdatePersonRequestDto(string? Name, bool? IsHidden);
 internal sealed record PersonDto(string Id, string? Name, bool IsHidden);
 internal sealed record ExifDto(
     string? Make, string? Model, string? LensModel, double? FNumber, string? ExposureTime, double? Iso, double? FocalLength,

@@ -32,4 +32,16 @@ public class ViewerActionsApiTests
         Assert.Empty(found);
         Assert.Equal("similar:a1", Assert.Single(server.SmartSearches));
     }
+
+    [Fact]
+    public async Task Naming_and_hiding_a_person_sends_only_what_changed()
+    {
+        var server = new FakeImmichServer();
+        using var client = Client(server);
+
+        await client.UpdatePersonAsync("p1", "Sam", null, TestContext.Current.CancellationToken);
+        await client.UpdatePersonAsync("p2", null, true, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["/api/people/p1 {\"name\":\"Sam\"}", "/api/people/p2 {\"isHidden\":true}"], server.PeopleUpdates);
+    }
 }

@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichSplash.App.Services"
+             xmlns:vm="using:ImmichSplash.App.ViewModels"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichSplash.App.Views.NameDialogView"
+             x:DataType="vm:NameDialogViewModel">
+  <Border Classes="card" Width="420" Padding="28,26" CornerRadius="22" HorizontalAlignment="Center" VerticalAlignment="Center"
+          BoxShadow="0 18 50 0 #40000000">
+    <StackPanel Spacing="14">
+      <TextBlock Classes="h2" Text="{Binding Title}" TextWrapping="Wrap" />
+      <StackPanel Spacing="6">
+        <TextBlock Classes="label" Text="{Binding Label}" />
+        <TextBox Name="TextBox" Text="{Binding Text}" AutomationProperties.Name="Name">
+          <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding SaveCommand}" /></TextBox.KeyBindings>
+        </TextBox>
+      </StackPanel>
+      <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding Error}" TextWrapping="Wrap"
+                 IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,6,0,0">
+        <Button Classes="secondary" l:Tr.Content="Cancel" Command="{Binding CancelCommand}" />
+        <Button Classes="primary" Command="{Binding SaveCommand}" IsEnabled="{Binding CanSave}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <mi:MaterialIcon Kind="Loading" Classes="spin" Width="16" Height="16" IsVisible="{Binding IsSaving}" />
+            <TextBlock Text="{Binding ConfirmText}" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

@@ -19,6 +19,7 @@
     <DataTemplate DataType="vm:ProfilePhotoViewModel"><views:ProfilePhotoView /></DataTemplate>
     <DataTemplate DataType="vm:DropUploadViewModel"><views:DropUploadView /></DataTemplate>
     <DataTemplate DataType="vm:AlbumEditorViewModel"><views:AlbumEditorView /></DataTemplate>
+    <DataTemplate DataType="vm:NameDialogViewModel"><views:NameDialogView /></DataTemplate>
   </Application.DataTemplates>
 
   <Application.Styles>

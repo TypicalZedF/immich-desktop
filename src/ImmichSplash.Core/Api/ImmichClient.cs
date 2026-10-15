@@ -489,18 +489,23 @@ public sealed class ImmichClient : IDisposable
         return results;
     }
 
-    public async Task<List<PersonInfo>> GetPeopleAsync(CancellationToken ct)
+    /// <summary>The people Immich found; with <paramref name="hidden"/>, only the ones you've hidden.</summary>
+    public async Task<List<PersonInfo>> GetPeopleAsync(CancellationToken ct, bool hidden = false)
     {
         var people = new List<PersonInfo>();
         for (var page = 1; page <= 20; page++)
         {
-            var response = await SendAsync<PeopleResponseDto>(HttpMethod.Get, $"people?withHidden=false&page={page}&size=500", null, ct);
-            people.AddRange((response.People ?? []).Where(p => !p.IsHidden).Select(p => new PersonInfo(p.Id, p.Name ?? "", p.IsHidden)));
+            var response = await SendAsync<PeopleResponseDto>(HttpMethod.Get, $"people?withHidden={(hidden ? "true" : "false")}&page={page}&size=500", null, ct);
+            people.AddRange((response.People ?? []).Where(p => p.IsHidden == hidden).Select(p => new PersonInfo(p.Id, p.Name ?? "", p.IsHidden)));
             if (response.HasNextPage != true)
                 break;
         }
         return people;
     }
+
+    /// <summary>Names a person and/or hides or shows them (leave a value null to keep it as it is).</summary>
+    public Task UpdatePersonAsync(string personId, string? name, bool? isHidden, CancellationToken ct) =>
+        SendAsync(HttpMethod.Put, $"people/{Uri.EscapeDataString(personId)}", new UpdatePersonRequestDto(name, isHidden), ct);
 
     public async Task<byte[]> GetPersonThumbnailAsync(string personId, CancellationToken ct)
     {

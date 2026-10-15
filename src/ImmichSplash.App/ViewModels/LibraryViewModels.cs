@@ -114,6 +114,19 @@ public sealed class PersonCardViewModel(PhotosViewModel owner, PersonInfo person
         loader.LoadPersonAsync(Person.Id, decodeWidth, ct);
 
     protected override void Open() => Owner.OpenPerson(Person);
+
+    public bool IsHidden => Person.IsHidden;
+    public bool IsVisiblePerson => !Person.IsHidden;
+    public string NameActionText => IsNamed ? Tr.T("Change name") : Tr.T("Add a name");
+
+    public IRelayCommand NameCommand => _name ??= new RelayCommand(() => Owner.NamePerson(Person));
+    IRelayCommand? _name;
+
+    public IRelayCommand HideCommand => _hide ??= new AsyncRelayCommand(() => Owner.SetPersonHiddenAsync(Person, true));
+    IRelayCommand? _hide;
+
+    public IRelayCommand UnhideCommand => _unhide ??= new AsyncRelayCommand(() => Owner.SetPersonHiddenAsync(Person, false));
+    IRelayCommand? _unhide;
 }
 
 public sealed class PlaceCardViewModel(PhotosViewModel owner, PlaceInfo place) : LibraryCardViewModel(owner)

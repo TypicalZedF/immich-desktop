@@ -20,6 +20,58 @@ public sealed partial class PhotosViewModel
     readonly List<PersonCardViewModel> _allPeople = [];
     readonly List<PlaceCardViewModel> _allPlaces = [];
 
+    /// <summary>Explore lists the people you've hidden (so you can bring them back) instead of the others.</summary>
+    [ObservableProperty]
+    public partial bool ShowHiddenPeople { get; set; }
+
+    partial void OnShowHiddenPeopleChanged(bool value) => _ = LoadPeopleAsync();
+
+    [RelayCommand]
+    void ToggleHiddenPeople() => ShowHiddenPeople = !ShowHiddenPeople;
+
+    /// <summary>Asks for a name for a person (Immich then groups their photos under it).</summary>
+    internal void NamePerson(PersonInfo person)
+    {
+        if (_main is null)
+            return;
+        _main.ShowOverlay(new NameDialogViewModel(_main,
+            person.Name.Length > 0 ? Tr.T("Change this person's name") : Tr.T("Who is this?"),
+            Tr.T("Name"), person.Name, Tr.T("Save"),
+            async name =>
+            {
+                if (Client is not { } client)
+                    return Tr.T("Not signed in.");
+                try
+                {
+                    await client.UpdatePersonAsync(person.Id, name, null, CancellationToken.None);
+                    ShowNotice(Tr.T("Named them {0}", name));
+                    _ = LoadPeopleAsync();
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    return Tr.T("Couldn't save the name. {0}", NetworkErrors.Describe(ex));
+                }
+            }));
+    }
+
+    /// <summary>Hides a person (their face is no longer listed, in Explore or in search) or brings them back.</summary>
+    internal async Task SetPersonHiddenAsync(PersonInfo person, bool hidden)
+    {
+        if (Client is not { } client)
+            return;
+        try
+        {
+            await client.UpdatePersonAsync(person.Id, null, hidden, CancellationToken.None);
+            ShowNotice(hidden ? Tr.T("Hidden. Find them again under “Show hidden”.") : Tr.T("They're back in your people"));
+            _ = LoadPeopleAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(Tr.T("Couldn't change that. {0}", NetworkErrors.Describe(ex)));
+        }
+    }
+
     [ObservableProperty]
     public partial bool IsLoadingCollection { get; set; }
 
@@ -52,7 +104,7 @@ public sealed partial class PhotosViewModel
 
     Task LoadPeopleAsync() => LoadCardsAsync(async c =>
     {
-        var people = await c.GetPeopleAsync(_lifetime.Token);
+        var people = await c.GetPeopleAsync(_lifetime.Token, ShowHiddenPeople);
         // Named people first, like the web app.
         return people.OrderByDescending(p => p.Name.Length > 0).Select(p => new PersonCardViewModel(this, p)).ToList();
     }, People, _allPeople, Tr.T("No people yet. Immich finds faces when machine learning is turned on in your server settings."),
