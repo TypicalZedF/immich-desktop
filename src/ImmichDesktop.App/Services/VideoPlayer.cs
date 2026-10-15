@@ -13,7 +13,7 @@ namespace ImmichDesktop.App.Services;
 /// (so our controls can sit on top of the picture), and videos in Immich are streamed with the
 /// account's sign-in. Windows ships VLC with the app; on Linux the system's libvlc is used.
 /// </summary>
-public sealed class VideoPlayer : IDisposable
+public sealed class VideoPlayer : IVideoPlayback
 {
     /// <summary>Bigger videos are scaled down while decoding; the viewer never needs more.</summary>
     const uint MaxWidth = 2560, MaxHeight = 1600;

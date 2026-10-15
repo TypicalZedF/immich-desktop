@@ -415,6 +415,22 @@ public sealed class ImmichClient : IDisposable
     /// Part of a video's playable version, for streaming it into the player: bytes from
     /// <paramref name="offset"/>, and the video's total size. Servers that ignore the range send it all.
     /// </summary>
+    /// <summary>
+    /// Where a video player can stream an asset from, with the sign-in headers it needs ("name: value").
+    /// The headers carry the session token or API key, so they're never logged.
+    /// </summary>
+    public (Uri Url, IReadOnlyList<string> Headers) VideoPlaybackRequest(string assetId)
+    {
+        var url = new Uri(ApiUrl, $"assets/{Uri.EscapeDataString(assetId)}/video/playback");
+        IReadOnlyList<string> headers = Credential switch
+        {
+            { Kind: AuthKind.AccessToken } c => [$"x-immich-user-token: {c.Secret}"],
+            { Kind: AuthKind.ApiKey } c => [$"x-api-key: {c.Secret}"],
+            _ => [],
+        };
+        return (url, headers);
+    }
+
     public async Task<VideoChunk> GetVideoChunkAsync(string assetId, long offset, int count, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"assets/{Uri.EscapeDataString(assetId)}/video/playback");

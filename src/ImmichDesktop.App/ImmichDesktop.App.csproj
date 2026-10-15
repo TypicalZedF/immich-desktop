@@ -23,6 +23,9 @@
     <AvaloniaResource Include="Assets\**" />
     <!-- The logo as a plain file, for desktop notifications (Windows and Linux need a path). -->
     <None Include="Assets\logo-256.png" Link="notification-icon.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- libmpv plays videos on Windows (downloaded into lib/mpv by build/publish.ps1; Linux uses the system's). -->
+    <None Include="..\..\lib\mpv\libmpv-2.dll" Link="libmpv-2.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
+          Condition="$([MSBuild]::IsOSPlatform('Windows')) And Exists('..\..\lib\mpv\libmpv-2.dll')" />
   </ItemGroup>
 
   <ItemGroup>

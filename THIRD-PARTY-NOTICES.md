@@ -2,6 +2,14 @@
 
 Immich Desktop includes or uses the following components.
 
+## libmpv (video playback)
+
+On Windows the app ships `libmpv-2.dll` from the [shinchiro/mpv-winbuild-cmake](https://github.com/shinchiro/mpv-winbuild-cmake)
+build 20261015 (unchanged; pinned by SHA-256 in `build/publish.ps1`). On Linux it uses the system's libmpv.
+[mpv](https://github.com/mpv-player/mpv) is licensed under the GNU GPL v2 or later; this build includes
+[FFmpeg](https://ffmpeg.org) and other libraries under the GPL and LGPL, as distributed by that project. The source
+for the build is available from the links above. This app is AGPL-3.0, which is compatible with these licenses.
+
 ## LibVLC and LibVLCSharp
 
 Videos are played with [LibVLC](https://www.videolan.org/vlc/libvlc.html) through

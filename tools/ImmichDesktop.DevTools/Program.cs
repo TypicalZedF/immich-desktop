@@ -18,11 +18,14 @@ namespace ImmichDesktop.DevTools;
 ///   icons &lt;assetsDir&gt;     regenerate app.ico, tray-*.ico and logo PNGs from the app logo (Assets/logo.png)
 ///   installer &lt;dir&gt;       regenerate the installer wizard images (BMP)
 ///   screens &lt;outDir&gt;      render screenshots of every screen in light and dark mode
+///   video-test [source]   play a video with libmpv in a real window (GPU path)
 /// </summary>
 static class Program
 {
     static int Main(string[] args)
     {
+        if (args.Length >= 1 && args[0] == "video-test")
+            return VideoTest.Run(args.Length > 1 ? args[1] : null);
         if (args.Length < 2 || args[0] is not ("icons" or "installer" or "screens"))
         {
             Console.Error.WriteLine("usage: devtools icons <assetsDir> | installer <dir> | screens <outDir>");

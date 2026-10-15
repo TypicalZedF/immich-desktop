@@ -7,3 +7,6 @@ artifacts/
 *.suo
 .idea/
 TestResults/
+
+# libmpv for Windows (121 MB): downloaded by build/publish.ps1, not committed
+lib/mpv/

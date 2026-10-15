@@ -31,6 +31,24 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
 }
 
+# libmpv plays videos (pinned build from github.com/shinchiro/mpv-winbuild-cmake, checked by SHA-256).
+$mpvDll = Join-Path $root "lib/mpv/libmpv-2.dll"
+$mpvDllSha = "154a1610c266563e131c328349af396dd9af693eeb049d0c04ef196324541539"
+if (-not (Test-Path $mpvDll) -or (Get-FileHash $mpvDll -Algorithm SHA256).Hash -ne $mpvDllSha) {
+    Write-Host "==> Downloading libmpv" -ForegroundColor Cyan
+    $mpvUrl = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261015/mpv-dev-x86_64-20261015-git-492bae0768.7z"
+    $mpvArchiveSha = "5db58c1768587b35f2d8daa11b53de4aec58197c00ea1d676f998f183a358ba8"
+    $archive = Join-Path ([IO.Path]::GetTempPath()) "mpv-dev.7z"
+    Invoke-WebRequest $mpvUrl -OutFile $archive
+    if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne $mpvArchiveSha) { throw "libmpv download doesn't match its pinned SHA-256" }
+    $sevenZip = @((Get-Command 7z.exe -ErrorAction SilentlyContinue).Source, "$env:ProgramFiles\7-Zip\7z.exe") | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+    if (-not $sevenZip) { throw "7-Zip is needed to unpack libmpv" }
+    New-Item -ItemType Directory -Force (Split-Path $mpvDll) | Out-Null
+    & $sevenZip e $archive "-o$(Split-Path $mpvDll)" libmpv-2.dll -y | Out-Null
+    if ((Get-FileHash $mpvDll -Algorithm SHA256).Hash -ne $mpvDllSha) { throw "libmpv-2.dll doesn't match its pinned SHA-256" }
+    Remove-Item $archive
+}
+
 Write-Host "==> Publishing $Runtime $Version" -ForegroundColor Cyan
 if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
 dotnet publish $project -c Release -r $Runtime --self-contained true `

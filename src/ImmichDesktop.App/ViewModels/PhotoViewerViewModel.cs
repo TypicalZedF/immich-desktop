@@ -282,8 +282,22 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
 
     // ---- Videos: played right here in the viewer ----
 
-    VideoPlayer? _video;
+    IVideoPlayback? _video;
     bool _waitingForPlayer, _wantVideo;
+
+    /// <summary>
+    /// libmpv plays videos when it's there and the app draws with the graphics card; VLC otherwise.
+    /// IMMICH_DESKTOP_VIDEO=vlc forces VLC (to compare).
+    /// </summary>
+    static bool UseMpv =>
+        Program.GpuRequested && Environment.GetEnvironmentVariable("IMMICH_DESKTOP_VIDEO") != "vlc" && Services.Mpv.MpvPlayer.IsAvailable;
+
+    /// <summary>The libmpv player, drawn by the view's MpvVideoView (null with VLC).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMpvVideo))]
+    public partial Services.Mpv.MpvPlayer? MpvVideo { get; set; }
+
+    public bool HasMpvVideo => MpvVideo is not null;
     bool _updatingPosition;
 
     /// <summary>The playing video's picture (null until the first frame, while the photo preview shows).</summary>
@@ -291,7 +305,9 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(HasVideoFrame))]
     public partial Avalonia.Media.Imaging.WriteableBitmap? VideoFrame { get; set; }
 
-    public bool HasVideoFrame => VideoFrame is not null;
+    public bool HasVideoFrame => VideoFrame is not null || _mpvFrame;
+
+    bool _mpvFrame;
 
     /// <summary>Raised when the video's picture changed (the view repaints it).</summary>
     public event Action? VideoFrameUpdated;
@@ -383,6 +399,11 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         if (Asset.IsImage)
             return;
         VideoError = null;
+        if (UseMpv)
+        {
+            StartMpv();
+            return;
+        }
         if (!VideoPlayer.IsReady)
         {
             _wantVideo = true; // starts by itself once the player is ready
@@ -414,6 +435,59 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
             VideoLoadingText = null; // the first frame is here
         };
         player.FrameReady += () => { if (ReferenceEquals(_video, player)) VideoFrameUpdated?.Invoke(); };
+        Hook(player, asset);
+        IsVideoStarted = true;
+        var fromServer = !(DevicePath is { } path && File.Exists(path));
+        VideoLoadingText = fromServer ? Tr.T("Loading the video from your server…") : Tr.T("Opening the video…");
+        _ = WatchStartAsync(player, fromServer);
+        player.Play();
+    }
+
+    void StartMpv()
+    {
+        Services.Mpv.MpvPlayer player;
+        var fromServer = false;
+        try
+        {
+            if (DevicePath is { } local && File.Exists(local))
+                player = Services.Mpv.MpvPlayer.ForFile(local);
+            else if (AppServices.Account.Client is { } client)
+            {
+                var (url, headers) = client.VideoPlaybackRequest(Asset.Id);
+                player = Services.Mpv.MpvPlayer.ForUrl(url, headers);
+                fromServer = true;
+            }
+            else
+                return;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("libmpv couldn't start", ex);
+            VideoError = Tr.T("This video couldn't be played here.");
+            return;
+        }
+        var asset = Asset;
+        _video = player;
+        player.IsMuted = IsMuted;
+        player.FirstFrame += () =>
+        {
+            if (!ReferenceEquals(_video, player))
+                return;
+            _mpvFrame = true;
+            OnPropertyChanged(nameof(HasVideoFrame));
+            VideoLoadingText = null;
+        };
+        Hook(player, asset);
+        MpvVideo = player;
+        IsVideoStarted = true;
+        VideoLoadingText = fromServer ? Tr.T("Loading the video from your server…") : Tr.T("Opening the video…");
+        _ = WatchStartAsync(player, fromServer);
+        player.Play();
+    }
+
+    /// <summary>Follows a player's state, time and failure (either engine).</summary>
+    void Hook(IVideoPlayback player, TimelineAsset asset)
+    {
         player.StateChanged += () =>
         {
             if (!ReferenceEquals(_video, player))
@@ -431,25 +505,20 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
             StopVideo();
             VideoError = Tr.T("This video couldn't be played here.");
         };
-        IsVideoStarted = true;
-        var fromServer = !(DevicePath is { } path && File.Exists(path));
-        VideoLoadingText = fromServer ? Tr.T("Loading the video from your server…") : Tr.T("Opening the video…");
-        _ = WatchStartAsync(player, fromServer);
-        player.Play();
     }
 
     /// <summary>
     /// Watches the start: if the video is playing but no picture has come (the time moves, the screen
     /// doesn't), tries again without the graphics card, then gives up clearly. If it's only slow, says why.
     /// </summary>
-    async Task WatchStartAsync(VideoPlayer player, bool fromServer)
+    async Task WatchStartAsync(IVideoPlayback player, bool fromServer)
     {
         await Task.Delay(TimeSpan.FromSeconds(4));
         if (!ReferenceEquals(_video, player) || player.HasFrame)
             return;
         if (player.IsPlaying && player.Time > TimeSpan.FromSeconds(1))
         {
-            if (VideoPlayer.UseHardwareDecoding)
+            if (player is VideoPlayer && VideoPlayer.UseHardwareDecoding)
             {
                 Log.Warn($"Video {Asset.Id} plays but shows no picture; trying again without the graphics card");
                 VideoPlayer.UseHardwareDecoding = false;
@@ -487,7 +556,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
             StartVideo();
     }
 
-    void UpdateVideoTime(VideoPlayer player)
+    void UpdateVideoTime(IVideoPlayback player)
     {
         var length = player.Length;
         _updatingPosition = true;
@@ -504,8 +573,11 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         VideoLoadingText = null;
         var video = _video;
         _video = null;
+        MpvVideo = null; // the view frees mpv's drawing context, then the player shuts down
         video?.Dispose();
         VideoFrame = null;
+        _mpvFrame = false;
+        OnPropertyChanged(nameof(HasVideoFrame));
         IsVideoPlaying = false;
         IsVideoStarted = false;
         _updatingPosition = true;

@@ -580,6 +580,8 @@
             <Panel Background="Black" IsVisible="{Binding HasVideoFrame}">
               <Image Name="VideoSurface" Source="{Binding VideoFrame}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="MediumQuality" />
             </Panel>
+            <!-- libmpv draws the video here directly on the graphics card -->
+            <c:MpvVideoView Player="{Binding MpvVideo}" IsVisible="{Binding HasMpvVideo}" />
           </Panel>
           <mi:MaterialIcon Kind="Loading" Classes="spin" Width="28" Height="28" Foreground="White"
                            HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
