@@ -23,9 +23,9 @@ jobs:
     outputs:
       stable: ${{ steps.kind.outputs.stable }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0.x"
 
@@ -50,7 +50,7 @@ jobs:
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
       # Built modules (FFmpeg, libmpv…) are reused until their recipe changes.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .flatpak-builder
           key: flatpak-builder-${{ hashFiles('build/flatpak/*.yaml') }}
@@ -86,7 +86,7 @@ jobs:
             --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
           ls -lh artifacts/ImmichSplash.flatpak
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: flatpak
           path: artifacts/ImmichSplash.flatpak
@@ -111,7 +111,7 @@ jobs:
           for i in $(seq 1 60); do gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 && break; sleep 30; done
           gh release upload "$GITHUB_REF_NAME" artifacts/ImmichSplash.flatpak site/$APP_ID.flatpakref --clobber
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: steps.kind.outputs.stable == 'true'
         with:
           path: site
@@ -128,4 +128,4 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
