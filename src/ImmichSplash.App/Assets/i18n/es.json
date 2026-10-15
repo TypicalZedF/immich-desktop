@@ -1032,5 +1032,14 @@
  "Order": "Orden",
  "Random": "Aleatorio",
  "Looking for Immich on your network…": "Buscando Immich en tu red…",
- "Found on your network": "Encontrado en tu red"
+ "Found on your network": "Encontrado en tu red",
+ "Linux login": "Inicio de sesión de Linux",
+ "Fingerprint or password": "Huella o contraseña",
+ "Unlock with your Linux login": "Desbloquear con tu inicio de sesión de Linux",
+ "Require your Linux login (fingerprint or password) or an app password to open this window. Backup keeps running while locked.": "Pedir tu inicio de sesión de Linux (huella o contraseña) o una contraseña de la app para abrir esta ventana. La copia de seguridad sigue mientras está bloqueada.",
+ "Immich Splash (to unlock it)": "Immich Splash (para desbloquearlo)",
+ "Use your Linux login to unlock. Backup keeps running in the background.": "Usa tu inicio de sesión de Linux para desbloquear. La copia de seguridad sigue en segundo plano.",
+ "Your Linux login can't be checked right now. Use “Forgot how to unlock?” below.": "Ahora no se puede comprobar tu inicio de sesión de Linux. Usa «¿Olvidaste cómo desbloquear?» abajo.",
+ "Your Linux login couldn't verify you. Try again.": "Tu inicio de sesión de Linux no pudo verificarte. Inténtalo de nuevo.",
+ "Your Linux login couldn't be checked. It needs a desktop that shows sign-in prompts (like KDE Plasma or GNOME). Or use a password.": "No se pudo comprobar tu inicio de sesión de Linux. Hace falta un escritorio que muestre avisos de inicio de sesión (como KDE Plasma o GNOME). O usa una contraseña."
 }

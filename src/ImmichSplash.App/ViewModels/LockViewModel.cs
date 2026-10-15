@@ -37,7 +37,7 @@ public sealed partial class LockViewModel : ViewModelBase
     public bool UsesPassword => _mode == AppLockMode.Password;
 
     public string Subtitle => UsesHello
-        ? Tr.T("Use Windows Hello to unlock. Backup keeps running in the background.")
+        ? (OperatingSystem.IsLinux() ? Tr.T("Use your Linux login to unlock. Backup keeps running in the background.") : Tr.T("Use Windows Hello to unlock. Backup keeps running in the background."))
         : Tr.T("Enter your app password to unlock. Backup keeps running in the background.");
 
     [ObservableProperty]
@@ -87,10 +87,12 @@ public sealed partial class LockViewModel : ViewModelBase
                 case HelloResult.Canceled:
                     break;
                 case HelloResult.Unavailable:
-                    Error = Tr.T("Windows Hello isn't available right now. If it was turned off, use “Forgot how to unlock?” below.");
+                    Error = OperatingSystem.IsLinux()
+                        ? Tr.T("Your Linux login can't be checked right now. Use “Forgot how to unlock?” below.")
+                        : Tr.T("Windows Hello isn't available right now. If it was turned off, use “Forgot how to unlock?” below.");
                     break;
                 default:
-                    Error = Tr.T("Windows Hello couldn't verify you. Try again.");
+                    Error = OperatingSystem.IsLinux() ? Tr.T("Your Linux login couldn't verify you. Try again.") : Tr.T("Windows Hello couldn't verify you. Try again.");
                     break;
             }
         }

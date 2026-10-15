@@ -12,11 +12,27 @@ public enum HelloResult
     Unavailable,
 }
 
-/// <summary>Windows Hello (face, fingerprint or PIN) verification for the app lock.</summary>
+/// <summary>
+/// The system's own "confirm it's you" for the app lock: Windows Hello (face, fingerprint or PIN), or on Linux the
+/// desktop's sign-in prompt through polkit (fingerprint when set up, else the account password).
+/// </summary>
 public static class WindowsHello
 {
+    /// <summary>What it's called here, for buttons and settings.</summary>
+    public static string Name => OperatingSystem.IsLinux() ? Tr.T("Linux login") : Tr.T("Windows Hello");
+
+    public static string Tip => OperatingSystem.IsLinux() ? Tr.T("Fingerprint or password") : Tr.T("Face, fingerprint or PIN");
+
+    public static string UnlockButtonText => OperatingSystem.IsLinux() ? Tr.T("Unlock with your Linux login") : Tr.T("Unlock with Windows Hello");
+
+    public static string SettingDescription => OperatingSystem.IsLinux()
+        ? Tr.T("Require your Linux login (fingerprint or password) or an app password to open this window. Backup keeps running while locked.")
+        : Tr.T("Require Windows Hello or a password to open this window. Backup keeps running while locked.");
+
     public static async Task<bool> IsAvailableAsync()
     {
+        if (OperatingSystem.IsLinux())
+            return await Core.Platform.Polkit.IsAvailableAsync();
 #if WINDOWS
         try
         {
@@ -41,6 +57,16 @@ public static class WindowsHello
     {
         if (FakePrompt is { } fake)
             return await fake();
+        if (OperatingSystem.IsLinux())
+        {
+            return await Core.Platform.Polkit.AuthenticateAsync(Tr.T("Immich Splash (to unlock it)")) switch
+            {
+                Core.Platform.PolkitResult.Verified => HelloResult.Verified,
+                Core.Platform.PolkitResult.Canceled => HelloResult.Canceled,
+                Core.Platform.PolkitResult.Unavailable => HelloResult.Unavailable,
+                _ => HelloResult.Failed,
+            };
+        }
 #if WINDOWS
         try
         {

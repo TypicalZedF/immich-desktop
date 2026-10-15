@@ -30,7 +30,7 @@ public static class LinuxDBus
 
     /// <summary>Calls a method; <paramref name="write"/> writes the arguments, <paramref name="read"/> reads the reply.</summary>
     public static Task<T> CallAsync<T>(Connection bus, string destination, string path, string @interface, string member, string? signature,
-        Action<MessageWriter>? write, MessageValueReader<T> read)
+        Action<MessageWriter>? write, MessageValueReader<T> read, TimeSpan? timeout = null)
     {
         MessageBuffer message;
         using (var writer = bus.GetMessageWriter())
@@ -39,7 +39,7 @@ public static class LinuxDBus
             write?.Invoke(writer);
             message = writer.CreateMessage();
         }
-        return bus.CallMethodAsync(message, read, null).WaitAsync(Timeout);
+        return bus.CallMethodAsync(message, read, null).WaitAsync(timeout ?? Timeout);
     }
 
     /// <summary>Runs async D-Bus work from synchronous code (called off the UI thread).</summary>

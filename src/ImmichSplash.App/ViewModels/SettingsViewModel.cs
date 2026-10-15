@@ -550,7 +550,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
                 if (result == HelloResult.Verified)
                     SaveLock(AppLockMode.WindowsHello, null);
                 else if (result != HelloResult.Canceled)
-                    LockError = Tr.T("Windows Hello isn't set up on this PC. Set it up in Windows Settings → Accounts → Sign-in options, or use a password.");
+                    LockError = OperatingSystem.IsLinux()
+                        ? Tr.T("Your Linux login couldn't be checked. It needs a desktop that shows sign-in prompts (like KDE Plasma or GNOME). Or use a password.")
+                        : Tr.T("Windows Hello isn't set up on this PC. Set it up in Windows Settings → Accounts → Sign-in options, or use a password.");
                 break;
             case AppLockMode.Password:
                 NewPassword = "";

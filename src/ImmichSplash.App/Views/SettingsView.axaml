@@ -311,16 +311,16 @@
             <StackPanel>
               <TextBlock Classes="title" l:Tr.Text="App lock" />
               <TextBlock Classes="caption" TextWrapping="Wrap"
-                         l:Tr.Text="Require Windows Hello or a password to open this window. Backup keeps running while locked." />
+                         Text="{x:Static l:WindowsHello.SettingDescription}" />
             </StackPanel>
             <Border Grid.Column="1" Classes="segmented" VerticalAlignment="Center">
               <StackPanel Orientation="Horizontal">
                 <RadioButton Classes="segment" GroupName="lock" l:Tr.Content="Off" IsChecked="{Binding LockOff}" />
                 <RadioButton Classes="segment" GroupName="lock" IsChecked="{Binding LockHello}" IsEnabled="{Binding HelloAvailable}"
-                             l:Tr.Tip="Face, fingerprint or PIN">
+                             ToolTip.Tip="{x:Static l:WindowsHello.Tip}">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <mi:MaterialIcon Kind="FaceRecognition" Width="16" Height="16" />
-                    <TextBlock l:Tr.Text="Windows Hello" />
+                    <TextBlock Text="{x:Static l:WindowsHello.Name}" />
                   </StackPanel>
                 </RadioButton>
                 <RadioButton Classes="segment" GroupName="lock" IsChecked="{Binding LockPassword}">

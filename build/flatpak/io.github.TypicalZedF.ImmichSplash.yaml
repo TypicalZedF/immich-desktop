@@ -28,6 +28,8 @@ finish-args:
   - --talk-name=org.freedesktop.Notifications
   # Network status (metered connections, home network) from NetworkManager.
   - --system-talk-name=org.freedesktop.NetworkManager
+  # App lock: the desktop's own sign-in prompt (fingerprint or password).
+  - --system-talk-name=org.freedesktop.PolicyKit1
   # Desktop background on KDE Plasma (elsewhere it goes through the desktop portal, which needs nothing here).
   - --talk-name=org.kde.plasmashell
 modules:

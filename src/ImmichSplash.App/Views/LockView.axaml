@@ -28,7 +28,7 @@
         <StackPanel Orientation="Horizontal" Spacing="10">
           <mi:MaterialIcon Kind="Loading" Classes="spin" IsVisible="{Binding IsBusy}" />
           <mi:MaterialIcon Kind="FaceRecognition" IsVisible="{Binding !IsBusy}" />
-          <TextBlock l:Tr.Text="Unlock with Windows Hello" />
+          <TextBlock Text="{x:Static l:WindowsHello.UnlockButtonText}" />
         </StackPanel>
       </Button>
 
