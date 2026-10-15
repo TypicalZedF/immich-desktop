@@ -544,6 +544,17 @@ static class Screens
                 "Photos and videos already uploaded stay in Immich. New files in this folder won't be backed up anymore.",
                 "Remove folder", "Cancel", true);
             Shot(main, outDir, $"41-dialog-{suffix}");
+            main.Dialog = null;
+            // Dragging photos over the window, then dropping a folder.
+            main.IsDragOver = true;
+            Shot(main, outDir, $"44-drag-hint-{suffix}");
+            main.IsDragOver = false;
+            var dropped = Directory.CreateDirectory(Path.Combine(_root, "Dropped")).FullName;
+            foreach (var name in new[] { "IMG_2001.jpg", "IMG_2002.jpg", "VID_2003.mp4", "notes.txt" })
+                File.WriteAllBytes(Path.Combine(dropped, name), [1, 2, 3]);
+            main.OfferUpload([dropped]);
+            Shot(main, outDir, $"45-drop-upload-{suffix}", settle: TimeSpan.FromSeconds(1));
+            main.CloseOverlay(main.Overlay);
             main.Dispose();
         }
         // Settings opens on the first click (it isn't in the sidebar, which used to "unselect" it),

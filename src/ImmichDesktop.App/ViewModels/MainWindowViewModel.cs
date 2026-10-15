@@ -30,6 +30,21 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial ViewModelBase? Overlay { get; set; }
 
+    /// <summary>Files are being dragged over the window (shows "Drop to upload").</summary>
+    [ObservableProperty]
+    public partial bool IsDragOver { get; set; }
+
+    /// <summary>Uploads can only start from the main app (signed in, not locked or setting up).</summary>
+    public bool CanAcceptDrop => Content is ShellViewModel && Overlay is null && Dialog is null;
+
+    /// <summary>Photos, videos or folders dropped on the window: offer to upload them.</summary>
+    public void OfferUpload(IEnumerable<string> paths)
+    {
+        if (!CanAcceptDrop)
+            return;
+        ShowOverlay(new DropUploadViewModel(this, Core.Sync.DroppedFilesUploader.CollectMedia(paths, Core.Sync.MediaTypes.Default)));
+    }
+
     public void ShowOverlay(ViewModelBase overlay)
     {
         CloseOverlay(Overlay);

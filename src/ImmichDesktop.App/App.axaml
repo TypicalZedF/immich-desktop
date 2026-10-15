@@ -17,6 +17,7 @@
     <DataTemplate DataType="vm:ActivityViewModel"><views:ActivityView /></DataTemplate>
     <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>
     <DataTemplate DataType="vm:ProfilePhotoViewModel"><views:ProfilePhotoView /></DataTemplate>
+    <DataTemplate DataType="vm:DropUploadViewModel"><views:DropUploadView /></DataTemplate>
   </Application.DataTemplates>
 
   <Application.Styles>

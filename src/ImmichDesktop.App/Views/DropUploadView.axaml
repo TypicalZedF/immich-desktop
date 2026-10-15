@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichDesktop.App.Services"
+             xmlns:vm="using:ImmichDesktop.App.ViewModels"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichDesktop.App.Views.DropUploadView"
+             x:DataType="vm:DropUploadViewModel">
+  <Border Classes="card" Width="460" Padding="28,26" CornerRadius="22" HorizontalAlignment="Center" VerticalAlignment="Center"
+          BoxShadow="0 18 50 0 #40000000">
+    <StackPanel Spacing="12">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <mi:MaterialIcon Kind="CloudUploadOutline" Width="28" Height="28" Foreground="{DynamicResource AppPrimaryBrush}" />
+        <TextBlock Classes="h2" Text="{Binding Title}" TextWrapping="Wrap" VerticalAlignment="Center" MaxWidth="370" />
+      </StackPanel>
+
+      <!-- Before: an optional album -->
+      <StackPanel Spacing="8" IsVisible="{Binding IsAsking}">
+        <TextBlock Classes="secondary" TextWrapping="Wrap"
+                   l:Tr.Text="They're uploaded once, not added to your backup folders. Anything already in Immich is skipped." />
+        <AutoCompleteBox Text="{Binding AlbumName}" ItemsSource="{Binding AlbumNames}" FilterMode="ContainsOrdinal"
+                         Watermark="{Binding AlbumHint}" />
+      </StackPanel>
+
+      <!-- During and after -->
+      <StackPanel Spacing="8" IsVisible="{Binding !IsAsking}">
+        <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="1" Height="6" IsVisible="{Binding IsUploading}" />
+        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" />
+      </StackPanel>
+
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,8,0,0">
+        <Button Classes="secondary" l:Tr.Content="Cancel" Command="{Binding CancelCommand}" IsVisible="{Binding !IsDone}" />
+        <Button Classes="primary" l:Tr.Content="Upload" Command="{Binding UploadCommand}" IsVisible="{Binding IsAsking}" />
+        <Button Classes="primary" l:Tr.Content="Done" Command="{Binding CloseCommand}" IsVisible="{Binding IsDone}" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

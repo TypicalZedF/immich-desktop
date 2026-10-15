@@ -38,6 +38,11 @@ public partial class MainWindow : Window
             }
         };
         AddHandler(PointerMovedEvent, (_, _) => _lastInput = DateTime.UtcNow, RoutingStrategies.Tunnel, handledEventsToo: true);
+
+        // Drop photos, videos or folders anywhere on the window to upload them once.
+        AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(DragDrop.DragLeaveEvent, (_, _) => SetDragOver(false));
+        AddHandler(DragDrop.DropEvent, OnDrop);
         AddHandler(KeyDownEvent, (_, _) => _lastInput = DateTime.UtcNow, RoutingStrategies.Tunnel, handledEventsToo: true);
         _idleTimer = new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, (_, _) =>
         {
@@ -113,5 +118,30 @@ public partial class MainWindow : Window
             AllowMultiple = false,
         });
         return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+    }
+
+    MainWindowViewModel? Main => DataContext as MainWindowViewModel;
+
+    void SetDragOver(bool value)
+    {
+        if (Main is { } main)
+            main.IsDragOver = value;
+    }
+
+    void OnDragOver(object? sender, DragEventArgs e)
+    {
+        var accepts = Main?.CanAcceptDrop == true && e.DataTransfer.Contains(DataFormat.File);
+        e.DragEffects = accepts ? DragDropEffects.Copy : DragDropEffects.None;
+        SetDragOver(accepts);
+        e.Handled = true;
+    }
+
+    void OnDrop(object? sender, DragEventArgs e)
+    {
+        SetDragOver(false);
+        var paths = e.DataTransfer.TryGetFiles()?.Select(item => item.TryGetLocalPath()).OfType<string>().ToList() ?? [];
+        if (paths.Count > 0)
+            Main?.OfferUpload(paths);
+        e.Handled = true;
     }
 }
