@@ -80,6 +80,22 @@ public partial class PhotosView : UserControl
                 _vm.MapPanelWidth = e.NewSize.Width - 14; // room for the scrollbar
         };
 
+        // The video's progress bar: drag it, and see pictures from the video where you point.
+        var seek = this.FindControl<VideoSeekBar>("VideoSeek")!;
+        seek.ScrubStarted += f => _viewer?.ScrubStarted(f);
+        seek.ScrubMoved += f => _viewer?.ScrubMoved(f);
+        seek.ScrubCompleted += f => _viewer?.ScrubCompleted(f);
+        seek.Hovered += (fraction, x) =>
+        {
+            _viewer?.HoverVideo(fraction);
+            if (fraction is not null && this.FindControl<Border>("VideoPreview") is { } preview)
+            {
+                // Centred over the pointer, but inside the bar.
+                var width = 176 + 8;
+                preview.Margin = new Thickness(Math.Clamp(x - width / 2, 0, Math.Max(0, seek.Bounds.Width - width)), -122, 0, 0);
+            }
+        };
+
         // Viewer: scroll to zoom, drag to move, double-click to toggle zoom.
         _stage.PointerWheelChanged += OnStageWheel;
         _stage.PointerPressed += OnStagePressed;
@@ -445,6 +461,7 @@ public partial class PhotosView : UserControl
         {
             _viewer.PropertyChanged -= OnViewerChanged;
             _viewer.VideoFrameUpdated -= OnVideoFrame;
+            _viewer.PreviewFrameUpdated -= OnPreviewFrame;
         }
         _viewer = viewer;
         ResetZoom();
@@ -452,6 +469,7 @@ public partial class PhotosView : UserControl
             return;
         viewer.PropertyChanged += OnViewerChanged;
         viewer.VideoFrameUpdated += OnVideoFrame;
+        viewer.PreviewFrameUpdated += OnPreviewFrame;
         UpdateViewerPixels();
         this.FindControl<Panel>("ViewerLayer")?.Focus();
     }
@@ -459,8 +477,24 @@ public partial class PhotosView : UserControl
     /// <summary>The video bitmap is redrawn in place; tell the image to repaint.</summary>
     void OnVideoFrame() => _videoSurface.InvalidateVisual();
 
+    /// <summary>The seek bar's preview picture was redrawn in place: repaint it.</summary>
+    void OnPreviewFrame() => this.FindControl<Image>("VideoPreviewImage")?.InvalidateVisual();
+
+    /// <summary>Sizes the preview to the video's shape (wide or tall), at most 176 by 132 pixels.</summary>
+    void FitPreviewBox()
+    {
+        if (_viewer?.PreviewFrame is not { } frame || frame.PixelSize.Height <= 0 || this.FindControl<Border>("VideoPreviewBox") is not { } box)
+            return;
+        var aspect = frame.PixelSize.Width / (double)frame.PixelSize.Height;
+        var height = Math.Min(132, 176 / aspect);
+        box.Height = Math.Round(height);
+        box.Width = Math.Round(Math.Min(176, height * aspect));
+    }
+
     void OnViewerChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(PhotoViewerViewModel.PreviewFrame))
+            FitPreviewBox();
         if (e.PropertyName == nameof(PhotoViewerViewModel.Generation))
             ResetZoom();
     }
@@ -574,6 +608,12 @@ public partial class PhotosView : UserControl
                     break;
                 case Key.M when viewer.IsVideo:
                     viewer.ToggleMuteCommand.Execute(null);
+                    break;
+                case Key.Up when viewer.IsVideo:
+                    viewer.ChangeVolume(+5);
+                    break;
+                case Key.Down when viewer.IsVideo:
+                    viewer.ChangeVolume(-5);
                     break;
                 case Key.C when e.KeyModifiers.HasFlag(KeyModifiers.Control) && !viewer.IsVideo:
                     viewer.CopyImageCommand.Execute(null);

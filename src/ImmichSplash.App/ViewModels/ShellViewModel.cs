@@ -42,8 +42,9 @@ public sealed partial class NavItem(ShellPage page, string title, MaterialIconKi
     public ViewModelBase ViewModel => _viewModel.Value;
     public bool IsCreated => _viewModel.IsValueCreated;
 
-    /// <summary>Has a drop-down under it in the sidebar (Albums: the ones you used last).</summary>
-    public bool IsExpandable { get; init; }
+    /// <summary>Has something to show in a drop-down under it in the sidebar (Albums: the ones you used last).</summary>
+    [ObservableProperty]
+    public partial bool HasChildren { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ChevronIcon))]
@@ -80,13 +81,13 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     public ShellViewModel(MainWindowViewModel main)
     {
         Main = main;
-        NavItem Library(ShellPage page, string title, MaterialIconKind icon, MaterialIconKind active, LibraryPage section, bool expandable = false) =>
+        NavItem Library(ShellPage page, string title, MaterialIconKind icon, MaterialIconKind active, LibraryPage section) =>
             new(page, title, icon, active, () =>
             {
                 var photos = new PhotosViewModel(this, section);
                 photos.LeaveRequested = () => Navigate(ShellPage.Photos);
                 return photos;
-            }) { IsExpandable = expandable };
+            });
 
         // Like the Immich web app's sidebar, with the mobile app's Library group, plus this PC's backup.
         NavEntries = new ObservableCollection<object>
@@ -95,7 +96,7 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
             Library(ShellPage.Explore, Tr.T("Explore"), MaterialIconKind.CompassOutline, MaterialIconKind.Compass, LibraryPage.Explore),
             Library(ShellPage.Map, Tr.T("Map"), MaterialIconKind.MapOutline, MaterialIconKind.Map, LibraryPage.Map),
             Library(ShellPage.Sharing, Tr.T("Sharing"), MaterialIconKind.AccountMultipleOutline, MaterialIconKind.AccountMultiple, LibraryPage.Sharing),
-            Library(ShellPage.Albums, Tr.T("Albums"), MaterialIconKind.ImageAlbum, MaterialIconKind.ImageAlbum, LibraryPage.Albums, expandable: true),
+            Library(ShellPage.Albums, Tr.T("Albums"), MaterialIconKind.ImageAlbum, MaterialIconKind.ImageAlbum, LibraryPage.Albums),
             new NavHeader(Tr.T("LIBRARY")),
             Library(ShellPage.Favorites, Tr.T("Favorites"), MaterialIconKind.HeartOutline, MaterialIconKind.Heart, LibraryPage.Favorites),
             Library(ShellPage.Archive, Tr.T("Archive"), MaterialIconKind.ArchiveOutline, MaterialIconKind.Archive, LibraryPage.Archive),
@@ -377,6 +378,7 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     void RebuildRecentAlbums()
     {
         var recent = AppServices.Settings.Current.RecentAlbumIds.Where(_albumCache.ContainsKey).Take(RecentAlbumCount).ToList();
+        AlbumsNav.HasChildren = recent.Count > 0; // no chevron when there is nothing to show
         var key = AlbumsNav.IsExpanded ? string.Join(",", recent) : "-";
         if (key == _recentKey)
             return;

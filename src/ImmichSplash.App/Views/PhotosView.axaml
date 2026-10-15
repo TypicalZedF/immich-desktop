@@ -674,31 +674,45 @@
             </StackPanel>
           </Border>
           <!-- Video: controls -->
-          <Border HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="80,0,80,48" Padding="10,6" CornerRadius="14" Background="#B3000000"
+          <Border HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="80,0,80,48" Padding="12,4,12,8" CornerRadius="14" Background="#B3000000"
                   MaxWidth="900" IsVisible="{Binding ShowVideoControls}">
-            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" VerticalAlignment="Center">
-              <Button Classes="videoControl" Command="{Binding PlayPauseCommand}" l:Tr.Tip="Play or pause (Space)">
-                <Panel>
-                  <mi:MaterialIcon Kind="Pause" IsVisible="{Binding IsVideoPlaying}" />
-                  <mi:MaterialIcon Kind="Play" IsVisible="{Binding !IsVideoPlaying}" />
-                </Panel>
-              </Button>
-              <Button Grid.Column="1" Classes="videoControl" Command="{Binding SkipBackCommand}" l:Tr.Tip="Back 10 seconds">
-                <mi:MaterialIcon Kind="Rewind10" />
-              </Button>
-              <Button Grid.Column="2" Classes="videoControl" Command="{Binding SkipForwardCommand}" l:Tr.Tip="Forward 10 seconds">
-                <mi:MaterialIcon Kind="FastForward10" />
-              </Button>
-              <Slider Grid.Column="3" Classes="videoSeek" Minimum="0" Maximum="1" Value="{Binding VideoPosition}" Margin="10,0" VerticalAlignment="Center" />
-              <TextBlock Grid.Column="4" Text="{Binding VideoTimeText}" Foreground="White" FontSize="12.5" VerticalAlignment="Center" Margin="4,0,8,0"
-                         FontFeatures="tnum" />
-              <Button Grid.Column="5" Classes="videoControl" Command="{Binding ToggleMuteCommand}" l:Tr.Tip="Mute (M)">
-                <Panel>
-                  <mi:MaterialIcon Kind="VolumeOff" IsVisible="{Binding IsMuted}" />
-                  <mi:MaterialIcon Kind="VolumeHigh" IsVisible="{Binding !IsMuted}" />
-                </Panel>
-              </Button>
-            </Grid>
+            <StackPanel Spacing="0">
+              <!-- Progress bar: press and drag; pictures from the video where you point -->
+              <Panel>
+                <c:VideoSeekBar Name="VideoSeek" Value="{Binding VideoPosition}" />
+                <Border Name="VideoPreview" IsVisible="{Binding ShowPreview}" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top"
+                        Margin="0,-122,0,0" Padding="4" CornerRadius="10" Background="#E6000000">
+                  <StackPanel Spacing="4">
+                    <Border Name="VideoPreviewBox" Width="176" Height="99" CornerRadius="6" ClipToBounds="True" Background="#FF101010">
+                      <Image Name="VideoPreviewImage" Source="{Binding PreviewFrame}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="MediumQuality" />
+                    </Border>
+                    <TextBlock Text="{Binding PreviewTimeText}" Foreground="White" FontSize="12.5" HorizontalAlignment="Center" FontFeatures="tnum" />
+                  </StackPanel>
+                </Border>
+              </Panel>
+              <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto" VerticalAlignment="Center">
+                <Button Classes="videoControl" Command="{Binding PlayPauseCommand}" l:Tr.Tip="Play or pause (Space)" AutomationProperties.Name="Play or pause">
+                  <Panel>
+                    <mi:MaterialIcon Kind="Pause" IsVisible="{Binding IsVideoPlaying}" />
+                    <mi:MaterialIcon Kind="Play" IsVisible="{Binding !IsVideoPlaying}" />
+                  </Panel>
+                </Button>
+                <Button Grid.Column="1" Classes="videoControl" Command="{Binding SkipBackCommand}" l:Tr.Tip="Back 10 seconds" AutomationProperties.Name="Back 10 seconds">
+                  <mi:MaterialIcon Kind="Rewind10" />
+                </Button>
+                <Button Grid.Column="2" Classes="videoControl" Command="{Binding SkipForwardCommand}" l:Tr.Tip="Forward 10 seconds" AutomationProperties.Name="Forward 10 seconds">
+                  <mi:MaterialIcon Kind="FastForward10" />
+                </Button>
+                <TextBlock Grid.Column="3" Text="{Binding VideoTimeText}" Foreground="White" FontSize="12.5" VerticalAlignment="Center" Margin="10,0,0,0"
+                           FontFeatures="tnum" />
+                <!-- Volume: the speaker mutes, the slider sets the level -->
+                <Button Grid.Column="5" Classes="videoControl" Command="{Binding ToggleMuteCommand}" l:Tr.Tip="Mute (M)" AutomationProperties.Name="Mute">
+                  <mi:MaterialIcon Kind="{Binding VolumeIcon}" />
+                </Button>
+                <Slider Grid.Column="6" Classes="videoSeek" Width="96" Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
+                        Value="{Binding Volume}" VerticalAlignment="Center" Margin="2,0,6,0" l:Tr.Tip="Volume (Up and Down arrows)" AutomationProperties.Name="Volume" />
+              </Grid>
+            </StackPanel>
           </Border>
 
           <!-- Top bar -->

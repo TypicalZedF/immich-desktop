@@ -16,9 +16,18 @@ public interface IVideoPlayback : IDisposable
     TimeSpan Length { get; }
     bool IsMuted { get; set; }
 
+    /// <summary>0 to 100.</summary>
+    int Volume { get; set; }
+
     void Play();
     void TogglePlay();
     /// <summary>Jumps to a position from 0 to 1.</summary>
     void Seek(double position);
+
+    /// <summary>
+    /// Jumps to a position from 0 to 1. Not <paramref name="exact"/>: to the nearest keyframe, which is much
+    /// quicker (while dragging the seek bar); the final jump should be exact.
+    /// </summary>
+    void Seek(double position, bool exact);
     void SeekBy(TimeSpan delta);
 }

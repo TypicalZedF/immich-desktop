@@ -18,7 +18,9 @@ namespace ImmichSplash.App.Services.Mpv;
 public sealed class MpvPlayer : IVideoPlayback
 {
     /// <summary>Bigger videos are drawn smaller in memory (software drawing only).</summary>
-    const int MaxSoftwareWidth = 1920, MaxSoftwareHeight = 1080;
+    int _maxWidth = 1920, _maxHeight = 1080;
+    readonly bool _preview;
+    double? _pendingPreview;
 
     static readonly Lazy<bool> Available = new(MpvNative.IsAvailable);
     static int _logLines;
@@ -63,15 +65,24 @@ public sealed class MpvPlayer : IVideoPlayback
     public event Action? Failed;
 
     /// <param name="software">Draw into memory (<see cref="Frame"/>) instead of on the graphics card.</param>
-    public static MpvPlayer ForFile(string path, bool software = false) => new(path, [], software);
+    public static MpvPlayer ForFile(string path, bool software = false) => new(path, [], software, preview: false);
 
     /// <summary>A video on the server; <paramref name="headers"/> carry the sign-in ("name: value").</summary>
-    public static MpvPlayer ForUrl(Uri url, IReadOnlyList<string> headers, bool software = false) => new(url.AbsoluteUri, headers, software);
+    public static MpvPlayer ForUrl(Uri url, IReadOnlyList<string> headers, bool software = false) => new(url.AbsoluteUri, headers, software, preview: false);
 
-    MpvPlayer(string target, IReadOnlyList<string> headers, bool software)
+    /// <summary>
+    /// A small silent copy that only shows still pictures at positions (the seek bar's preview): software
+    /// drawing, no sound, jumps to keyframes. Use <see cref="ShowFrameAt"/>.
+    /// </summary>
+    public static MpvPlayer ForPreview(string target, IReadOnlyList<string> headers) => new(target, headers, software: true, preview: true);
+
+    MpvPlayer(string target, IReadOnlyList<string> headers, bool software, bool preview)
     {
         _target = target;
         _software = software;
+        _preview = preview;
+        if (preview)
+            (_maxWidth, _maxHeight) = (320, 180);
         _onUpdate = _ =>
         {
             if (_software)
@@ -100,7 +111,17 @@ public sealed class MpvPlayer : IVideoPlayback
         Option("osc", "no");
         Option("input-default-bindings", "no");
         Option("cache", "yes");
-        Option("demuxer-max-bytes", "128MiB");
+        Option("demuxer-max-bytes", preview ? "24MiB" : "128MiB");
+        if (preview)
+        {
+            Option("aid", "no"); // no sound
+            Option("ao", "null");
+            Option("hr-seek", "no"); // keyframes only: quick
+            Option("vd-lavc-skiploopfilter", "all");
+            Option("vd-lavc-fast", "yes");
+            Option("sub", "no");
+            Option("pause", "yes");
+        }
         Option("audio-client-name", AppInfo.Name);
         if (headers.Count > 0)
             Option("http-header-fields", string.Join(",", headers));
@@ -131,6 +152,18 @@ public sealed class MpvPlayer : IVideoPlayback
 
     /// <summary>Software drawing: the latest picture (redrawn in place; see <see cref="FrameReady"/>).</summary>
     public WriteableBitmap? Frame => _frame;
+
+    int _volume = 100;
+
+    public int Volume
+    {
+        get => _volume;
+        set
+        {
+            _volume = Math.Clamp(value, 0, 100);
+            mpv_set_property_string(_mpv, "volume", _volume.ToString(CultureInfo.InvariantCulture));
+        }
+    }
 
     public bool IsMuted
     {
@@ -171,8 +204,33 @@ public sealed class MpvPlayer : IVideoPlayback
             Play();
     }
 
-    public void Seek(double position) =>
-        Command(_mpv, "seek", (Math.Clamp(position, 0, 1) * 100).ToString("0.###", CultureInfo.InvariantCulture), "absolute-percent");
+    public void Seek(double position) => Seek(position, exact: true);
+
+    public void Seek(double position, bool exact) =>
+        Command(_mpv, "seek", (Math.Clamp(position, 0, 1) * 100).ToString("0.###", CultureInfo.InvariantCulture),
+            exact ? "absolute-percent+exact" : "absolute-percent+keyframes");
+
+    /// <summary>Preview players: shows the picture at a position from 0 to 1 (the newest request wins).</summary>
+    public void ShowFrameAt(double position)
+    {
+        if (!_preview)
+            return;
+        position = Math.Clamp(position, 0, 1);
+        if (!_loaded)
+        {
+            // libmpv needs its drawing context first; the software one exists from the start.
+            _loaded = true;
+            _pendingPreview = position;
+            Command(_mpv, "loadfile", _target);
+            return;
+        }
+        if (!_hasFrame)
+        {
+            _pendingPreview = position; // the file isn't open yet: jump there once it is
+            return;
+        }
+        Seek(position, exact: false);
+    }
 
     public void SeekBy(TimeSpan delta) =>
         Command(_mpv, "seek", delta.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture), "relative");
@@ -267,7 +325,7 @@ public sealed class MpvPlayer : IVideoPlayback
                     continue;
                 if (mpv_get_property_long(_mpv, "dwidth", FormatInt64, out var w) < 0 || mpv_get_property_long(_mpv, "dheight", FormatInt64, out var h) < 0 || w <= 0 || h <= 0)
                     continue;
-                var scale = Math.Min(1.0, Math.Min(MaxSoftwareWidth / (double)w, MaxSoftwareHeight / (double)h));
+                var scale = Math.Min(1.0, Math.Min(_maxWidth / (double)w, _maxHeight / (double)h));
                 var width = Math.Max(2, (int)(w * scale)) & ~1;
                 var height = Math.Max(2, (int)(h * scale)) & ~1;
                 if (width != _width || height != _height)
@@ -357,6 +415,11 @@ public sealed class MpvPlayer : IVideoPlayback
                 case EventPlaybackRestart when !_hasFrame:
                     _hasFrame = true;
                     Post(() => FirstFrame?.Invoke());
+                    if (_pendingPreview is { } pending)
+                    {
+                        _pendingPreview = null;
+                        Seek(pending, exact: false);
+                    }
                     break;
                 case EventEndFile when Marshal.PtrToStructure<EndFileData>(e.Data) is { Reason: EndFileError } end:
                     Log.Warn($"mpv couldn't play the video: {ErrorText(end.Error)}");

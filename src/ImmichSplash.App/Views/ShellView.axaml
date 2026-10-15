@@ -151,7 +151,7 @@
                 </StackPanel>
                 <!-- Albums: fold the list of recent albums away or open it again -->
                 <Button Grid.Column="1" Classes="ghost icon" Width="28" Height="28" Padding="0" Margin="0,-4,-6,-4" VerticalAlignment="Center"
-                        IsVisible="{Binding IsExpandable}" Command="{Binding ToggleExpandedCommand}" l:Tr.Tip="Recent albums" AutomationProperties.Name="Recent albums">
+                        IsVisible="{Binding HasChildren}" Command="{Binding ToggleExpandedCommand}" l:Tr.Tip="Recent albums" AutomationProperties.Name="Recent albums">
                   <mi:MaterialIcon Kind="{Binding ChevronIcon}" Width="18" Height="18" />
                 </Button>
               </Grid>

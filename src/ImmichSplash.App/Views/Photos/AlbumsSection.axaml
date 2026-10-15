@@ -6,60 +6,91 @@
              xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="ImmichSplash.App.Views.Photos.AlbumsSection"
              x:DataType="vm:PhotosViewModel">
+  <UserControl.Styles>
+    <!-- A quiet on/off button: only a soft background when it's on (no loud colour) -->
+    <Style Selector="ToggleButton.toolToggle">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="ToggleButton.toolToggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.toolToggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppNeutralSoftBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.toolToggle:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppHoverBrush}" />
+    </Style>
+    <Style Selector="Border.toolbarDivider">
+      <Setter Property="Width" Value="1" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Margin" Value="4,0" />
+      <Setter Property="Background" Value="{DynamicResource AppDividerBrush}" />
+    </Style>
+  </UserControl.Styles>
   <DockPanel>
-    <!-- Toolbar -->
-    <WrapPanel DockPanel.Dock="Top" Margin="28,4,10,10" ItemSpacing="10" LineSpacing="8">
-      <Border Classes="segmented" VerticalAlignment="Center">
-        <StackPanel Orientation="Horizontal">
-          <RadioButton Classes="segment" GroupName="albumFilter" l:Tr.Content="All" IsChecked="{Binding IsFilterAll, Mode=OneWay}" Command="{Binding ShowAllAlbumsCommand}" />
-          <RadioButton Classes="segment" GroupName="albumFilter" l:Tr.Content="Owned" IsChecked="{Binding IsFilterOwned, Mode=OneWay}" Command="{Binding ShowOwnedAlbumsCommand}" />
-          <RadioButton Classes="segment" GroupName="albumFilter" l:Tr.Content="Shared" IsChecked="{Binding IsFilterShared, Mode=OneWay}" Command="{Binding ShowSharedAlbumsCommand}" />
-        </StackPanel>
-      </Border>
+    <!-- Toolbar: what you look at on the left (filter, search); what you do and how it's arranged on the right.
+         On a narrow window the right side drops to its own line, still on the right. -->
+    <Grid Name="Toolbar" DockPanel.Dock="Top" Margin="28,4,10,10" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+      <StackPanel Name="ToolbarLeft" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="0,0,16,0">
+        <Border Classes="segmented" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal">
+            <RadioButton Classes="segment" GroupName="albumFilter" l:Tr.Content="All" IsChecked="{Binding IsFilterAll, Mode=OneWay}" Command="{Binding ShowAllAlbumsCommand}" />
+            <RadioButton Classes="segment" GroupName="albumFilter" l:Tr.Content="Owned" IsChecked="{Binding IsFilterOwned, Mode=OneWay}" Command="{Binding ShowOwnedAlbumsCommand}" />
+            <RadioButton Classes="segment" GroupName="albumFilter" l:Tr.Content="Shared" IsChecked="{Binding IsFilterShared, Mode=OneWay}" Command="{Binding ShowSharedAlbumsCommand}" />
+          </StackPanel>
+        </Border>
+        <TextBox Width="240" Text="{Binding AlbumSearchText}" l:Tr.Watermark="Search albums" VerticalAlignment="Center" AutomationProperties.Name="Search albums" />
+      </StackPanel>
 
-      <TextBox Width="260" Text="{Binding AlbumSearchText}" l:Tr.Watermark="Search albums" VerticalAlignment="Center" AutomationProperties.Name="Search albums" />
+      <StackPanel Name="ToolbarRight" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Right">
+        <Button Classes="secondary" Command="{Binding CreateAlbumCommand}" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <mi:MaterialIcon Kind="Plus" Width="16" Height="16" />
+            <TextBlock l:Tr.Text="Create album" />
+          </StackPanel>
+        </Button>
 
-      <Button Classes="secondary" Command="{Binding CreateAlbumCommand}" VerticalAlignment="Center">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <mi:MaterialIcon Kind="Plus" Width="16" Height="16" />
-          <TextBlock l:Tr.Text="Create album" />
-        </StackPanel>
-      </Button>
+        <Border Classes="toolbarDivider" />
 
-      <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
         <Button Classes="ghost icon" Command="{Binding ToggleAlbumSortDirectionCommand}" l:Tr.Tip="Reverse the order" AutomationProperties.Name="Reverse the order">
           <mi:MaterialIcon Kind="{Binding AlbumSortIcon}" Width="18" Height="18" />
         </Button>
-        <ComboBox ItemsSource="{Binding AlbumSortChoices}" SelectedItem="{Binding SelectedAlbumSort}" MinWidth="170" AutomationProperties.Name="Sort albums">
+        <ComboBox ItemsSource="{Binding AlbumSortChoices}" SelectedItem="{Binding SelectedAlbumSort}" MinWidth="170" VerticalAlignment="Center" AutomationProperties.Name="Sort albums">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="vm:AlbumSortChoice"><TextBlock Text="{Binding Label}" /></DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-      </StackPanel>
 
-      <ToggleButton Classes="ghost" IsChecked="{Binding AlbumGroupByYear}" VerticalAlignment="Center">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <mi:MaterialIcon Kind="CalendarMonthOutline" Width="18" Height="18" />
-          <TextBlock l:Tr.Text="Group by year" />
-        </StackPanel>
-      </ToggleButton>
+        <Border Classes="toolbarDivider" />
 
-      <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" IsVisible="{Binding AlbumGroupByYear}">
-        <Button Classes="ghost icon" Command="{Binding ExpandAllAlbumGroupsCommand}" l:Tr.Tip="Expand all years" AutomationProperties.Name="Expand all years">
+        <ToggleButton Classes="toolToggle" IsChecked="{Binding AlbumGroupByYear}" VerticalAlignment="Center" l:Tr.Tip="Group the albums by year">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <mi:MaterialIcon Kind="CalendarMonthOutline" Width="18" Height="18" />
+            <TextBlock l:Tr.Text="Group by year" />
+          </StackPanel>
+        </ToggleButton>
+        <Button Classes="ghost icon" Command="{Binding ExpandAllAlbumGroupsCommand}" IsVisible="{Binding AlbumGroupByYear}" l:Tr.Tip="Expand all years" AutomationProperties.Name="Expand all years">
           <mi:MaterialIcon Kind="UnfoldMoreHorizontal" Width="18" Height="18" />
         </Button>
-        <Button Classes="ghost icon" Command="{Binding CollapseAllAlbumGroupsCommand}" l:Tr.Tip="Collapse all years" AutomationProperties.Name="Collapse all years">
+        <Button Classes="ghost icon" Command="{Binding CollapseAllAlbumGroupsCommand}" IsVisible="{Binding AlbumGroupByYear}" l:Tr.Tip="Collapse all years" AutomationProperties.Name="Collapse all years">
           <mi:MaterialIcon Kind="UnfoldLessHorizontal" Width="18" Height="18" />
         </Button>
-      </StackPanel>
 
-      <Button Classes="ghost" Command="{Binding ToggleAlbumViewCommand}" VerticalAlignment="Center">
-        <StackPanel Orientation="Horizontal" Spacing="8">
+        <Border Classes="toolbarDivider" />
+
+        <Button Classes="ghost icon" Command="{Binding ToggleAlbumViewCommand}" l:Tr.Tip="Switch between cover cards and a list" AutomationProperties.Name="Switch between cover cards and a list">
           <mi:MaterialIcon Kind="{Binding AlbumViewIcon}" Width="18" Height="18" />
-          <TextBlock Text="{Binding AlbumViewText}" />
-        </StackPanel>
-      </Button>
-    </WrapPanel>
+        </Button>
+      </StackPanel>
+    </Grid>
 
     <!-- Create / edit an album -->
     <Border DockPanel.Dock="Top" Classes="card" Margin="28,0,10,12" Padding="18" CornerRadius="16" IsVisible="{Binding IsEditingAlbum}" MaxWidth="560" HorizontalAlignment="Left">

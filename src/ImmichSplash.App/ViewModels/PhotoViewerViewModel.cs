@@ -380,16 +380,11 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
 
     static string VideoCacheDir => Path.Combine(Path.GetTempPath(), "ImmichSplash", "videos");
 
-    partial void OnVideoPositionChanged(double value)
-    {
-        if (!_updatingPosition)
-            _video?.Seek(value);
-    }
-
     partial void OnIsMutedChanged(bool value)
     {
         if (_video is not null)
             _video.IsMuted = value;
+        OnPropertyChanged(nameof(VolumeIcon));
     }
 
     /// <summary>Plays or pauses (starting the player the first time).</summary>
@@ -455,6 +450,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         var asset = Asset;
         _video = player;
         player.IsMuted = IsMuted;
+        player.Volume = Volume;
         player.FirstFrame += () =>
         {
             if (!ReferenceEquals(_video, player))
@@ -531,6 +527,8 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
 
     void UpdateVideoTime(IVideoPlayback player)
     {
+        if (HoldingPosition(player))
+            return; // dragging the bar (or just dropped): the bar follows you, not the video
         var length = player.Length;
         _updatingPosition = true;
         VideoPosition = length > TimeSpan.Zero ? player.Time / length : 0;
@@ -542,6 +540,8 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
 
     void StopVideo()
     {
+        IsScrubbing = false;
+        ClosePreviewPlayer();
         VideoLoadingText = null;
         var video = _video;
         _video = null;

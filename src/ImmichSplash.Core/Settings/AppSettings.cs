@@ -151,6 +151,9 @@ public sealed class AppSettings
     public bool AlbumGroupByYear { get; set; } = true;
     public bool AlbumListView { get; set; }
 
+    /// <summary>The video player's volume, 0 to 100 (remembered).</summary>
+    public int VideoVolume { get; set; } = 100;
+
     /// <summary>The albums you opened or added to most recently (ids, newest first), for the sidebar.</summary>
     public List<string> RecentAlbumIds { get; set; } = [];
 
