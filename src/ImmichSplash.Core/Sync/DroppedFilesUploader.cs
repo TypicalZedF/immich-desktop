@@ -39,7 +39,7 @@ public static class DroppedFilesUploader
     }
 
     public static async Task<DropResult> UploadAsync(ImmichClient client, IReadOnlyList<string> files, string? albumName, BandwidthLimiter limiter,
-        IProgress<DropProgress>? progress, CancellationToken ct)
+        IProgress<DropProgress>? progress, CancellationToken ct, string? albumId = null)
     {
         int uploaded = 0, alreadyThere = 0, failed = 0, done = 0;
         var assetIds = new List<string>();
@@ -96,10 +96,11 @@ public static class DroppedFilesUploader
         if (!string.IsNullOrWhiteSpace(albumName) && assetIds.Count > 0)
         {
             var name = albumName.Trim();
-            var album = (await client.GetAlbumsAsync(ct)).FirstOrDefault(a => a.AlbumName == name)
-                        ?? await client.CreateAlbumAsync(name, null, ct);
+            // An album given by its id (the one open when the files were dropped) wins over a same-named one.
+            var existing = albumId is not null ? albumId : (await client.GetAlbumsAsync(ct)).FirstOrDefault(a => a.AlbumName == name)?.Id;
+            var target = existing ?? (await client.CreateAlbumAsync(name, null, ct)).Id;
             foreach (var ids in assetIds.Distinct().Chunk(500))
-                await client.AddAssetsToAlbumAsync(album.Id, ids, ct);
+                await client.AddAssetsToAlbumAsync(target, ids, ct);
         }
         return new DropResult(uploaded, alreadyThere, failed);
     }

@@ -745,6 +745,10 @@ public sealed class ImmichClient : IDisposable
     public Task DeleteAlbumAsync(string albumId, CancellationToken ct) =>
         SendAsync(HttpMethod.Delete, $"albums/{Uri.EscapeDataString(albumId)}", null, ct);
 
+    /// <summary>Renames an album and/or changes its description.</summary>
+    public Task<AlbumInfo> UpdateAlbumAsync(string albumId, string name, string? description, CancellationToken ct) =>
+        SendAsync<AlbumInfo>(HttpMethod.Patch, $"albums/{Uri.EscapeDataString(albumId)}", new UpdateAlbumRequestDto(name, description ?? ""), ct);
+
     public Task AddAssetsToAlbumAsync(string albumId, IReadOnlyList<string> assetIds, CancellationToken ct) =>
         SendAsync(HttpMethod.Put, $"albums/{Uri.EscapeDataString(albumId)}/assets", new BulkIdsRequestDto(assetIds), ct);
 

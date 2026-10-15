@@ -40,6 +40,23 @@ public class DroppedFilesTests
         Assert.Equal(3, reports[^1].Done);
     }
 
+    [Fact]
+    public async Task Files_dropped_on_an_open_album_go_into_that_album_even_when_another_has_the_same_name()
+    {
+        using var temp = new TempDir();
+        var server = new FakeImmichServer();
+        server.Albums["other"] = ("Trip", []);
+        server.Albums["open"] = ("Trip", []);
+        using var client = new ImmichClient(new Uri("https://immich.test/api/"), new AuthCredential(AuthKind.ApiKey, "key"), server);
+
+        await DroppedFilesUploader.UploadAsync(client, [temp.File("a.jpg")], "Trip", new BandwidthLimiter(), null,
+            TestContext.Current.CancellationToken, albumId: "open");
+
+        Assert.Single(server.Albums["open"].Assets);
+        Assert.Empty(server.Albums["other"].Assets);
+        Assert.Equal(2, server.Albums.Count);
+    }
+
     /// <summary>Reports straight away (Progress&lt;T&gt; would post to a thread pool and race the asserts).</summary>
     sealed class SyncProgress<T>(Action<T> report) : IProgress<T>
     {

@@ -1,8 +1,11 @@
+using System.Collections.ObjectModel;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImmichSplash.App.Services;
 using ImmichSplash.Core;
+using ImmichSplash.Core.Api;
 using ImmichSplash.Core.Platform;
 using ImmichSplash.Core.Settings;
 using ImmichSplash.Core.Sync;
@@ -28,7 +31,7 @@ public enum ShellPage
     Settings,
 }
 
-public sealed class NavItem(ShellPage page, string title, MaterialIconKind icon, MaterialIconKind activeIcon, Func<ViewModelBase> create)
+public sealed partial class NavItem(ShellPage page, string title, MaterialIconKind icon, MaterialIconKind activeIcon, Func<ViewModelBase> create) : ObservableObject
 {
     readonly Lazy<ViewModelBase> _viewModel = new(create);
 
@@ -38,6 +41,28 @@ public sealed class NavItem(ShellPage page, string title, MaterialIconKind icon,
     public MaterialIconKind ActiveIcon { get; } = activeIcon;
     public ViewModelBase ViewModel => _viewModel.Value;
     public bool IsCreated => _viewModel.IsValueCreated;
+
+    /// <summary>Has a drop-down under it in the sidebar (Albums: the ones you used last).</summary>
+    public bool IsExpandable { get; init; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ChevronIcon))]
+    public partial bool IsExpanded { get; set; } = true;
+
+    public MaterialIconKind ChevronIcon => IsExpanded ? MaterialIconKind.ChevronUp : MaterialIconKind.ChevronDown;
+
+    [RelayCommand]
+    void ToggleExpanded() => IsExpanded = !IsExpanded;
+}
+
+/// <summary>One of the albums you used last, listed under Albums in the sidebar.</summary>
+public sealed partial class NavAlbum(AlbumInfo album) : ObservableObject
+{
+    public AlbumInfo Album { get; } = album;
+    public string Title => Album.AlbumName;
+
+    [ObservableProperty]
+    public partial Bitmap? Cover { get; set; }
 }
 
 /// <summary>A group heading in the sidebar ("LIBRARY"); an empty title is just a divider.</summary>
@@ -55,17 +80,22 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     public ShellViewModel(MainWindowViewModel main)
     {
         Main = main;
-        NavItem Library(ShellPage page, string title, MaterialIconKind icon, MaterialIconKind active, LibraryPage section) =>
-            new(page, title, icon, active, () => new PhotosViewModel(this, section));
+        NavItem Library(ShellPage page, string title, MaterialIconKind icon, MaterialIconKind active, LibraryPage section, bool expandable = false) =>
+            new(page, title, icon, active, () =>
+            {
+                var photos = new PhotosViewModel(this, section);
+                photos.LeaveRequested = () => Navigate(ShellPage.Photos);
+                return photos;
+            }) { IsExpandable = expandable };
 
         // Like the Immich web app's sidebar, with the mobile app's Library group, plus this PC's backup.
-        NavEntries =
-        [
+        NavEntries = new ObservableCollection<object>
+        {
             Library(ShellPage.Photos, Tr.T("Photos"), MaterialIconKind.ImageMultipleOutline, MaterialIconKind.ImageMultiple, LibraryPage.Timeline),
             Library(ShellPage.Explore, Tr.T("Explore"), MaterialIconKind.CompassOutline, MaterialIconKind.Compass, LibraryPage.Explore),
             Library(ShellPage.Map, Tr.T("Map"), MaterialIconKind.MapOutline, MaterialIconKind.Map, LibraryPage.Map),
             Library(ShellPage.Sharing, Tr.T("Sharing"), MaterialIconKind.AccountMultipleOutline, MaterialIconKind.AccountMultiple, LibraryPage.Sharing),
-            Library(ShellPage.Albums, Tr.T("Albums"), MaterialIconKind.ImageAlbum, MaterialIconKind.ImageAlbum, LibraryPage.Albums),
+            Library(ShellPage.Albums, Tr.T("Albums"), MaterialIconKind.ImageAlbum, MaterialIconKind.ImageAlbum, LibraryPage.Albums, expandable: true),
             new NavHeader(Tr.T("LIBRARY")),
             Library(ShellPage.Favorites, Tr.T("Favorites"), MaterialIconKind.HeartOutline, MaterialIconKind.Heart, LibraryPage.Favorites),
             Library(ShellPage.Archive, Tr.T("Archive"), MaterialIconKind.ArchiveOutline, MaterialIconKind.Archive, LibraryPage.Archive),
@@ -76,7 +106,7 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
             new NavItem(ShellPage.Overview, Tr.T("Backup"), MaterialIconKind.CloudUploadOutline, MaterialIconKind.CloudUpload, () => new OverviewViewModel(this)),
             new NavItem(ShellPage.Folders, Tr.T("Folders"), MaterialIconKind.FolderOutline, MaterialIconKind.Folder, () => new FoldersViewModel(this)),
             new NavItem(ShellPage.Activity, Tr.T("Activity"), MaterialIconKind.History, MaterialIconKind.History, () => new ActivityViewModel(this)),
-        ];
+        };
         // Settings live in the top bar (like the web and mobile apps' account menu), not the sidebar.
         NavItems = [.. NavEntries.OfType<NavItem>(),
             new NavItem(ShellPage.Settings, Tr.T("Settings"), MaterialIconKind.CogOutline, MaterialIconKind.Cog, () => new SettingsViewModel(this))];
@@ -90,6 +120,13 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
 
         AppServices.Engine.StatusChanged += OnStatusChanged;
         AppServices.Settings.Changed += OnSettingsChanged;
+        AppServices.AlbumsChanged += OnAlbumsChanged;
+        AlbumsNav.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(NavItem.IsExpanded))
+                RebuildRecentAlbums();
+        };
+        _ = LoadAlbumCacheAsync();
         ThemeService.Changed += OnThemeChanged;
         _ = LoadStorageAsync();
     }
@@ -99,7 +136,7 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<NavItem> NavItems { get; }
 
     /// <summary>The sidebar: pages and group headings.</summary>
-    public IReadOnlyList<object> NavEntries { get; }
+    public ObservableCollection<object> NavEntries { get; }
 
     [ObservableProperty]
     public partial NavItem SelectedNav { get; set; }
@@ -116,7 +153,12 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
         get => NavEntries.Contains(SelectedNav) ? SelectedNav : null;
         set
         {
-            if (value is NavItem item && !ReferenceEquals(item, SelectedNav))
+            if (value is NavAlbum recent)
+            {
+                OpenAlbumFromSidebar(recent.Album);
+                OnPropertyChanged();
+            }
+            else if (value is NavItem item && !ReferenceEquals(item, SelectedNav))
                 SelectedNav = item;
             else
                 OnPropertyChanged(); // headers can't be selected; keep the highlight where it was
@@ -298,8 +340,86 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
 
     void OnStatusChanged(SyncStatus status) => Dispatcher.UIThread.Post(() => ApplyStatus(status));
 
+    // ---- The sidebar's drop-down of the albums you used last ----
+
+    const int RecentAlbumCount = 3;
+    readonly Dictionary<string, AlbumInfo> _albumCache = [];
+    string _recentKey = "";
+    ThumbnailLoader? _navThumbnails;
+
+    NavItem AlbumsNav => NavItems.First(n => n.Page == ShellPage.Albums);
+
+    void OnAlbumsChanged() => Dispatcher.UIThread.Post(() => _ = LoadAlbumCacheAsync());
+
+    async Task LoadAlbumCacheAsync()
+    {
+        if (AppServices.Account.Client is not { } client)
+            return;
+        try
+        {
+            var albums = await client.GetAlbumsAsync(_lifetime.Token);
+            _albumCache.Clear();
+            foreach (var album in albums)
+                _albumCache[album.Id] = album;
+            _navThumbnails = new ThumbnailLoader(client);
+            _recentKey = "";
+            RebuildRecentAlbums();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Log.Info($"Recent albums unavailable: {ex.Message}");
+        }
+    }
+
+    void RebuildRecentAlbums()
+    {
+        var recent = AppServices.Settings.Current.RecentAlbumIds.Where(_albumCache.ContainsKey).Take(RecentAlbumCount).ToList();
+        var key = AlbumsNav.IsExpanded ? string.Join(",", recent) : "-";
+        if (key == _recentKey)
+            return;
+        _recentKey = key;
+        foreach (var old in NavEntries.OfType<NavAlbum>().ToList())
+        {
+            NavEntries.Remove(old);
+            old.Cover?.Dispose();
+        }
+        if (!AlbumsNav.IsExpanded)
+            return;
+        var at = NavEntries.IndexOf(AlbumsNav) + 1;
+        foreach (var id in recent)
+        {
+            var entry = new NavAlbum(_albumCache[id]);
+            NavEntries.Insert(at++, entry);
+            _ = LoadNavCoverAsync(entry);
+        }
+    }
+
+    async Task LoadNavCoverAsync(NavAlbum entry)
+    {
+        if (_navThumbnails is not { } loader || entry.Album.AlbumThumbnailAssetId is not { } cover)
+            return;
+        try
+        {
+            entry.Cover = await loader.LoadAsync(cover, AssetImageSize.Thumbnail, 64, _lifetime.Token);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Info($"Sidebar cover failed: {ex.Message}");
+        }
+    }
+
+    void OpenAlbumFromSidebar(AlbumInfo album)
+    {
+        Navigate(ShellPage.Albums);
+        (AlbumsNav.ViewModel as PhotosViewModel)?.OpenAlbum(album);
+    }
+
     void OnSettingsChanged(AppSettings settings) => Dispatcher.UIThread.Post(() =>
     {
+        RebuildRecentAlbums();
         LoadAccount(settings);
         IsLockEnabled = settings.AppLock != AppLockMode.Off;
         ApplyStatus(AppServices.Engine.Status);
@@ -325,6 +445,7 @@ public sealed partial class ShellViewModel : ViewModelBase, IDisposable
         _lifetime.Cancel();
         AppServices.Engine.StatusChanged -= OnStatusChanged;
         AppServices.Settings.Changed -= OnSettingsChanged;
+        AppServices.AlbumsChanged -= OnAlbumsChanged;
         ThemeService.Changed -= OnThemeChanged;
         foreach (var item in NavItems.Where(n => n.IsCreated))
             (item.ViewModel as IDisposable)?.Dispose();

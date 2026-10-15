@@ -141,12 +141,27 @@
               </Panel>
             </DataTemplate>
             <DataTemplate DataType="vm:NavItem">
-              <StackPanel Orientation="Horizontal" Spacing="14">
-                <Panel Width="20" Height="20">
-                  <mi:MaterialIcon Classes="inactive" Kind="{Binding Icon}" Width="20" Height="20" />
-                  <mi:MaterialIcon Classes="active" Kind="{Binding ActiveIcon}" Width="20" Height="20" />
-                </Panel>
-                <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" />
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Orientation="Horizontal" Spacing="14">
+                  <Panel Width="20" Height="20">
+                    <mi:MaterialIcon Classes="inactive" Kind="{Binding Icon}" Width="20" Height="20" />
+                    <mi:MaterialIcon Classes="active" Kind="{Binding ActiveIcon}" Width="20" Height="20" />
+                  </Panel>
+                  <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" />
+                </StackPanel>
+                <!-- Albums: fold the list of recent albums away or open it again -->
+                <Button Grid.Column="1" Classes="ghost icon" Width="28" Height="28" Padding="0" Margin="0,-4,-6,-4" VerticalAlignment="Center"
+                        IsVisible="{Binding IsExpandable}" Command="{Binding ToggleExpandedCommand}" l:Tr.Tip="Recent albums" AutomationProperties.Name="Recent albums">
+                  <mi:MaterialIcon Kind="{Binding ChevronIcon}" Width="18" Height="18" />
+                </Button>
+              </Grid>
+            </DataTemplate>
+            <DataTemplate DataType="vm:NavAlbum">
+              <StackPanel Orientation="Horizontal" Spacing="12" Margin="34,0,0,0">
+                <Border Width="26" Height="26" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
+                  <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                </Border>
+                <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="150" />
               </StackPanel>
             </DataTemplate>
           </ListBox.DataTemplates>

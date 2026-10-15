@@ -69,6 +69,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         if (Client is { } client)
             Thumbnails = new ThumbnailLoader(client);
         _ = LoadPageAsync();
+        _ = WatchMemoryAsync();
     }
 
     /// <summary>The same library for choosing a photo (e.g. a profile picture): clicking a photo picks it instead of opening it.</summary>

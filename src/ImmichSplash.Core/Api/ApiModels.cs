@@ -45,7 +45,9 @@ public sealed record UploadResult(string Id, string Status)
 }
 
 public sealed record AlbumInfo(string Id, string AlbumName, string? AlbumThumbnailAssetId = null, int AssetCount = 0, bool Shared = false,
-    string? OwnerId = null, List<System.Text.Json.JsonElement>? AlbumUsers = null, System.Text.Json.JsonElement? Owner = null)
+    string? OwnerId = null, List<System.Text.Json.JsonElement>? AlbumUsers = null, System.Text.Json.JsonElement? Owner = null,
+    DateTimeOffset? CreatedAt = null, DateTimeOffset? UpdatedAt = null, DateTimeOffset? StartDate = null, DateTimeOffset? EndDate = null,
+    string? Description = null)
 {
     /// <summary>
     /// Shared with other people: anyone besides you is in it (or it's someone else's album). The
@@ -206,6 +208,7 @@ internal sealed record UserResponseDto(string Id, string Name, string Email, lon
 internal sealed record ServerStorageDto(long DiskSizeRaw, long DiskUseRaw);
 internal sealed record BulkCheckRequestDto(IReadOnlyList<ChecksumItem> Assets);
 internal sealed record BulkCheckResponseDto(List<BulkCheckResult> Results);
+internal sealed record UpdateAlbumRequestDto(string AlbumName, string Description);
 internal sealed record CreateAlbumRequestDto(string AlbumName, IReadOnlyList<string>? AssetIds);
 internal sealed record BulkIdsRequestDto(IReadOnlyList<string> Ids);
 internal sealed record ServerFeaturesDto(bool PasswordLogin, bool Oauth, bool OauthAutoLaunch);

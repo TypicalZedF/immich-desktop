@@ -223,7 +223,8 @@ sealed class DemoServer : HttpMessageHandler
             // Like Immich v3: no ownerId, the owner is the first member, and "shared" also counts link-only albums.
             "/api/albums" => Json(Albums.Where(a => !DeletedAlbums.Contains(a.Id)).Select((a, i) => new
             {
-                id = a.Id, albumName = a.Name, albumThumbnailAssetId = $"202609-{i * 5 + 1}", assetCount = a.Count, shared = true, hasSharedLink = !a.Shared,
+                id = a.Id, albumName = a.Name, albumThumbnailAssetId = $"202609-{i * 5 + 1}", assetCount = a.Count, createdAt = DateTime.UtcNow.AddMonths(-i * 7 - 2), updatedAt = DateTime.UtcNow.AddMonths(-i * 7 - 1),
+                startDate = DateTime.UtcNow.AddMonths(-i * 7 - 3), endDate = DateTime.UtcNow.AddMonths(-i * 7 - (i % 2 == 0 ? 3 : 1)), shared = true, hasSharedLink = !a.Shared,
                 albumUsers = a.Shared
                     ? new object[] { new { role = "editor", user = new { id = "u1", name = "Alex" } }, new { role = "editor", user = new { id = "u2", name = "Sam" } } }
                     : new object[] { new { role = "editor", user = new { id = "u1", name = "Alex" } } },

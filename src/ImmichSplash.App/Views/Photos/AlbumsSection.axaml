@@ -1,4 +1,4 @@
-<!-- The Albums page: your albums as cover cards. Part of PhotosView. -->
+<!-- The Albums page: filter, search, sort, group by year, create/edit, cover cards or a list. Part of PhotosView. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:l="using:ImmichSplash.App.Services"
@@ -6,33 +6,165 @@
              xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="ImmichSplash.App.Views.Photos.AlbumsSection"
              x:DataType="vm:PhotosViewModel">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="28,8,10,24">
-    <ItemsControl ItemsSource="{Binding Albums}">
-      <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-      <ItemsControl.ItemTemplate>
-        <DataTemplate x:DataType="vm:AlbumCardViewModel">
-          <Button Classes="cover" Width="196" Command="{Binding OpenCommand}">
-            <Button.ContextMenu>
-              <ContextMenu>
-                <MenuItem l:Tr.Header="Open" Command="{Binding OpenCommand}" />
-                <MenuItem l:Tr.Header="Delete album" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" />
-              </ContextMenu>
-            </Button.ContextMenu>
-            <StackPanel Spacing="8">
-              <Border Classes="coverImage" Width="196" Height="196" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
-                <Panel>
-                  <mi:MaterialIcon Kind="ImageAlbum" Width="40" Height="40" Foreground="{DynamicResource AppTextTertiaryBrush}" />
-                  <Image Source="{Binding Cover}" Stretch="UniformToFill" />
-                </Panel>
-              </Border>
-              <StackPanel Spacing="1" Margin="2,0">
-                <TextBlock Text="{Binding Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
-                <TextBlock Classes="caption" Text="{Binding Subtitle}" />
-              </StackPanel>
+  <DockPanel>
+    <!-- Toolbar -->
+    <WrapPanel DockPanel.Dock="Top" Margin="28,4,10,10" ItemSpacing="10" LineSpacing="8">
+      <Border Classes="segmented" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal">
+          <RadioButton Classes="segment" GroupName="albumFilter" l:Tr.Content="All" IsChecked="{Binding IsFilterAll, Mode=OneWay}" Command="{Binding ShowAllAlbumsCommand}" />
+          <RadioButton Classes="segment" GroupName="albumFilter" l:Tr.Content="Owned" IsChecked="{Binding IsFilterOwned, Mode=OneWay}" Command="{Binding ShowOwnedAlbumsCommand}" />
+          <RadioButton Classes="segment" GroupName="albumFilter" l:Tr.Content="Shared" IsChecked="{Binding IsFilterShared, Mode=OneWay}" Command="{Binding ShowSharedAlbumsCommand}" />
+        </StackPanel>
+      </Border>
+
+      <TextBox Width="260" Text="{Binding AlbumSearchText}" l:Tr.Watermark="Search albums" VerticalAlignment="Center" AutomationProperties.Name="Search albums" />
+
+      <Button Classes="secondary" Command="{Binding CreateAlbumCommand}" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <mi:MaterialIcon Kind="Plus" Width="16" Height="16" />
+          <TextBlock l:Tr.Text="Create album" />
+        </StackPanel>
+      </Button>
+
+      <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+        <Button Classes="ghost icon" Command="{Binding ToggleAlbumSortDirectionCommand}" l:Tr.Tip="Reverse the order" AutomationProperties.Name="Reverse the order">
+          <mi:MaterialIcon Kind="{Binding AlbumSortIcon}" Width="18" Height="18" />
+        </Button>
+        <ComboBox ItemsSource="{Binding AlbumSortChoices}" SelectedItem="{Binding SelectedAlbumSort}" MinWidth="170" AutomationProperties.Name="Sort albums">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:AlbumSortChoice"><TextBlock Text="{Binding Label}" /></DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+      </StackPanel>
+
+      <ToggleButton Classes="ghost" IsChecked="{Binding AlbumGroupByYear}" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <mi:MaterialIcon Kind="CalendarMonthOutline" Width="18" Height="18" />
+          <TextBlock l:Tr.Text="Group by year" />
+        </StackPanel>
+      </ToggleButton>
+
+      <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" IsVisible="{Binding AlbumGroupByYear}">
+        <Button Classes="ghost icon" Command="{Binding ExpandAllAlbumGroupsCommand}" l:Tr.Tip="Expand all years" AutomationProperties.Name="Expand all years">
+          <mi:MaterialIcon Kind="UnfoldMoreHorizontal" Width="18" Height="18" />
+        </Button>
+        <Button Classes="ghost icon" Command="{Binding CollapseAllAlbumGroupsCommand}" l:Tr.Tip="Collapse all years" AutomationProperties.Name="Collapse all years">
+          <mi:MaterialIcon Kind="UnfoldLessHorizontal" Width="18" Height="18" />
+        </Button>
+      </StackPanel>
+
+      <Button Classes="ghost" Command="{Binding ToggleAlbumViewCommand}" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <mi:MaterialIcon Kind="{Binding AlbumViewIcon}" Width="18" Height="18" />
+          <TextBlock Text="{Binding AlbumViewText}" />
+        </StackPanel>
+      </Button>
+    </WrapPanel>
+
+    <!-- Create / edit an album -->
+    <Border DockPanel.Dock="Top" Classes="card" Margin="28,0,10,12" Padding="18" CornerRadius="16" IsVisible="{Binding IsEditingAlbum}" MaxWidth="560" HorizontalAlignment="Left">
+      <StackPanel Spacing="10">
+        <TextBlock Classes="h3" Text="{Binding AlbumEditorTitle}" />
+        <TextBox Text="{Binding AlbumEditorName}" l:Tr.Watermark="Album name" AutomationProperties.Name="Album name">
+          <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding SaveAlbumEditorCommand}" /></TextBox.KeyBindings>
+        </TextBox>
+        <TextBox Text="{Binding AlbumEditorDescription}" l:Tr.Watermark="Description (optional)" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" AutomationProperties.Name="Description" />
+        <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding AlbumEditorError}"
+                   IsVisible="{Binding AlbumEditorError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+          <Button Classes="secondary" l:Tr.Content="Cancel" Command="{Binding CancelAlbumEditorCommand}" />
+          <Button Classes="primary" l:Tr.Content="Save" Command="{Binding SaveAlbumEditorCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <TextBlock DockPanel.Dock="Top" Classes="secondary" Margin="28,12,10,0" Text="{Binding AlbumsEmptyText}"
+               IsVisible="{Binding AlbumsEmptyText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="28,0,10,24">
+      <ItemsControl ItemsSource="{Binding AlbumGroups}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:AlbumGroupViewModel">
+            <StackPanel Spacing="8" Margin="0,0,0,14">
+              <!-- Year heading -->
+              <Button Classes="ghost" Command="{Binding ToggleCommand}" IsVisible="{Binding ShowHeader}" HorizontalAlignment="Left" Padding="4,2">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <mi:MaterialIcon Kind="ChevronDown" Width="20" Height="20" IsVisible="{Binding IsExpanded}" />
+                  <mi:MaterialIcon Kind="ChevronRight" Width="20" Height="20" IsVisible="{Binding !IsExpanded}" />
+                  <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <TextBlock Classes="secondary" Text="{Binding CountText}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+
+              <!-- Cover cards -->
+              <ItemsControl ItemsSource="{Binding Albums}" IsVisible="{Binding IsGridOpen}">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:AlbumCardViewModel">
+                    <Button Classes="cover" Width="196" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Title}">
+                      <Button.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem l:Tr.Header="Open" Command="{Binding OpenCommand}" />
+                          <MenuItem l:Tr.Header="Edit album" Command="{Binding EditCommand}" IsVisible="{Binding CanDelete}" />
+                          <MenuItem l:Tr.Header="Share" Command="{Binding ShareCommand}" IsVisible="{Binding CanDelete}" />
+                          <MenuItem l:Tr.Header="Download" Command="{Binding DownloadCommand}" />
+                          <MenuItem l:Tr.Header="Delete album" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" />
+                        </ContextMenu>
+                      </Button.ContextMenu>
+                      <StackPanel Spacing="8">
+                        <Border Classes="coverImage" Width="196" Height="196" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
+                          <Panel>
+                            <mi:MaterialIcon Kind="ImageAlbum" Width="40" Height="40" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                            <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                          </Panel>
+                        </Border>
+                        <StackPanel Spacing="1" Margin="2,0">
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="caption" Text="{Binding DateText}" IsVisible="{Binding HasDateText}" />
+                          <TextBlock Classes="caption" Text="{Binding Meta}" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <!-- List rows -->
+              <ItemsControl ItemsSource="{Binding Albums}" IsVisible="{Binding IsListOpen}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:AlbumCardViewModel">
+                    <Button Classes="cover" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Command="{Binding OpenCommand}"
+                            AutomationProperties.Name="{Binding Title}">
+                      <Button.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem l:Tr.Header="Open" Command="{Binding OpenCommand}" />
+                          <MenuItem l:Tr.Header="Edit album" Command="{Binding EditCommand}" IsVisible="{Binding CanDelete}" />
+                          <MenuItem l:Tr.Header="Share" Command="{Binding ShareCommand}" IsVisible="{Binding CanDelete}" />
+                          <MenuItem l:Tr.Header="Download" Command="{Binding DownloadCommand}" />
+                          <MenuItem l:Tr.Header="Delete album" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" />
+                        </ContextMenu>
+                      </Button.ContextMenu>
+                      <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="2,4">
+                        <Border Classes="coverImage" Width="56" Height="56" CornerRadius="10" ClipToBounds="True" Background="{DynamicResource AppNeutralSoftBrush}">
+                          <Panel>
+                            <mi:MaterialIcon Kind="ImageAlbum" Width="22" Height="22" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                            <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                          </Panel>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="1">
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="caption" Text="{Binding DateText}" IsVisible="{Binding HasDateText}" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Classes="secondary" Text="{Binding Meta}" VerticalAlignment="Center" Margin="0,0,16,0" />
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
             </StackPanel>
-          </Button>
-        </DataTemplate>
-      </ItemsControl.ItemTemplate>
-    </ItemsControl>
-  </ScrollViewer>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </DockPanel>
 </UserControl>

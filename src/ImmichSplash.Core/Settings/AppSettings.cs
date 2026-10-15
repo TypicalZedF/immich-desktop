@@ -145,6 +145,15 @@ public sealed class AppSettings
     /// <summary>Photo grid thumbnail size in pixels (the zoom slider in Photos).</summary>
     public int ThumbnailSize { get; set; } = 168;
 
+    /// <summary>How the Albums page is arranged (remembered).</summary>
+    public string AlbumSort { get; set; } = "MostRecentPhoto";
+    public bool AlbumSortDescending { get; set; } = true;
+    public bool AlbumGroupByYear { get; set; } = true;
+    public bool AlbumListView { get; set; }
+
+    /// <summary>The albums you opened or added to most recently (ids, newest first), for the sidebar.</summary>
+    public List<string> RecentAlbumIds { get; set; } = [];
+
     /// <summary>Where the main window was when it was last closed (null: use the default size, centred).</summary>
     public double? WindowWidth { get; set; }
     public double? WindowHeight { get; set; }

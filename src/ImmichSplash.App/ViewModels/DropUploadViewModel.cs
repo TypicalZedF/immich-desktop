@@ -15,12 +15,20 @@ public sealed partial class DropUploadViewModel : ViewModelBase
 {
     readonly MainWindowViewModel _main;
     readonly IReadOnlyList<string> _files;
+    readonly AlbumInfo? _contextAlbum;
+    readonly Action? _uploaded;
     CancellationTokenSource? _cts;
 
-    public DropUploadViewModel(MainWindowViewModel main, IReadOnlyList<string> files)
+    /// <param name="contextAlbum">The album that was open when the files were dropped: they go into it unless you change that.</param>
+    /// <param name="uploaded">Called after files went in (so the open page can show them).</param>
+    public DropUploadViewModel(MainWindowViewModel main, IReadOnlyList<string> files, AlbumInfo? contextAlbum = null, Action? uploaded = null)
     {
         _main = main;
         _files = files;
+        _contextAlbum = contextAlbum;
+        _uploaded = uploaded;
+        if (contextAlbum is not null)
+            AlbumName = contextAlbum.AlbumName;
         if (files.Count == 0)
         {
             Title = Tr.T("Nothing to upload");
@@ -39,6 +47,11 @@ public sealed partial class DropUploadViewModel : ViewModelBase
     public partial string AlbumName { get; set; } = "";
 
     public string AlbumHint => Tr.T("Add to an album (optional)");
+
+    /// <summary>Says where the files are going when an album was open.</summary>
+    public string? ContextText => _contextAlbum is { } a ? Tr.T("They'll be added to the album “{0}”, the one you have open.", a.AlbumName) : null;
+
+    public bool HasContext => _contextAlbum is not null;
 
     /// <summary>Your albums, as suggestions while typing.</summary>
     [ObservableProperty]
@@ -90,7 +103,14 @@ public sealed partial class DropUploadViewModel : ViewModelBase
         {
             var limiter = new BandwidthLimiter(AppServices.Settings.Current.UploadLimitKBps * 1024L);
             var album = AlbumName.Trim();
-            var result = await Task.Run(() => DroppedFilesUploader.UploadAsync(client, _files, album, limiter, progress, cts.Token), cts.Token);
+            var result = await Task.Run(() => DroppedFilesUploader.UploadAsync(client, _files, album, limiter, progress, cts.Token,
+                _contextAlbum is { } ctx && album == ctx.AlbumName ? ctx.Id : null), cts.Token);
+            if (result.Uploaded + result.AlreadyThere > 0)
+            {
+                _uploaded?.Invoke();
+                if (album.Length > 0)
+                    await RememberAlbumAsync(client, album);
+            }
             var parts = new List<string>();
             if (result.Uploaded > 0)
                 parts.Add(Tr.T("Uploaded {0}.", Format.Plural(result.Uploaded, "photo or video", "photos and videos")));
@@ -118,6 +138,24 @@ public sealed partial class DropUploadViewModel : ViewModelBase
             IsUploading = false;
             IsDone = true;
             Progress = 1;
+        }
+    }
+
+    /// <summary>Puts the album the files went into at the top of the sidebar's recent albums.</summary>
+    async Task RememberAlbumAsync(ImmichClient client, string name)
+    {
+        try
+        {
+            var id = _contextAlbum is { } ctx && ctx.AlbumName == name
+                ? ctx.Id
+                : (await client.GetAlbumsAsync(CancellationToken.None)).FirstOrDefault(a => a.AlbumName == name)?.Id;
+            if (id is not null)
+                PhotosViewModel.RememberAlbum(id);
+            AppServices.RaiseAlbumsChanged();
+        }
+        catch (Exception ex)
+        {
+            Log.Info($"Couldn't note the album for the sidebar: {ex.Message}");
         }
     }
 

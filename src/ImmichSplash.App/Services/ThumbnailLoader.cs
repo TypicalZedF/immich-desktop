@@ -17,6 +17,9 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
 
     readonly SemaphoreSlim _downloads = new(8, 8);
     readonly SemaphoreSlim _local = new(3, 3);
+
+    // Decoding is CPU- and memory-hungry: a fast scroll must queue up, not decode a hundred pictures at once.
+    readonly SemaphoreSlim _decodes = new(Math.Clamp(Environment.ProcessorCount / 2, 2, 4));
     readonly Lock _gate = new();
     readonly Dictionary<string, LinkedListNode<(string Key, byte[] Data)>> _index = [];
     readonly LinkedList<(string Key, byte[] Data)> _lru = new();
@@ -26,21 +29,46 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
     public async Task<Bitmap?> LoadAsync(string assetId, AssetImageSize size, int decodeWidth, CancellationToken ct)
     {
         var data = await FetchAsync($"{assetId}:{size}", t => client.GetAssetImageAsync(assetId, size, t), cache: size == AssetImageSize.Thumbnail, ct);
-        return await Task.Run(() =>
+        await _decodes.WaitAsync(ct);
+        try
         {
-            using var stream = new MemoryStream(data);
-            return Bitmap.DecodeToWidth(stream, Math.Max(32, decodeWidth), BitmapInterpolationMode.MediumQuality);
-        }, ct);
+            return await Task.Run(() =>
+            {
+                ct.ThrowIfCancellationRequested();
+                using var stream = new MemoryStream(data);
+                return Bitmap.DecodeToWidth(stream, Math.Max(32, decodeWidth), BitmapInterpolationMode.MediumQuality);
+            }, ct);
+        }
+        finally
+        {
+            _decodes.Release();
+        }
     }
 
-    // Decoded grid thumbnails, shared by every cell showing that photo. Eviction just drops the
-    // reference (a cell may still be drawing it); the memory is freed once nothing uses it.
-    const long DecodedBudgetBytes = 192L * 1024 * 1024;
-    readonly Dictionary<string, LinkedListNode<(string Key, Bitmap Bitmap, long Bytes)>> _decoded = [];
-    readonly LinkedList<(string Key, Bitmap Bitmap, long Bytes)> _decodedOrder = new();
+    // Decoded grid thumbnails, shared by every cell showing that photo. Each cell that shows one holds
+    // a lease on it; an evicted picture is freed as soon as the last lease is returned (not left to the
+    // garbage collector, which can't see the native memory behind a picture and lets it pile up when
+    // scrolling fast).
+    const long DecodedBudgetBytes = 160L * 1024 * 1024;
+
+    sealed class Decoded(string key, Bitmap bitmap, long bytes)
+    {
+        public string Key { get; } = key;
+        public Bitmap Bitmap { get; } = bitmap;
+        public long Bytes { get; } = bytes;
+        public int Leases;
+        public bool Evicted;
+    }
+
+    readonly Dictionary<string, LinkedListNode<Decoded>> _decoded = [];
+    readonly LinkedList<Decoded> _decodedOrder = new();
+    readonly Dictionary<Bitmap, Decoded> _leased = new(ReferenceEqualityComparer.Instance);
     long _decodedBytes;
 
-    /// <summary>A grid thumbnail, decoded once and reused (don't dispose it: the cache owns it).</summary>
+    /// <summary>
+    /// A grid thumbnail, decoded once and shared. The caller holds a lease on it until it hands it
+    /// back with <see cref="ReturnGridThumbnail"/>; don't dispose it yourself.
+    /// </summary>
     public async Task<Bitmap?> LoadGridThumbnailAsync(string assetId, int decodeWidth, CancellationToken ct)
     {
         // Round the width so small layout changes reuse what's decoded.
@@ -52,7 +80,7 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
             {
                 _decodedOrder.Remove(node);
                 _decodedOrder.AddFirst(node);
-                return node.Value.Bitmap;
+                return Lease(node.Value);
             }
         }
         var bitmap = await LoadAsync(assetId, AssetImageSize.Thumbnail, width, ct);
@@ -61,18 +89,65 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
         lock (_gate)
         {
             if (_decoded.TryGetValue(key, out var raced))
-                return raced.Value.Bitmap;
-            var bytes = (long)bitmap.PixelSize.Width * bitmap.PixelSize.Height * 4;
-            _decoded[key] = _decodedOrder.AddFirst((key, bitmap, bytes));
-            _decodedBytes += bytes;
-            while (_decodedBytes > DecodedBudgetBytes && _decodedOrder.Last is { } oldest)
             {
-                _decodedOrder.RemoveLast();
-                _decoded.Remove(oldest.Value.Key);
-                _decodedBytes -= oldest.Value.Bytes;
+                bitmap.Dispose(); // someone else decoded the same picture meanwhile
+                return Lease(raced.Value);
             }
+            var entry = new Decoded(key, bitmap, (long)bitmap.PixelSize.Width * bitmap.PixelSize.Height * 4);
+            _decoded[key] = _decodedOrder.AddFirst(entry);
+            _decodedBytes += entry.Bytes;
+            var result = Lease(entry);
+            EvictDecoded(DecodedBudgetBytes);
+            return result;
         }
-        return bitmap;
+    }
+
+    Bitmap Lease(Decoded entry)
+    {
+        entry.Leases++;
+        _leased[entry.Bitmap] = entry;
+        return entry.Bitmap;
+    }
+
+    /// <summary>Hands back a picture from <see cref="LoadGridThumbnailAsync"/> once nothing shows it.</summary>
+    public void ReturnGridThumbnail(Bitmap bitmap)
+    {
+        lock (_gate)
+        {
+            if (!_leased.TryGetValue(bitmap, out var entry))
+                return;
+            if (--entry.Leases > 0)
+                return;
+            _leased.Remove(bitmap);
+            if (entry.Evicted)
+                entry.Bitmap.Dispose();
+        }
+    }
+
+    /// <summary>Drops cached pictures (oldest first) until at most <paramref name="budget"/> bytes remain. Call with the lock held.</summary>
+    void EvictDecoded(long budget)
+    {
+        while (_decodedBytes > budget && _decodedOrder.Last is { } oldest)
+        {
+            _decodedOrder.RemoveLast();
+            _decoded.Remove(oldest.Value.Key);
+            _decodedBytes -= oldest.Value.Bytes;
+            oldest.Value.Evicted = true;
+            if (oldest.Value.Leases == 0)
+                oldest.Value.Bitmap.Dispose();
+        }
+    }
+
+    /// <summary>Frees the cached pictures nobody is showing (memory is running high).</summary>
+    public void TrimMemory()
+    {
+        lock (_gate)
+        {
+            EvictDecoded(0);
+            _index.Clear();
+            _lru.Clear();
+            _cachedBytes = 0;
+        }
     }
 
     /// <summary>
@@ -186,9 +261,7 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
     {
         lock (_gate)
         {
-            _decoded.Clear();
-            _decodedOrder.Clear();
-            _decodedBytes = 0;
+            EvictDecoded(0);
             _index.Clear();
             _lru.Clear();
             _cachedBytes = 0;

@@ -42,7 +42,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (!CanAcceptDrop)
             return;
-        ShowOverlay(new DropUploadViewModel(this, Core.Sync.DroppedFilesUploader.CollectMedia(paths, Core.Sync.MediaTypes.Default)));
+        // Dropped onto an open album: it goes into that album (shown in the panel, and you can change it).
+        var photos = (Content as ShellViewModel)?.CurrentPage as PhotosViewModel;
+        var album = photos?.Drill?.Album;
+        ShowOverlay(new DropUploadViewModel(this, Core.Sync.DroppedFilesUploader.CollectMedia(paths, Core.Sync.MediaTypes.Default), album,
+            album is null ? null : () => photos!.RefreshCommand.Execute(null)));
     }
 
     public void ShowOverlay(ViewModelBase overlay)

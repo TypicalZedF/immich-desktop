@@ -117,10 +117,26 @@ public sealed class BucketState
     {
         // Shared by every row of the group; a failed load is retried next time.
         if (_assets is null || _assets.IsFaulted || _assets.IsCanceled)
-            _assets = _load();
+            _assets = LoadThrottledAsync();
         return Cast(_assets.WaitAsync(ct));
 
         static async Task<IReadOnlyList<TimelineAsset>> Cast(Task<List<TimelineAsset>> task) => await task;
+    }
+
+    // Fast scrolling or dragging the date rail asks for many months at once: fetch a few at a time.
+    static readonly SemaphoreSlim BucketLoads = new(3, 3);
+
+    async Task<List<TimelineAsset>> LoadThrottledAsync()
+    {
+        await BucketLoads.WaitAsync();
+        try
+        {
+            return await _load();
+        }
+        finally
+        {
+            BucketLoads.Release();
+        }
     }
 
     /// <summary>Updates a loaded asset in place (e.g. after favoriting it).</summary>
@@ -356,7 +372,9 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
             {
                 // Shared, decoded thumbnails: scrolling back shows them instantly (the cache owns them).
                 var bitmap = await loader.LoadGridThumbnailAsync(asset.Id, owner.DecodeWidth, ct);
-                if (!ct.IsCancellationRequested)
+                if (bitmap is not null && (ct.IsCancellationRequested || Thumbnail is not null))
+                    loader.ReturnGridThumbnail(bitmap); // scrolled away (or already has one): give it back
+                else if (bitmap is not null)
                 {
                     Thumbnail = bitmap;
                     _ownsThumbnail = false;
@@ -387,8 +405,12 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
         var bitmap = Thumbnail;
         _thumbnailTried = false;
         Thumbnail = null;
+        if (bitmap is null)
+            return;
         if (_ownsThumbnail)
-            bitmap?.Dispose();
+            bitmap.Dispose();
+        else
+            owner.Thumbnails?.ReturnGridThumbnail(bitmap);
     }
 
     /// <summary>Opens the photo, or (while selecting) adds it to the selection.</summary>

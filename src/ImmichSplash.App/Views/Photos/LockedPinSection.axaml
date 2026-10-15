@@ -6,29 +6,52 @@
              xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="ImmichSplash.App.Views.Photos.LockedPinSection"
              x:DataType="vm:PhotosViewModel">
-  <Border Classes="card" Width="400" Padding="28,26" HorizontalAlignment="Center" VerticalAlignment="Center"
+  <UserControl.Styles>
+    <Style Selector="Border.pinBox">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="Height" Value="48" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="Background" Value="{DynamicResource AppInputBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppCardBorderBrush}" />
+    </Style>
+    <Style Selector="Border.pinBox.active">
+      <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryBrush}" />
+    </Style>
+  </UserControl.Styles>
+  <Border Classes="card" Width="520" Padding="32,34,32,30" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center"
           IsVisible="{Binding ShowLockedPrompt}">
-    <StackPanel Spacing="14">
-      <Border Width="56" Height="56" CornerRadius="28" Background="{DynamicResource AppPrimarySoftBrush}" HorizontalAlignment="Center">
-        <mi:MaterialIcon Kind="Lock" Width="26" Height="26" Foreground="{DynamicResource AppPrimaryBrush}" />
-      </Border>
-      <TextBlock Classes="h2" l:Tr.Text="Locked folder" HorizontalAlignment="Center" />
-      <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
-                 l:Tr.Text="Photos here are hidden from your timeline, albums and search. Enter your Immich PIN to see them." />
-      <StackPanel Spacing="10" IsVisible="{Binding CanEnterPin}">
-        <TextBox Text="{Binding Pin}" PasswordChar="●" l:Tr.Watermark="PIN code" HorizontalContentAlignment="Center">
+    <StackPanel Spacing="22">
+      <mi:MaterialIcon Kind="LockOutline" Width="64" Height="64" Foreground="{DynamicResource AppPrimaryBrush}" HorizontalAlignment="Center" />
+      <TextBlock l:Tr.Text="Enter your PIN code to access the locked folder" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+      <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center" IsVisible="{Binding !CanEnterPin}"
+                 l:Tr.Text="Photos here are hidden from your timeline, albums and search." />
+
+      <!-- Six boxes to look at; an invisible text box on top takes the typing. -->
+      <Panel HorizontalAlignment="Center" IsVisible="{Binding CanEnterPin}">
+        <ItemsControl ItemsSource="{Binding PinBoxes}" IsHitTestVisible="False">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="10" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PinBox">
+              <Border Classes="pinBox" Classes.active="{Binding Active}">
+                <Ellipse Width="10" Height="10" Fill="{DynamicResource AppTextBrush}" IsVisible="{Binding Filled}" />
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBox Name="PinInput" Text="{Binding Pin}" MaxLength="6" PasswordChar="●" Opacity="0" Background="Transparent" BorderThickness="0"
+                 l:Tr.Watermark="PIN code" AutomationProperties.Name="PIN code">
           <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding UnlockCommand}" /></TextBox.KeyBindings>
         </TextBox>
-        <Button Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding UnlockCommand}"
-                IsEnabled="{Binding !IsUnlocking}">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <mi:MaterialIcon Kind="Loading" Classes="spin" Width="16" Height="16" IsVisible="{Binding IsUnlocking}" />
-            <TextBlock l:Tr.Text="Unlock" />
-          </StackPanel>
-        </Button>
-      </StackPanel>
+      </Panel>
+
       <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding LockedMessage}" TextWrapping="Wrap"
                  TextAlignment="Center" IsVisible="{Binding LockedMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+      <Button Classes="secondary" HorizontalAlignment="Center" MinWidth="96" HorizontalContentAlignment="Center" Command="{Binding CancelPinCommand}"
+              Background="{DynamicResource AppTextBrush}" Foreground="{DynamicResource AppCardBrush}">
+        <TextBlock l:Tr.Text="Cancel" />
+      </Button>
     </StackPanel>
   </Border>
 </UserControl>

@@ -38,12 +38,17 @@ public sealed partial class PhotosViewModel
     [ObservableProperty]
     public partial bool HasMorePlaces { get; set; }
 
-    Task LoadAlbumsAsync() => LoadCardsAsync(async c =>
+    async Task LoadAlbumsAsync()
     {
-        var albums = await c.GetAlbumsAsync(_lifetime.Token);
-        return albums.OrderByDescending(a => a.AssetCount > 0).ThenBy(a => a.AlbumName, StringComparer.CurrentCultureIgnoreCase)
-            .Select(a => new AlbumCardViewModel(this, a)).ToList();
-    }, Albums, null, Tr.T("No albums yet. Create one from selected photos with “Add to album”."), m => CollectionMessage = m);
+        // The page's own empty message is shown by the album list (it knows about filters and search).
+        await LoadCardsAsync(async c =>
+        {
+            var albums = await c.GetAlbumsAsync(_lifetime.Token);
+            return albums.Select(a => new AlbumCardViewModel(this, a)).ToList();
+        }, Albums, null, "", m => CollectionMessage = string.IsNullOrEmpty(m) ? null : m);
+        RebuildAlbumGroups();
+        AppServices.RaiseAlbumsChanged();
+    }
 
     Task LoadPeopleAsync() => LoadCardsAsync(async c =>
     {
@@ -125,8 +130,21 @@ public sealed partial class PhotosViewModel
         LoadCovers(rest);
     }
 
-    internal void OpenAlbum(AlbumInfo album) =>
+    internal void OpenAlbum(AlbumInfo album)
+    {
+        RememberAlbum(album.Id);
         OpenDrill(new GridQuery(album.AlbumName, (c, ct) => TimelineAsync(c, new TimelineFilter(AlbumId: album.Id), ct), album));
+    }
+
+    /// <summary>Puts an album first in the sidebar's list of recent albums.</summary>
+    internal static void RememberAlbum(string albumId) =>
+        AppServices.Settings.Update(s =>
+        {
+            s.RecentAlbumIds.Remove(albumId);
+            s.RecentAlbumIds.Insert(0, albumId);
+            if (s.RecentAlbumIds.Count > 10)
+                s.RecentAlbumIds.RemoveRange(10, s.RecentAlbumIds.Count - 10);
+        });
 
     internal void OpenPerson(PersonInfo person) =>
         OpenDrill(new GridQuery(person.Name.Length > 0 ? person.Name : Tr.T("Unnamed person"), (c, ct) => TimelineAsync(c, new TimelineFilter(PersonId: person.Id), ct)));

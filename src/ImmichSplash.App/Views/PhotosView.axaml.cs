@@ -50,6 +50,7 @@ public partial class PhotosView : UserControl
         {
             if (_scroll is null)
                 return;
+            _pinned = null;
             _scroll.Offset = new Vector(_scroll.Offset.X, Math.Clamp(_scroll.Offset.Y - e.Delta.Y * 120, 0, Math.Max(0, _scroll.Extent.Height - _scroll.Viewport.Height)));
             e.Handled = true;
         };
@@ -94,7 +95,11 @@ public partial class PhotosView : UserControl
         _scroll = _grid.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
         if (_scroll is null)
             return;
-        _scroll.ScrollChanged += (_, _) => UpdateScrubber();
+        _scroll.ScrollChanged += (_, _) =>
+        {
+            UpdateScrubber();
+            Realign();
+        };
         _scroll.SizeChanged += (_, _) => UpdateScrubber();
         // Smooth wheel scrolling (and Ctrl + wheel to resize thumbnails), before the list jumps by itself.
         _grid.AddHandler(PointerWheelChangedEvent, OnGridWheel, Avalonia.Interactivity.RoutingStrategies.Tunnel);
@@ -126,6 +131,7 @@ public partial class PhotosView : UserControl
         if (!point.Properties.IsMiddleButtonPressed || _scroll is null)
             return;
         e.Handled = true;
+        _pinned = null;
         _scrollTarget = null;
         _autoAnchor = _autoPointer = point.Position;
         _autoStarted = DateTime.UtcNow;
@@ -197,6 +203,7 @@ public partial class PhotosView : UserControl
         if (Math.Abs(e.Delta.X) > Math.Abs(e.Delta.Y) || e.KeyModifiers.HasFlag(KeyModifiers.Shift))
             return; // sideways: e.g. the memories strip
         e.Handled = true;
+        _pinned = null;
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
             _vm.ThumbnailSize *= Math.Pow(1.12, e.Delta.Y);
@@ -291,11 +298,54 @@ public partial class PhotosView : UserControl
         return null;
     }
 
+    // ---- Keeping a position you asked for ----
+    // The list only estimates the height of rows it hasn't drawn, so while rows around a seek target
+    // are drawn and the estimates settle, the content would drift away from where the date rail put
+    // it. For a moment after a seek (or any other jump), keep correcting to the exact position, until
+    // you scroll yourself.
+
+    double? _pinned;
+    DateTime _pinUntil;
+    bool _realigning;
+
+    void Pin(double exactOffset)
+    {
+        _pinned = exactOffset;
+        _pinUntil = DateTime.UtcNow.AddMilliseconds(1500);
+    }
+
+    void Realign()
+    {
+        if (_pinned is not { } pinned || _scroll is null || _vm is null || _realigning)
+            return;
+        if (DateTime.UtcNow > _pinUntil)
+        {
+            _pinned = null;
+            return;
+        }
+        if (CurrentOffset() is not { } current)
+            return;
+        var error = pinned - current;
+        if (Math.Abs(error) < 1)
+            return;
+        _realigning = true;
+        try
+        {
+            var max = Math.Max(0, _scroll.Extent.Height - _scroll.Viewport.Height);
+            _scroll.Offset = new Vector(_scroll.Offset.X, Math.Clamp(_scroll.Offset.Y + error, 0, max));
+        }
+        finally
+        {
+            _realigning = false;
+        }
+    }
+
     /// <summary>Scrolls so that an exact grid position is at the top: bring its row into view, then line it up.</summary>
     void SeekTo(double offset)
     {
         if (_vm is null || _scroll is null)
             return;
+        Pin(offset);
         var (index, within) = _vm.RowAt(offset);
         _grid.ScrollIntoView(index);
         _grid.UpdateLayout();
@@ -491,6 +541,7 @@ public partial class PhotosView : UserControl
 
     void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        _pinned = null;
         if (_vm is null)
             return;
         if (e.Key == Key.Escape && _vm.Panel is { } panel)

@@ -17,6 +17,7 @@
       <StackPanel Spacing="8" IsVisible="{Binding IsAsking}">
         <TextBlock Classes="secondary" TextWrapping="Wrap"
                    l:Tr.Text="They're uploaded once, not added to your backup folders. Anything already in Immich is skipped." />
+        <TextBlock TextWrapping="Wrap" FontWeight="Medium" Text="{Binding ContextText}" IsVisible="{Binding HasContext}" />
         <AutoCompleteBox Text="{Binding AlbumName}" ItemsSource="{Binding AlbumNames}" FilterMode="ContainsOrdinal"
                          Watermark="{Binding AlbumHint}" />
       </StackPanel>

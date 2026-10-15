@@ -20,6 +20,41 @@ public sealed partial class PhotosViewModel
     [ObservableProperty]
     public partial string? LockedMessage { get; set; }
 
+    /// <summary>The PIN as six boxes (a filled one per typed digit; the next one to fill is the active one).</summary>
+    public IReadOnlyList<PinBox> PinBoxes => Enumerable.Range(0, PinLength)
+        .Select(i => new PinBox(i < Pin.Length, CanEnterPin && !IsUnlocking && i == Math.Min(Pin.Length, PinLength - 1))).ToList();
+
+    const int PinLength = 6;
+
+    partial void OnPinChanged(string value)
+    {
+        // Digits only; the box row is the display and the six-digit PIN unlocks as soon as it's complete.
+        var digits = new string(value.Where(char.IsAsciiDigit).Take(PinLength).ToArray());
+        if (digits != value)
+        {
+            Pin = digits;
+            return;
+        }
+        OnPropertyChanged(nameof(PinBoxes));
+        if (digits.Length == PinLength && CanEnterPin && !IsUnlocking)
+            _ = UnlockAsync();
+    }
+
+    partial void OnCanEnterPinChanged(bool value) => OnPropertyChanged(nameof(PinBoxes));
+
+    partial void OnIsUnlockingChanged(bool value) => OnPropertyChanged(nameof(PinBoxes));
+
+    /// <summary>Set by the shell: leaves the locked folder (the PIN prompt's Cancel).</summary>
+    internal Action? LeaveRequested { get; set; }
+
+    [RelayCommand]
+    void CancelPin()
+    {
+        Pin = "";
+        LockedMessage = null;
+        LeaveRequested?.Invoke();
+    }
+
     [ObservableProperty]
     public partial bool CanEnterPin { get; set; }
 
@@ -79,6 +114,7 @@ public sealed partial class PhotosViewModel
         catch (ImmichApiException ex) when ((int)ex.StatusCode is >= 400 and < 500)
         {
             LockedMessage = Tr.T("That PIN isn't right.");
+            Pin = "";
         }
         catch (Exception ex)
         {
@@ -139,3 +175,6 @@ public sealed partial class PhotosViewModel
         return await panel.Result;
     }
 }
+
+/// <summary>One of the PIN prompt's boxes.</summary>
+public sealed record PinBox(bool Filled, bool Active);

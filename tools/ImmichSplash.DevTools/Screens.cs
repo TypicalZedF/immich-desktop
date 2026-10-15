@@ -428,6 +428,9 @@ static class Screens
             photos.Panel = null;
             photos.ClearSelectionCommand.Execute(null);
 
+            // The sidebar lists the albums used last.
+            AppServices.Settings.Update(s => s.RecentAlbumIds = ["a2", "a1", "a3"]);
+            Pump(TimeSpan.FromSeconds(2));
             shell.Navigate(ShellPage.Albums);
             Shot(main, outDir, $"19a-albums-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
             if (suffix == "light")

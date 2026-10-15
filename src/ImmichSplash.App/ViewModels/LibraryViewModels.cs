@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -60,6 +61,28 @@ public sealed class AlbumCardViewModel(PhotosViewModel owner, AlbumInfo album) :
     public override string Subtitle => Format.Plural(Album.AssetCount, "item") +
         (Album.IsSharedWithPeople(AppServices.Settings.Current.UserId) ? Tr.T(" · Shared") : "");
 
+    /// <summary>"Aug 2025 – Feb 2026": when the photos in it were taken (empty for an empty album).</summary>
+    public string DateText
+    {
+        get
+        {
+            if (Album.StartDate?.ToLocalTime() is not { } start || Album.EndDate?.ToLocalTime() is not { } end)
+                return "";
+            var culture = CultureInfo.CurrentCulture;
+            if (start.Year == end.Year && start.Month == end.Month)
+                return start.ToString("MMMM yyyy", culture);
+            return start.Year == end.Year
+                ? $"{start.ToString("MMM", culture)} – {end.ToString("MMM yyyy", culture)}"
+                : $"{start.ToString("MMM yyyy", culture)} – {end.ToString("MMM yyyy", culture)}";
+        }
+    }
+
+    public bool HasDateText => DateText.Length > 0;
+
+    /// <summary>"221 items · Owned" (or Shared).</summary>
+    public string Meta => Format.Plural(Album.AssetCount, "item") + " · " +
+        (Album.IsOwnedBy(AppServices.Settings.Current.UserId) ? Tr.T("Owned") : Tr.T("Shared"));
+
     protected override Task<Bitmap?> LoadAsync(ThumbnailLoader loader, int decodeWidth, CancellationToken ct) =>
         Album.AlbumThumbnailAssetId is { } cover ? loader.LoadAsync(cover, AssetImageSize.Thumbnail, decodeWidth, ct) : Task.FromResult<Bitmap?>(null);
 
@@ -69,6 +92,15 @@ public sealed class AlbumCardViewModel(PhotosViewModel owner, AlbumInfo album) :
 
     public IRelayCommand DeleteCommand => _delete ??= new AsyncRelayCommand(() => Owner.DeleteAlbumAsync(Album));
     IRelayCommand? _delete;
+
+    public IRelayCommand EditCommand => _edit ??= new RelayCommand(() => Owner.EditAlbum(Album));
+    IRelayCommand? _edit;
+
+    public IRelayCommand ShareCommand => _share ??= new RelayCommand(() => Owner.ShareAlbumFromCard(Album));
+    IRelayCommand? _share;
+
+    public IRelayCommand DownloadCommand => _download ??= new AsyncRelayCommand(() => Owner.DownloadAlbumAsync(Album));
+    IRelayCommand? _download;
 }
 
 public sealed class PersonCardViewModel(PhotosViewModel owner, PersonInfo person) : LibraryCardViewModel(owner)
@@ -244,6 +276,7 @@ public sealed partial class AlbumPickerViewModel : ViewModelBase
     Task AddTo(AlbumInfo album) => RunAsync(async client =>
     {
         await client.AddAssetsToAlbumAsync(album.Id, _assetIds, CancellationToken.None);
+        PhotosViewModel.RememberAlbum(album.Id);
         return album.AlbumName;
     });
 
@@ -255,7 +288,9 @@ public sealed partial class AlbumPickerViewModel : ViewModelBase
             return Task.CompletedTask;
         return RunAsync(async client =>
         {
-            await client.CreateAlbumAsync(name, _assetIds, CancellationToken.None);
+            var created = await client.CreateAlbumAsync(name, _assetIds, CancellationToken.None);
+            PhotosViewModel.RememberAlbum(created.Id);
+            AppServices.RaiseAlbumsChanged();
             return name;
         });
     }

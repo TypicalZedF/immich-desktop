@@ -21,6 +21,11 @@ public static class AppServices
     public static NetworkMonitor Network { get; private set; } = null!;
     public static PrivacyScanService PrivacyScan { get; private set; } = null!;
 
+    /// <summary>Albums were created, renamed, deleted or filled (the sidebar reloads its recent albums).</summary>
+    public static event Action? AlbumsChanged;
+
+    public static void RaiseAlbumsChanged() => AlbumsChanged?.Invoke();
+
     public static void Initialize()
     {
         Settings = new SettingsStore(AppPaths.SettingsFile);
