@@ -71,13 +71,6 @@ public static class Program
             e.SetObserved();
         };
 
-        // Something going wrong while drawing or loading one picture mustn't take the whole app down.
-        Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
-        {
-            Log.Error("Unhandled exception on the UI thread", e.Exception);
-            e.Handled = e.Exception is not (OutOfMemoryException or StackOverflowException);
-        };
-
         Log.Info($"Starting {AppInfo.Name} {AppInfo.Version} on {RuntimeInformation.OSDescription} ({RuntimeInformation.ProcessArchitecture})");
         try
         {
