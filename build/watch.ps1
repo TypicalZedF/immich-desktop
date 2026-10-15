@@ -17,6 +17,7 @@ GitRun fetch --quiet --tags origin | Out-Null
 $isTag = $Ref -match '^v\d'
 if ($isTag) { $sha = GitRun rev-list -n 1 $Ref } else { $sha = GitRun rev-parse "origin/$Ref" }
 if (-not $Workflows) {
-    if ($isTag) { $Workflows = @("Release", "Flatpak") } else { $Workflows = @("CI", "Release", "Flatpak") }
+    # Releases and Flatpaks are built for tags and beta pushes only; main just runs CI.
+    if ($isTag) { $Workflows = @("Release", "Flatpak") } elseif ($Ref -eq "main") { $Workflows = @("CI") } else { $Workflows = @("CI", "Release", "Flatpak") }
 }
 if (-not (Wait-Workflows $sha $Workflows $Ref $TimeoutMinutes)) { exit 1 }

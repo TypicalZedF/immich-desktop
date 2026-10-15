@@ -100,7 +100,9 @@ git push origin v1.2.0
 
 GitHub Actions tests, builds `ImmichSplash-Setup.exe`, the portable zip and the Linux tarball, and publishes the release.
 
-**Betas:** push to the `beta` branch. Each push publishes a pre-release numbered after the latest stable version (e.g. `v1.3.1-beta.42` after `v1.3.0`), which Beta-channel installs pick up. Merge `beta` into `main` and tag it to ship it to everyone. Every push also runs CI, which installs, launches, quits and uninstalls the app on a clean Windows machine, and renders every screen against a demo server to catch broken pages.
+A release doesn't need a beta first: `./build/release.ps1` tests the current commit, moves `main` to it, waits for CI and tags it.
+
+**Betas (optional):** push to the `beta` branch. Each push publishes a pre-release numbered after the latest stable version (e.g. `v1.3.1-beta.42` after `v1.3.0`), which Beta-channel installs pick up. Beta-channel installs always take the newest version there is, so a stable release newer than the last beta reaches them too. Every push also runs CI, which installs, launches, quits and uninstalls the app on a clean Windows machine, and renders every screen against a demo server to catch broken pages.
 
 ## Build from source
 

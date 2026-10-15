@@ -1,15 +1,17 @@
 <#
 .SYNOPSIS
-  Makes a stable release from what's on beta: checks CI passed, moves main up to beta, tags vX.Y.Z,
-  then waits for the Windows/Linux release and the Flatpak repository and reports in a few lines.
+  Makes a stable release of this PC's current commit: tests it, moves main to it, waits for CI, tags vX.Y.Z (which
+  publishes it), then waits for the Windows/Linux release and the Flatpak repository and reports in a few lines.
 
 .DESCRIPTION
+  No beta needed first, and the beta branch isn't touched. Installed apps on the Beta channel take the newest version
+  of all, so a stable release is what they get when it's newer than the last beta.
   The version is the next patch after the latest stable release unless you say otherwise.
   Release notes are written by GitHub from the commits (release.yml).
 
 .EXAMPLE
-  ./build/release.ps1               # next patch, e.g. 1.5.2 -> 1.5.3 (asks before publishing)
-  ./build/release.ps1 -Minor        # 1.5.x -> 1.6.0
+  ./build/release.ps1               # next patch, e.g. 1.6.0 -> 1.6.1 (asks before publishing)
+  ./build/release.ps1 -Minor        # 1.6.x -> 1.7.0
   ./build/release.ps1 -Version 2.0.0 -Yes
   ./build/release.ps1 -DryRun       # show what would be released, change nothing
 #>
@@ -24,22 +26,18 @@ param(
 . "$PSScriptRoot/common.ps1"
 Require-Gh
 
-Step "Checking beta"
-GitRun fetch --quiet --tags origin | Out-Null
-$sha = GitRun rev-parse origin/beta
-$ErrorActionPreference = "Continue"
-git -C $script:Root merge-base --is-ancestor origin/main $sha 2>$null
-$canFastForward = $LASTEXITCODE -eq 0
-$ErrorActionPreference = "Stop"
-if (-not $canFastForward) { Fail "main has commits that aren't on beta. Merge main into beta first." }
-
-$ci = Get-Runs $sha "beta" | Where-Object { $_.workflowName -eq "CI" }
-if (-not $ci) { Fail "No CI run found for $($sha.Substring(0,7)) yet. Wait a minute and try again." }
-if ($ci.status -ne "completed") {
-    if (-not (Wait-Workflows $sha @("CI") "beta")) { Fail "CI didn't pass; not releasing." }
+function Test-Ancestor([string]$older, [string]$newer) {
+    $ErrorActionPreference = "Continue"
+    git -C $script:Root merge-base --is-ancestor $older $newer 2>$null
+    $LASTEXITCODE -eq 0
 }
-elseif ($ci.conclusion -ne "success") { Fail "CI failed on $($sha.Substring(0,7)): $($ci.url)" }
-Ok "CI passed on $(GitRun log -1 --format='%h %s' $sha)"
+
+Step "Checking this commit"
+GitRun fetch --quiet --tags origin | Out-Null
+if (GitRun status --porcelain --untracked-files=no) { Fail "There are uncommitted changes. Commit them first." }
+$sha = GitRun rev-parse HEAD
+if (-not (Test-Ancestor origin/main $sha)) { Fail "main on GitHub has commits that aren't here. Pull them in first." }
+Ok "Releasing $(GitRun log -1 --format='%h %s' $sha)"
 
 # ---- Version ----
 $last = Get-LatestStable
@@ -58,15 +56,24 @@ Write-Host "Release $tag (after v$last): $($changes.Count) commits" -ForegroundC
 $changes | Select-Object -First 15 | Write-Host
 if ($changes.Count -gt 15) { Write-Host "  … and $($changes.Count - 15) more" }
 Write-Host ""
+if ($changes.Count -eq 0) { Fail "Nothing new since v$last." }
 if ($DryRun) { Note "Dry run: nothing was changed."; exit 0 }
 if (-not $Yes) {
-    $answer = Read-Host "Publish $tag to everyone on the Stable channel? (y/N)"
+    $answer = Read-Host "Publish $tag to everyone? (y/N)"
     if ($answer -notmatch '^(y|yes)$') { Note "Cancelled; nothing was changed."; exit 0 }
 }
 
 # ---- Publish ----
-Step "Moving main to beta and tagging $tag"
+Step "Testing here"
+& "$PSScriptRoot/check.ps1"
+if ($LASTEXITCODE -ne 0) { Fail "Tests failed; nothing was pushed." }
+
+Step "Moving main to this commit (CI runs on it)"
 GitRun push --quiet origin "${sha}:refs/heads/main" | Out-Null
+Start-Sleep -Seconds 10
+if (-not (Wait-Workflows $sha @("CI") "main" 30)) { Fail "CI didn't pass on main, so it isn't tagged and nothing was released. Fix it and run this again." }
+
+Step "Tagging $tag (this publishes it)"
 GitRun tag $tag $sha | Out-Null
 GitRun push --quiet origin $tag | Out-Null
 Ok "Pushed main and $tag"
