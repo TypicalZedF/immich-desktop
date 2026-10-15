@@ -341,6 +341,8 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             for (var start = 0; start < bucket.Count; start += _columns)
                 rows.Add(new AssetRowViewModel(this, bucket, start, Math.Min(_columns, bucket.Count - start), tile));
         }
+        if (ShowsMemories && _memoryCards.Count > 0)
+            rows.Insert(0, new MemoriesRowViewModel(_memoryCards));
         UpdateOffsets(rows);
         Rows = new ObservableCollection<object>(rows);
     }
@@ -350,7 +352,7 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     {
         var tile = TileSize(_columns);
         var sections = new List<TimelineSection>();
-        double offset = 0;
+        double offset = rows.Count > 0 && rows[0] is MemoriesRowViewModel ? MemoriesHeight : 0;
         foreach (var bucket in _buckets)
         {
             var rowCount = (bucket.Count + _columns - 1) / _columns;
@@ -361,7 +363,12 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         }
         _rowOffsets = new double[rows.Count + 1];
         for (var i = 0; i < rows.Count; i++)
-            _rowOffsets[i + 1] = _rowOffsets[i] + (rows[i] is AssetRowViewModel row ? row.RowHeight : HeaderHeight);
+            _rowOffsets[i + 1] = _rowOffsets[i] + rows[i] switch
+            {
+                AssetRowViewModel row => row.RowHeight,
+                MemoriesRowViewModel => MemoriesHeight,
+                _ => HeaderHeight,
+            };
         // The rail is for the timeline; one big group (e.g. search results) has no dates to show.
         Sections = sections.Count > 1 && sections.Any(s => s.Year is not null) ? sections : [];
     }
@@ -553,6 +560,8 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
         foreach (var card in Albums.Cast<LibraryCardViewModel>().Concat(People).Concat(Places))
             card.Dispose();
         Duplicates?.Dispose();
+        foreach (var card in _memoryCards)
+            card.Dispose();
         Privacy?.Dispose();
         if (_privacyHooked)
             AppServices.PrivacyScan.StatusChanged -= OnPrivacyStatus;

@@ -449,6 +449,28 @@ public sealed class ImmichClient : IDisposable
         return response.Assets.Items.Select(ToTimelineAsset).ToList();
     }
 
+    /// <summary>
+    /// The memories Immich has for a day ("on this day" in earlier years, birthdays), most recent year
+    /// first, like the strip at the top of the web app's Photos page. Empty on servers without memories.
+    /// </summary>
+    public async Task<List<Memory>> GetMemoriesAsync(DateOnly day, CancellationToken ct)
+    {
+        List<MemoryDto> memories;
+        try
+        {
+            memories = await SendAsync<List<MemoryDto>>(HttpMethod.Get, $"memories?for={day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}", null, ct);
+        }
+        catch (ImmichApiException ex) when (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)
+        {
+            return [];
+        }
+        return memories
+            .Where(m => m.Assets.Count > 0)
+            .Select(m => new Memory(m.Id, m.Type, m.Data?.Year, m.Data?.PersonName, m.Assets.Select(ToTimelineAsset).ToList()))
+            .OrderByDescending(m => m.Year ?? int.MaxValue)
+            .ToList();
+    }
+
     /// <summary>Photos by file name or city, newest first, up to <paramref name="max"/>.</summary>
     public async Task<List<TimelineAsset>> SearchAsync(string? fileName, string? city, int max, CancellationToken ct)
     {

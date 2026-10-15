@@ -111,6 +111,7 @@ public sealed partial class PhotosViewModel
                 _onDevice = await Task.Run(AppServices.Database.GetAssetsOnDevice, cts.Token);
             var buckets = await query.Load(client, cts.Token);
             buckets = await BucketState.SplitRecentDaysAsync(buckets, Today(), cts.Token);
+            await LoadMemoriesAsync(client, cts.Token);
             if (cts.IsCancellationRequested)
                 return;
             _buckets = buckets;

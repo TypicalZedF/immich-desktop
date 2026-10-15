@@ -283,6 +283,11 @@ sealed class DemoServer : HttpMessageHandler
             "/api/users/me" => Json(new { id = "u1", name = "Alex Morgan", email = "alex@example.com", profileImagePath = "upload/profile/u1.jpg", avatarColor = "pink", quotaSizeInBytes = (long?)null, quotaUsageInBytes = (long?)null }),
             "/api/users/u1/profile-image" => Bytes(_avatar!),
             "/api/server/storage" => Json(new { diskSizeRaw = 1_980_000_000_000L, diskUseRaw = 742_000_000_000L }),
+            "/api/memories" => Json(new object[]
+            {
+                new { id = "mem-1", type = "on_this_day", data = new { year = DateTime.Now.Year - 1 }, assets = Enumerable.Range(0, 6).Select(i => AssetJson($"202610-{i}", i)).ToArray() },
+                new { id = "mem-3", type = "on_this_day", data = new { year = DateTime.Now.Year - 3 }, assets = Enumerable.Range(0, 4).Select(i => AssetJson($"202609-{i + 10}", i + 10)).ToArray() },
+            }),
             "/api/timeline/buckets" => Json(Buckets.Select(b => new { timeBucket = b.Bucket, count = b.Count })),
             "/api/timeline/bucket" => BucketResponse(Uri.UnescapeDataString(query.Split("timeBucket=")[1].Split('&')[0])),
             _ when path.EndsWith("/thumbnail", StringComparison.Ordinal) => Thumbnail(path, query),

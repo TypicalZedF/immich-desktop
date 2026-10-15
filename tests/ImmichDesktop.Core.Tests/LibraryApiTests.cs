@@ -212,6 +212,29 @@ public class LibraryApiTests
         Assert.Equal(72_000, files[0].DurationMs);
         Assert.Equal(("POST", "/api/search/large-assets?minFileSize=10000000&size=250"), (handler.Requests[0].Method, handler.Requests[0].PathAndQuery));
     }
+
+    [Fact]
+    public async Task Memories_for_today_are_read_newest_year_first()
+    {
+        static object Asset(string id) => new { id, type = "IMAGE", originalFileName = id + ".jpg", fileCreatedAt = "2020-10-14T10:00:00Z", isFavorite = false, duration = "0:00:00.00000" };
+        var handler = new Recorder((_, _) => new object[]
+        {
+            new { id = "m1", type = "on_this_day", data = new { year = 2019 }, assets = new[] { Asset("a"), Asset("b") } },
+            new { id = "m2", type = "on_this_day", data = new { year = 2023 }, assets = new[] { Asset("c") } },
+            new { id = "m3", type = "birthday", data = new { personName = "Sam" }, assets = new[] { Asset("d") } },
+            new { id = "m4", type = "on_this_day", data = new { year = 2021 }, assets = Array.Empty<object>() }, // nothing to show
+        });
+        using var client = Client(handler);
+
+        var memories = await client.GetMemoriesAsync(new DateOnly(2026, 10, 14), TestContext.Current.CancellationToken);
+
+        Assert.Equal("/api/memories?for=2026-10-14", handler.Requests.Single().PathAndQuery);
+        Assert.Equal(["m3", "m2", "m1"], memories.Select(m => m.Id));
+        Assert.True(memories[0].IsBirthday);
+        Assert.Equal("Sam", memories[0].PersonName);
+        Assert.Equal(2, memories[2].Assets.Count);
+    }
+
 }
 
 public class SharedAlbumTests

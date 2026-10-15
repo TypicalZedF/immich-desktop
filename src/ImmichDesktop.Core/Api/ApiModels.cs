@@ -222,6 +222,15 @@ internal sealed record ExifDto(
     string? Make, string? Model, string? LensModel, double? FNumber, string? ExposureTime, double? Iso, double? FocalLength,
     string? City, string? State, string? Country, int? ExifImageWidth, int? ExifImageHeight, long? FileSizeInByte, string? Description);
 internal sealed record AssetPersonDto(string? Name);
+/// <summary>A memory Immich made for a day: photos from that day in an earlier year, or someone's birthday.</summary>
+public sealed record Memory(string Id, string Type, int? Year, string? PersonName, IReadOnlyList<TimelineAsset> Assets)
+{
+    public bool IsBirthday => Type == "birthday";
+}
+
+internal sealed record MemoryDataDto(int? Year, string? PersonName);
+internal sealed record MemoryDto(string Id, string Type, MemoryDataDto? Data, List<AssetDto> Assets);
+
 internal sealed record AssetDto(
     string Id, string? Type, string? OriginalFileName, string? FileCreatedAt, bool IsFavorite, System.Text.Json.JsonElement Duration,
     ExifDto? ExifInfo, List<AssetPersonDto>? People);

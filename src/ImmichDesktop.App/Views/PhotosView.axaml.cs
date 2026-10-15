@@ -194,6 +194,8 @@ public partial class PhotosView : UserControl
     {
         if (_scroll is null || _vm is null)
             return;
+        if (Math.Abs(e.Delta.X) > Math.Abs(e.Delta.Y) || e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            return; // sideways: e.g. the memories strip
         e.Handled = true;
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
