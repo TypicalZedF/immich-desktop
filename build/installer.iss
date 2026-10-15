@@ -91,13 +91,6 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-[InstallDelete]
-; Files from before the app was renamed.
-Type: files; Name: "{app}\ImmichDesktop.*"
-
-[Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "ImmichDesktop"; Flags: deletevalue
-
 [UninstallDelete]
 ; Anything the app created inside its own folder.
 Type: filesandordirs; Name: "{app}"

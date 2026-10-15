@@ -19,9 +19,6 @@ public static class Autostart
 
     static string LinuxEntryPath => LinuxEntry("immich-splash.desktop");
 
-    /// <summary>Entry written by versions before the rename; removed so the app doesn't start twice.</summary>
-    static string LegacyLinuxEntryPath => LinuxEntry("immich-desktop.desktop");
-
     static string LinuxEntry(string fileName)
     {
         // In a Flatpak, XDG_CONFIG_HOME is the sandbox's own folder: autostart lives in the real ~/.config.
@@ -41,7 +38,7 @@ public static class Autostart
                 return key?.GetValue(AppInfo.Id) is string;
             }
             if (OperatingSystem.IsLinux())
-                return File.Exists(LinuxEntryPath) || File.Exists(LegacyLinuxEntryPath);
+                return File.Exists(LinuxEntryPath);
         }
         catch (Exception ex)
         {
@@ -66,8 +63,6 @@ public static class Autostart
             else if (OperatingSystem.IsLinux())
             {
                 var entry = LinuxEntryPath;
-                if (File.Exists(LegacyLinuxEntryPath))
-                    File.Delete(LegacyLinuxEntryPath);
                 if (enabled && exe is not null)
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(entry)!);

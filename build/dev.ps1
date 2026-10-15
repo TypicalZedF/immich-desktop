@@ -43,9 +43,6 @@ Write-Host "==> Dev build $version" -ForegroundColor Cyan
 # ---- Windows ----
 if (-not $NoWindows) {
     $installDir = Join-Path $env:LOCALAPPDATA "Programs\Immich Splash"
-    # Installs made before the rename keep their original folder.
-    $oldDir = Join-Path $env:LOCALAPPDATA "Programs\Immich Desktop"
-    if (-not (Test-Path $installDir) -and (Test-Path $oldDir)) { $installDir = $oldDir }
     $installedExe = Join-Path $installDir "ImmichSplash.exe"
 
     # libmpv (videos): reuse the installed app's copy if this checkout doesn't have it yet.

@@ -36,9 +36,6 @@ public static class UrlProtocol
             {
                 var apps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "applications");
                 Directory.CreateDirectory(apps);
-                var legacy = Path.Combine(apps, "immich-desktop-url.desktop");
-                if (File.Exists(legacy))
-                    File.Delete(legacy);
                 File.WriteAllText(Path.Combine(apps, "immich-splash-url.desktop"), $"""
                     [Desktop Entry]
                     Type=Application
@@ -66,7 +63,6 @@ public static class UrlProtocol
             {
                 var apps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "applications");
                 File.Delete(Path.Combine(apps, "immich-splash-url.desktop"));
-                File.Delete(Path.Combine(apps, "immich-desktop-url.desktop"));
             }
         }
         catch (Exception ex)
