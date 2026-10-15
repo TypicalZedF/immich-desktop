@@ -32,7 +32,7 @@ public static class UrlProtocol
                 using var command = key.CreateSubKey(@"shell\open\command");
                 command.SetValue("", $"\"{exe}\" \"%1\"");
             }
-            else if (OperatingSystem.IsLinux())
+            else if (OperatingSystem.IsLinux() && !Flatpak.IsRunning) // a Flatpak's own desktop file handles the link
             {
                 var apps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "applications");
                 Directory.CreateDirectory(apps);

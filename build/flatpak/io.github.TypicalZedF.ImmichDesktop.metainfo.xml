@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.TypicalZedF.ImmichDesktop</id>
+  <name>Immich Desktop</name>
+  <summary>Back up photos and videos to your Immich server</summary>
+  <developer id="io.github.TypicalZedF">
+    <name>TypicalZedF</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <description>
+    <p>
+      An unofficial desktop companion for a self-hosted Immich server. It sits in the system tray and backs up
+      the folders you choose, checking with your server first so nothing is uploaded twice, and lets you browse
+      your library: photos, albums, people, places, a map, sharing and the locked folder.
+    </p>
+    <p>
+      Immich Desktop is not affiliated with or endorsed by the Immich project.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.TypicalZedF.ImmichDesktop.desktop</launchable>
+  <url type="homepage">https://github.com/TypicalZedF/immich-desktop</url>
+  <url type="bugtracker">https://github.com/TypicalZedF/immich-desktop/issues</url>
+  <content_rating type="oars-1.1" />
+  <categories>
+    <category>Graphics</category>
+    <category>Photography</category>
+  </categories>
+</component>

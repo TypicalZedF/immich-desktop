@@ -17,7 +17,7 @@ public static class DesktopNotifications
     public static event Action<NoticeKind>? Clicked;
 
     static string IconPath => Path.Combine(AppContext.BaseDirectory, "notification-icon.png");
-    static bool _linuxUnavailable;
+    static bool _linuxUnavailable, _noNotifySend;
 
     public static void Show(Notice notice)
     {
@@ -26,7 +26,7 @@ public static class DesktopNotifications
             if (OperatingSystem.IsWindows())
                 ShowOnWindows(notice);
             else if (OperatingSystem.IsLinux() && !_linuxUnavailable)
-                _ = ShowOnLinuxAsync(notice);
+                _ = Core.Platform.Flatpak.IsRunning || _noNotifySend ? ShowWithGdbusAsync(notice) : ShowOnLinuxAsync(notice);
         }
         catch (Exception ex)
         {
@@ -66,8 +66,37 @@ public static class DesktopNotifications
         }
         catch (System.ComponentModel.Win32Exception)
         {
+            _noNotifySend = true; // not installed: talk to the notification service directly instead
+            await ShowWithGdbusAsync(notice);
+        }
+    }
+
+    /// <summary>
+    /// Through the desktop's notification service with gdbus (part of GLib, so also inside the Flatpak,
+    /// where notify-send isn't). No click action this way.
+    /// </summary>
+    static async Task ShowWithGdbusAsync(Notice notice)
+    {
+        try
+        {
+            static string Quote(string s) => "'" + s.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
+            var start = new ProcessStartInfo("gdbus") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            foreach (var arg in new[]
+            {
+                "call", "--session", "--dest", "org.freedesktop.Notifications", "--object-path", "/org/freedesktop/Notifications",
+                "--method", "org.freedesktop.Notifications.Notify",
+                Quote(AppInfo.Name), "0", Quote(Core.Platform.Flatpak.AppId ?? IconPath), Quote(notice.Title), Quote(notice.Body), "[]", "{}", "-1",
+            })
+                start.ArgumentList.Add(arg);
+            using var process = Process.Start(start)!;
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0)
+                Log.Info($"Desktop notification failed: {(await process.StandardError.ReadToEndAsync()).Trim()}");
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
             _linuxUnavailable = true;
-            Log.Info("Desktop notifications need notify-send (libnotify), which isn't installed");
+            Log.Info("Desktop notifications need notify-send or gdbus, and neither is installed");
         }
     }
 

@@ -1,0 +1,52 @@
+# Builds the Linux Flatpak (build/flatpak) and attaches ImmichDesktop.flatpak to the run.
+# Install it with: flatpak install --user ImmichDesktop.flatpak
+name: Flatpak
+
+on:
+  push:
+    branches: [beta]
+  workflow_dispatch:
+
+jobs:
+  flatpak:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish the app for Linux
+        run: |
+          dotnet publish src/ImmichDesktop.App/ImmichDesktop.App.csproj -c Release -r linux-x64 --self-contained true \
+            -p:DebugType=none -o artifacts/publish/linux-x64 --nologo
+
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      # Built modules (FFmpeg, libmpv…) are reused until their recipe changes.
+      - uses: actions/cache@v4
+        with:
+          path: .flatpak-builder
+          key: flatpak-builder-${{ hashFiles('build/flatpak/*.yaml') }}
+          restore-keys: flatpak-builder-
+
+      - name: Build the Flatpak
+        run: |
+          flatpak-builder --user --install-deps-from=flathub --force-clean --disable-rofiles-fuse \
+            --repo=repo build-dir build/flatpak/io.github.TypicalZedF.ImmichDesktop.yaml
+
+      - name: Bundle
+        run: |
+          flatpak build-bundle repo artifacts/ImmichDesktop.flatpak io.github.TypicalZedF.ImmichDesktop \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+          ls -lh artifacts/ImmichDesktop.flatpak
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak
+          path: artifacts/ImmichDesktop.flatpak

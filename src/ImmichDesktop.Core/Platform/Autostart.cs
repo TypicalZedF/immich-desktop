@@ -21,7 +21,8 @@ public static class Autostart
     {
         get
         {
-            var config = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+            // In a Flatpak, XDG_CONFIG_HOME is the sandbox's own folder: autostart lives in the real ~/.config.
+            var config = Flatpak.IsRunning ? null : Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
             if (string.IsNullOrWhiteSpace(config))
                 config = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
             return Path.Combine(config, "autostart", "immich-desktop.desktop");
@@ -71,8 +72,8 @@ public static class Autostart
                         Type=Application
                         Name={AppInfo.Name}
                         Comment=Back up photos and videos to Immich
-                        Exec="{exe}" {BackgroundArgument}
-                        Icon=immich-desktop
+                        Exec={(Flatpak.IsRunning ? Flatpak.LaunchCommand : $"\"{exe}\"")} {BackgroundArgument}
+                        Icon={Flatpak.AppId ?? "immich-desktop"}
                         Terminal=false
                         X-GNOME-Autostart-enabled=true
                         """);
