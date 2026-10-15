@@ -109,6 +109,21 @@ public sealed class ThumbnailLoader(ImmichClient client) : IDisposable
         return entry.Bitmap;
     }
 
+    /// <summary>
+    /// Another lease on a picture from <see cref="LoadGridThumbnailAsync"/> (the viewer showing a cell's
+    /// thumbnail while its own image loads), so it outlives the cell. False if it isn't one of the cache's.
+    /// </summary>
+    public bool RetainGridThumbnail(Bitmap bitmap)
+    {
+        lock (_gate)
+        {
+            if (!_leased.TryGetValue(bitmap, out var entry))
+                return false;
+            entry.Leases++;
+            return true;
+        }
+    }
+
     /// <summary>Hands back a picture from <see cref="LoadGridThumbnailAsync"/> once nothing shows it.</summary>
     public void ReturnGridThumbnail(Bitmap bitmap)
     {

@@ -82,9 +82,7 @@ public sealed partial class PhotoViewerViewModel
         _video?.Seek(fraction, exact: true);
         _holdTarget = fraction;
         _holdPositionUntil = DateTime.UtcNow.AddMilliseconds(900);
-        _updatingPosition = true;
         VideoPosition = fraction;
-        _updatingPosition = false;
         IsScrubbing = false;
         ShowScrubTime(fraction);
     }
@@ -125,6 +123,7 @@ public sealed partial class PhotoViewerViewModel
     // Pictures from the video at the pointer (a second, small, silent player that only jumps and shows a still).
 
     MpvPlayer? _preview;
+    bool _previewFailed; // this video gives no pictures: don't start a player again on every move
     DispatcherTimer? _previewTimer;
     double _previewTarget;
 
@@ -153,7 +152,7 @@ public sealed partial class PhotoViewerViewModel
         ShowPreview = true;
         PreviewTimeText = AssetCellViewModel.FormatDuration((long)(length * f).TotalMilliseconds);
         _previewTarget = f;
-        // Not on every pixel of movement: about every 90 ms, the newest position.
+        // Not on every pixel of movement: about every 120 ms, the newest position.
         _previewTimer ??= new DispatcherTimer(TimeSpan.FromMilliseconds(120), DispatcherPriority.Background, (_, _) => RequestPreviewFrame());
         if (!_previewTimer.IsEnabled)
         {
@@ -181,7 +180,7 @@ public sealed partial class PhotoViewerViewModel
     {
         if (_preview is not null)
             return _preview;
-        if (!MpvPlayer.IsAvailable || Asset.IsImage)
+        if (_previewFailed || !MpvPlayer.IsAvailable || Asset.IsImage)
             return null;
         try
         {
@@ -202,8 +201,10 @@ public sealed partial class PhotoViewerViewModel
             player.FrameReady += () => { if (ReferenceEquals(_preview, player)) PreviewFrameUpdated?.Invoke(); };
             player.Failed += () =>
             {
-                if (ReferenceEquals(_preview, player))
-                    ClosePreviewPlayer(); // no pictures; the time still shows
+                if (!ReferenceEquals(_preview, player))
+                    return;
+                _previewFailed = true;
+                ClosePreviewPlayer(); // no pictures; the time still shows
             };
             _preview = player;
             return player;

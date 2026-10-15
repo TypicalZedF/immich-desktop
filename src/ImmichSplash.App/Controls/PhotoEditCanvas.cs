@@ -34,7 +34,7 @@ public sealed class PhotoEditCanvas : Control
 
     enum Grab { None, Move, NW, N, NE, E, SE, S, SW, W }
 
-    const double Margin = 28, HandleReach = 14, MinSize = 28;
+    const double Inset = 28, HandleReach = 14, MinSize = 28;
 
     Grab _grab;
     Rect _grabStart;
@@ -63,7 +63,7 @@ public sealed class PhotoEditCanvas : Control
         get
         {
             var o = Oriented;
-            var room = new Size(Math.Max(1, Bounds.Width - Margin * 2), Math.Max(1, Bounds.Height - Margin * 2));
+            var room = new Size(Math.Max(1, Bounds.Width - Inset * 2), Math.Max(1, Bounds.Height - Inset * 2));
             var scale = Math.Min(room.Width / o.Width, room.Height / o.Height);
             var size = new Size(o.Width * scale, o.Height * scale);
             return new Rect((Bounds.Width - size.Width) / 2, (Bounds.Height - size.Height) / 2, size.Width, size.Height);

@@ -240,6 +240,9 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial PhotoViewerViewModel? Viewer { get; set; }
 
+    // However the viewer goes away (closed, opening the editor, a jump to the timeline, locking), its video must stop.
+    partial void OnViewerChanged(PhotoViewerViewModel? oldValue, PhotoViewerViewModel? newValue) => oldValue?.Shutdown();
+
     [RelayCommand]
     Task Refresh() => Duplicates is { } duplicates ? duplicates.RefreshCommand.ExecuteAsync(null)
         : ShowGrid ? LoadGridAsync() : LoadPageAsync();

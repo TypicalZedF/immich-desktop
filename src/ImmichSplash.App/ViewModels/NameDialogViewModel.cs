@@ -39,6 +39,8 @@ public sealed partial class NameDialogViewModel : ViewModelBase
     [RelayCommand]
     async Task SaveAsync()
     {
+        if (IsSaving)
+            return; // Enter pressed again while saving
         var text = Text.Trim();
         if (text.Length == 0)
         {

@@ -663,12 +663,22 @@ public sealed class ImmichClient : IDisposable
 
     // ---- Archive, locked folder, trash -------------------------------------------------------
 
-    /// <summary>Moves assets to the timeline ("timeline"), the archive ("archive") or the locked folder ("locked").</summary>
     // ---- Editing (Immich 2.5 and newer): crop, turn and flip, applied by the server to the original ----
 
+    /// <summary>
+    /// The original photo's size, the right way up (what crops are measured on). Like the Immich web editor this
+    /// comes from the photo's EXIF data: the asset's own width and height change once it's edited.
+    /// </summary>
     public async Task<AssetSize> GetAssetSizeAsync(string assetId, CancellationToken ct)
     {
         var asset = await SendAsync<AssetSizeDto>(HttpMethod.Get, $"assets/{Uri.EscapeDataString(assetId)}", null, ct);
+        if (asset.ExifInfo is { ExifImageWidth: > 0 and var w, ExifImageHeight: > 0 and var h } exif)
+        {
+            // Orientations 5 to 8 are a quarter turn: the stored picture is on its side.
+            var orientation = exif.Orientation is { } o ? o.ToString() : "";
+            var sideways = orientation is "5" or "6" or "7" or "8";
+            return new AssetSize(sideways ? h : w, sideways ? w : h, asset.IsEdited == true);
+        }
         return new AssetSize(asset.Width ?? 0, asset.Height ?? 0, asset.IsEdited == true);
     }
 
@@ -698,6 +708,7 @@ public sealed class ImmichClient : IDisposable
     public Task RunAssetJobAsync(IReadOnlyList<string> assetIds, string job, CancellationToken ct) =>
         SendAsync(HttpMethod.Post, "assets/jobs", new AssetJobRequestDto(assetIds, job), ct);
 
+    /// <summary>Moves assets to the timeline ("timeline"), the archive ("archive") or the locked folder ("locked").</summary>
     public Task SetVisibilityAsync(IReadOnlyList<string> assetIds, string visibility, CancellationToken ct) =>
         SendAsync(HttpMethod.Put, "assets", new VisibilityRequestDto(assetIds, visibility), ct);
 

@@ -231,7 +231,8 @@ internal sealed record PeopleResponseDto(List<PersonDto>? People, bool? HasNextP
 internal sealed record UpdatePersonRequestDto(string Name);
 internal sealed record AssetEditItemDto(string Action, object Parameters);
 internal sealed record AssetEditsRequestDto(List<AssetEditItemDto> Edits);
-internal sealed record AssetSizeDto(int? Width, int? Height, bool? IsEdited);
+internal sealed record AssetSizeDto(int? Width, int? Height, bool? IsEdited, AssetSizeExifDto? ExifInfo);
+internal sealed record AssetSizeExifDto(int? ExifImageWidth, int? ExifImageHeight, System.Text.Json.JsonElement? Orientation);
 
 /// <summary>How big a photo is (as Immich sees it) and whether it already has edits.</summary>
 public sealed record AssetSize(int Width, int Height, bool IsEdited);

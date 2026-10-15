@@ -44,6 +44,8 @@ public sealed partial class AlbumEditorViewModel : ViewModelBase
     [RelayCommand]
     async Task SaveAsync()
     {
+        if (IsSaving)
+            return; // Enter pressed again while the first save is on its way: don't make two albums
         var name = Name.Trim();
         if (name.Length == 0)
         {

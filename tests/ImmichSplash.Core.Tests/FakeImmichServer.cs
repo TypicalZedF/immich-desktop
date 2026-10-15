@@ -27,6 +27,9 @@ sealed class FakeImmichServer : HttpMessageHandler
     /// <summary>Jobs asked for with POST /assets/jobs, and the kinds of smart search made.</summary>
     public ConcurrentQueue<string> AssetJobs { get; } = new();
     public ConcurrentQueue<string> AssetEdits { get; } = new();
+
+    /// <summary>The EXIF orientation GET /assets/{id} reports ("6": stored on its side).</summary>
+    public string ExifOrientation { get; set; } = "1";
     public ConcurrentQueue<string> SharedLinkPatches { get; } = new();
     public ConcurrentDictionary<string, List<(string UserId, string Role)>> AlbumMembers { get; } = new();
     public ConcurrentQueue<string> PeopleUpdates { get; } = new();
@@ -105,7 +108,7 @@ sealed class FakeImmichServer : HttpMessageHandler
                 return Json(HttpStatusCode.OK, new { id = path.Split('/')[^1] });
             }
             case ("GET", _) when path.StartsWith("/api/assets/", StringComparison.Ordinal) && path.Count(c => c == '/') == 3:
-                return Json(HttpStatusCode.OK, new { id = path.Split('/')[^1], width = 4000, height = 3000, isEdited = false });
+                return Json(HttpStatusCode.OK, new { id = path.Split('/')[^1], width = 4000, height = 3000, isEdited = false, exifInfo = new { exifImageWidth = 4000, exifImageHeight = 3000, orientation = ExifOrientation } });
             case ("PUT", _) when path.StartsWith("/api/assets/", StringComparison.Ordinal) && path.EndsWith("/edits", StringComparison.Ordinal):
             {
                 // Like Immich v3 (zod): at least one edit, a known action and the right parameters for it.

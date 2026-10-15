@@ -23,6 +23,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     BucketState _bucket;
     int _index;
     Bitmap? _ownedImage; // the viewer's own sharp image; placeholders belong to the grid
+    Bitmap? _placeholderLease; // the grid's thumbnail on show, leased so the grid can't free it meanwhile
     int _loadedSize;     // long side of the best image shown so far
     bool _fullLoaded;
 
@@ -163,6 +164,9 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         // Show the (already loaded) thumbnail instantly, then swap in sharper images.
         Image = placeholder;
         ReleaseOwnedImage();
+        ReturnPlaceholder();
+        if (placeholder is not null && _owner.Thumbnails?.RetainGridThumbnail(placeholder) == true)
+            _placeholderLease = placeholder;
         _loadedSize = 0;
         _fullLoaded = false;
         _cts?.Cancel();
@@ -273,6 +277,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
             }
             Image = bitmap;
             ReleaseOwnedImage();
+            ReturnPlaceholder();
             _ownedImage = bitmap;
             _loadedSize = size;
         });
@@ -330,7 +335,6 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     public partial Services.Mpv.MpvPlayer? MpvVideo { get; set; }
 
     public bool HasMpvVideo => MpvVideo is not null;
-    bool _updatingPosition;
     long _lastTimeUpdate;
 
     /// <summary>The playing video's picture (null until the first frame, while the photo preview shows).</summary>
@@ -545,9 +549,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
             return;
         _lastTimeUpdate = now;
         var length = player.Length;
-        _updatingPosition = true;
         VideoPosition = length > TimeSpan.Zero ? player.Time / length : 0;
-        _updatingPosition = false;
         VideoTimeText = length > TimeSpan.Zero
             ? $"{AssetCellViewModel.FormatDuration((long)player.Time.TotalMilliseconds)} / {AssetCellViewModel.FormatDuration((long)length.TotalMilliseconds)}"
             : AssetCellViewModel.FormatDuration((long)player.Time.TotalMilliseconds);
@@ -557,6 +559,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     {
         IsScrubbing = false;
         ClosePreviewPlayer();
+        _previewFailed = false;
         VideoLoadingText = null;
         var video = _video;
         _video = null;
@@ -568,9 +571,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
         IsVideoPlaying = false;
         IsVideoStarted = false;
         IsLiveMotion = false;
-        _updatingPosition = true;
         VideoPosition = 0;
-        _updatingPosition = false;
         VideoTimeText = "";
     }
 
@@ -681,6 +682,14 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
             Close();
     }
 
+    void ReturnPlaceholder()
+    {
+        var leased = _placeholderLease;
+        _placeholderLease = null;
+        if (leased is not null)
+            _owner.Thumbnails?.ReturnGridThumbnail(leased);
+    }
+
     void ReleaseOwnedImage()
     {
         var old = _ownedImage;
@@ -690,13 +699,16 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    void Close()
+    void Close() => _owner.CloseViewer(); // the page then calls Shutdown
+
+    /// <summary>The viewer was closed or replaced (whatever closed it): stop the video and free the pictures.</summary>
+    internal void Shutdown()
     {
         StopSlideshow();
         StopVideo();
         _cts?.Cancel();
-        _owner.CloseViewer();
         Image = null;
+        ReturnPlaceholder();
         ReleaseOwnedImage();
     }
 
