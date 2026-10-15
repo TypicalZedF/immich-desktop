@@ -17,6 +17,32 @@ function Require-Gh {
     if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Fail "The GitHub CLI (gh) is needed: winget install GitHub.cli, then gh auth login" }
 }
 
+# True when origin has the branch (beta only exists between "push to beta" and the next stable release).
+function Test-RemoteBranch([string]$name) {
+    $ErrorActionPreference = "Continue"
+    git -C $script:Root rev-parse --verify --quiet "refs/remotes/origin/$name" 2>$null | Out-Null
+    $LASTEXITCODE -eq 0
+}
+
+function Test-Ancestor([string]$older, [string]$newer) {
+    $ErrorActionPreference = "Continue"
+    git -C $script:Root merge-base --is-ancestor $older $newer 2>$null
+    $LASTEXITCODE -eq 0
+}
+
+# Brings in what was merged on GitHub's main (e.g. Dependabot updates) when this commit doesn't have it yet.
+function Merge-Main {
+    if (Test-Ancestor origin/main HEAD) { return }
+    $ErrorActionPreference = "Continue"
+    git -C $script:Root merge --quiet --no-edit origin/main 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        git -C $script:Root merge --abort 2>&1 | Out-Null
+        Fail "main on GitHub has changes that conflict with yours. Merge origin/main by hand, then run this again."
+    }
+    $ErrorActionPreference = "Stop"
+    Ok "Merged in the new commits from main"
+}
+
 # Latest stable version tag (vX.Y.Z), as a [version].
 function Get-LatestStable {
     $tags = GitRun tag --list "v*" | Where-Object { $_ -match '^v\d+\.\d+\.\d+$' }

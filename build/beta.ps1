@@ -1,11 +1,13 @@
 <#
 .SYNOPSIS
-  Ships what's committed on beta as a beta release: syncs with origin, runs the tests, pushes,
-  then waits for CI and the beta release and reports in a few lines.
+  Ships this PC's current commit as a beta release (only when the user says "push to beta"; until then changes are
+  tried with ./build/dev.ps1): syncs with origin, runs the tests, pushes to the beta branch, then waits for CI and
+  the beta release and reports in a few lines.
 
 .DESCRIPTION
   Every push to beta becomes a pre-release (vX.Y.Z-beta.N); installed apps on the Beta channel update to it.
-  Uncommitted changes stop the script unless you pass -Message (then everything is committed with it).
+  A stable release removes the beta branch, so the first push after one starts it again from this commit.
+  Works from any local branch. Uncommitted changes stop the script unless you pass -Message (then everything is committed with it).
 
 .EXAMPLE
   ./build/beta.ps1                         # push the commits you have
@@ -20,8 +22,6 @@ param(
 . "$PSScriptRoot/common.ps1"
 Require-Gh
 
-if ((GitRun rev-parse --abbrev-ref HEAD) -ne "beta") { Fail "Switch to the beta branch first (git switch beta)." }
-
 if (@(GitRun status --porcelain).Count -gt 0) {
     if (-not $Message) { Fail "There are uncommitted changes. Commit them, or pass -Message `"...`" to commit everything." }
     Step "Committing"
@@ -33,9 +33,10 @@ if (@(GitRun status --porcelain).Count -gt 0) {
     Ok (GitRun log -1 --format="%h %s")
 }
 
-Step "Syncing with origin/beta"
-GitRun fetch --quiet origin | Out-Null
-$behind = [int](GitRun rev-list --count HEAD..origin/beta)
+Step "Syncing with GitHub"
+GitRun fetch --quiet --prune origin | Out-Null
+$hasBeta = Test-RemoteBranch beta
+$behind = if ($hasBeta) { [int](GitRun rev-list --count HEAD..origin/beta) } else { 0 }
 if ($behind -gt 0) {
     $ErrorActionPreference = "Continue"
     git -C $script:Root rebase --quiet origin/beta 2>&1 | Out-Null
@@ -46,8 +47,15 @@ if ($behind -gt 0) {
     $ErrorActionPreference = "Stop"
     Ok "Rebased onto $behind new commit(s)"
 }
-$ahead = [int](GitRun rev-list --count origin/beta..HEAD)
-if ($ahead -eq 0) { Note "Nothing new to push."; exit 0 }
+Merge-Main
+if ($hasBeta) {
+    $ahead = [int](GitRun rev-list --count origin/beta..HEAD)
+    if ($ahead -eq 0) { Note "Nothing new to push."; exit 0 }
+}
+else {
+    $ahead = [int](GitRun rev-list --count origin/main..HEAD)
+    if ($ahead -eq 0) { Note "Nothing new since the last stable release."; exit 0 }
+}
 
 if (-not $SkipTests) {
     Step "Running the tests"
@@ -59,7 +67,7 @@ if (-not $SkipTests) {
     Ok (($result -split "`n" | Where-Object { $_ -match 'Passed!' } | Select-Object -First 1).Trim())
 }
 
-Step "Pushing $ahead commit(s) to beta"
+if ($hasBeta) { Step "Pushing $ahead commit(s) to beta" } else { Step "Starting the beta branch ($ahead commit(s) after main)" }
 GitRun push --quiet origin HEAD:beta | Out-Null
 $sha = GitRun rev-parse HEAD
 Ok (GitRun log -1 --format="%h %s")

@@ -4,8 +4,9 @@
   publishes it), then waits for the Windows/Linux release and the Flatpak repository and reports in a few lines.
 
 .DESCRIPTION
-  No beta needed first, and the beta branch isn't touched. Installed apps on the Beta channel take the newest version
-  of all, so a stable release is what they get when it's newer than the last beta.
+  No beta needed first. Once it's out, every beta release is removed, and so is the beta branch when everything on it
+  is in this release (release.yml), leaving only main. Beta-channel installs move to this release.
+  Updates merged on GitHub's main (Dependabot) are merged in here first.
   The version is the next patch after the latest stable release unless you say otherwise.
   Release notes are written by GitHub from the commits (release.yml).
 
@@ -26,18 +27,18 @@ param(
 . "$PSScriptRoot/common.ps1"
 Require-Gh
 
-function Test-Ancestor([string]$older, [string]$newer) {
-    $ErrorActionPreference = "Continue"
-    git -C $script:Root merge-base --is-ancestor $older $newer 2>$null
-    $LASTEXITCODE -eq 0
-}
-
 Step "Checking this commit"
 GitRun fetch --quiet --tags origin | Out-Null
 if (GitRun status --porcelain --untracked-files=no) { Fail "There are uncommitted changes. Commit them first." }
 $sha = GitRun rev-parse HEAD
-if (-not (Test-Ancestor origin/main $sha)) { Fail "main on GitHub has commits that aren't here. Pull them in first." }
+if (-not (Test-Ancestor origin/main $sha)) {
+    if ($DryRun) { Note "main on GitHub has commits that aren't here; they'd be merged in first." }
+    else { Merge-Main; $sha = GitRun rev-parse HEAD }
+}
 Ok "Releasing $(GitRun log -1 --format='%h %s' $sha)"
+if ((Test-RemoteBranch beta) -and -not (Test-Ancestor origin/beta $sha)) {
+    Note "beta has commits that aren't in this release; the beta branch will be kept for them."
+}
 
 # ---- Version ----
 $last = Get-LatestStable

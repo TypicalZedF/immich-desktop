@@ -15,6 +15,7 @@ Require-Gh
 
 GitRun fetch --quiet --tags origin | Out-Null
 $isTag = $Ref -match '^v\d'
+if (-not $isTag -and -not (Test-RemoteBranch $Ref)) { Fail "There's no $Ref branch on GitHub (a stable release removes beta)." }
 if ($isTag) { $sha = GitRun rev-list -n 1 $Ref } else { $sha = GitRun rev-parse "origin/$Ref" }
 if (-not $Workflows) {
     # Releases and Flatpaks are built for tags and beta pushes only; main just runs CI.

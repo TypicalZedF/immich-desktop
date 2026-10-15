@@ -44,12 +44,22 @@ Without SSH, `-Linux` leaves `artifacts/dev/ImmichSplash-dev-linux-x64.tar.gz`; 
 
 ### For maintainers: betas and releases
 
+The flow: changes are tried with dev builds (`build/dev.ps1`) until they're ready for testers, then pushed as a beta. A stable release can come from a beta or straight from the current commit. Once it's out, the betas are removed (releases and the `beta` branch), so only `main` is left until the next beta.
+
+| Branch / tag | What it is | Pushing to it |
+|---|---|---|
+| `main` | What's been released, plus Dependabot updates waiting for the next release | Runs CI only |
+| `beta` | Only exists while there's a beta out | Publishes a pre-release `vX.Y.Z-beta.N` |
+| `vX.Y.Z` tag | A stable release | Publishes the release and the Flatpak repository |
+
 These need the [GitHub CLI](https://cli.github.com) (`gh auth login`). Each prints a few lines; if a check fails, it shows the failed step and its errors.
 
-- `./build/status.ps1`: where `beta` and `main` are, the latest releases, and the checks on `beta`.
-- `./build/beta.ps1`: syncs with `origin/beta`, runs the tests, pushes, then waits for CI and the beta release (`-NoWait` to skip waiting, `-Message "..."` to commit everything first).
+- `./build/status.ps1`: where `beta` and `main` are, the latest releases, and the latest checks.
+- `./build/beta.ps1`: pushes the current commit as a beta. It brings in other pushes to `beta` and anything new on `main`, runs the tests, pushes (starting `beta` again if the last release removed it), then waits for CI and the beta release (`-NoWait` to skip waiting, `-Message "..."` to commit everything first).
 - `./build/watch.ps1 [-Ref vX.Y.Z]`: waits for the checks on `beta` or on a release tag.
-- `./build/release.ps1`: makes a stable release from `beta`. It checks CI, moves `main` up, tags the next version (`-Minor`, `-Major`, `-Version`), and waits for the release and the Flatpak repository. Run it with `-DryRun` first to see what would ship.
+- `./build/release.ps1`: makes a stable release of the current commit, with or without a beta first. It merges in anything new on `main`, runs the tests, moves `main` up, waits for CI, tags the next version (`-Minor`, `-Major`, `-Version`), and waits for the release and the Flatpak repository. Run it with `-DryRun` first to see what would ship.
+
+Dependabot opens one PR a month for NuGet packages and one for GitHub Actions, against `main`, with minor and patch updates only. Merging one ships nothing by itself; it goes out with the next release. Major updates are done by hand.
 
 ## Before you open a pull request
 
