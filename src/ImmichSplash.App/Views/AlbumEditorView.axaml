@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:ImmichSplash.App.Services"
+             xmlns:vm="using:ImmichSplash.App.ViewModels"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ImmichSplash.App.Views.AlbumEditorView"
+             x:DataType="vm:AlbumEditorViewModel">
+  <Border Classes="card" Width="460" Padding="28,26" CornerRadius="22" HorizontalAlignment="Center" VerticalAlignment="Center"
+          BoxShadow="0 18 50 0 #40000000">
+    <StackPanel Spacing="14">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <mi:MaterialIcon Kind="ImageAlbum" Width="28" Height="28" Foreground="{DynamicResource AppPrimaryBrush}" />
+        <TextBlock Classes="h2" Text="{Binding Title}" VerticalAlignment="Center" />
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Classes="label" l:Tr.Text="Album name" />
+        <TextBox Name="NameBox" Text="{Binding Name}" l:Tr.Watermark="Name" AutomationProperties.Name="Album name">
+          <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding SaveCommand}" /></TextBox.KeyBindings>
+        </TextBox>
+      </StackPanel>
+      <StackPanel Spacing="6">
+        <TextBlock Classes="label" l:Tr.Text="Description (optional)" />
+        <TextBox Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="84" MaxHeight="160" AutomationProperties.Name="Description" />
+      </StackPanel>
+
+      <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding Error}" TextWrapping="Wrap"
+                 IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,6,0,0">
+        <Button Classes="secondary" l:Tr.Content="Cancel" Command="{Binding CancelCommand}" />
+        <Button Classes="primary" Command="{Binding SaveCommand}" IsEnabled="{Binding CanSave}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <mi:MaterialIcon Kind="Loading" Classes="spin" Width="16" Height="16" IsVisible="{Binding IsSaving}" />
+            <TextBlock Text="{Binding ConfirmText}" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

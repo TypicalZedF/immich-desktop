@@ -254,81 +254,47 @@ public sealed partial class PhotosViewModel
         }
     }
 
-    // ---- Create and edit ----
-
-    [ObservableProperty]
-    public partial bool IsEditingAlbum { get; set; }
-
-    [ObservableProperty]
-    public partial string AlbumEditorTitle { get; set; } = "";
-
-    [ObservableProperty]
-    public partial string AlbumEditorName { get; set; } = "";
-
-    [ObservableProperty]
-    public partial string AlbumEditorDescription { get; set; } = "";
-
-    [ObservableProperty]
-    public partial string? AlbumEditorError { get; set; }
-
-    AlbumInfo? _editedAlbum;
+    // ---- Create and edit (a dialog over the window) ----
 
     [RelayCommand]
     void CreateAlbum()
     {
-        _editedAlbum = null;
-        AlbumEditorTitle = Tr.T("Create album");
-        AlbumEditorName = "";
-        AlbumEditorDescription = "";
-        AlbumEditorError = null;
-        IsEditingAlbum = true;
+        if (_main is not null)
+            _main.ShowOverlay(new AlbumEditorViewModel(this, _main, null));
     }
 
     internal void EditAlbum(AlbumInfo album)
     {
-        _editedAlbum = album;
-        AlbumEditorTitle = Tr.T("Edit album");
-        AlbumEditorName = album.AlbumName;
-        AlbumEditorDescription = album.Description ?? "";
-        AlbumEditorError = null;
-        IsEditingAlbum = true;
+        if (_main is not null)
+            _main.ShowOverlay(new AlbumEditorViewModel(this, _main, album));
     }
 
-    [RelayCommand]
-    void CancelAlbumEditor() => IsEditingAlbum = false;
-
-    [RelayCommand]
-    async Task SaveAlbumEditorAsync()
+    /// <summary>Creates the album (and opens it) or renames the existing one. Returns what went wrong, or null.</summary>
+    internal async Task<string?> SaveAlbumAsync(AlbumInfo? existing, string name, string description)
     {
-        var name = AlbumEditorName.Trim();
-        if (name.Length == 0)
-        {
-            AlbumEditorError = Tr.T("Give the album a name.");
-            return;
-        }
         if (Client is not { } client)
-            return;
+            return Tr.T("Not signed in.");
         try
         {
-            if (_editedAlbum is { } existing)
+            if (existing is not null)
             {
-                await client.UpdateAlbumAsync(existing.Id, name, AlbumEditorDescription.Trim(), CancellationToken.None);
+                await client.UpdateAlbumAsync(existing.Id, name, description, CancellationToken.None);
                 ShowNotice(Tr.T("Album updated"));
-                IsEditingAlbum = false;
                 await LoadAlbumsAsync();
             }
             else
             {
                 var created = await client.CreateAlbumAsync(name, null, CancellationToken.None);
+                RememberAlbum(created.Id);
                 ShowNotice(Tr.T("Created the album “{0}”", name));
-                IsEditingAlbum = false;
                 await LoadAlbumsAsync();
                 OpenAlbum(created with { AlbumName = name });
             }
+            return null;
         }
         catch (Exception ex)
         {
-            AlbumEditorError = Tr.T("Couldn't save the album. {0}", NetworkErrors.Describe(ex));
+            return Tr.T("Couldn't save the album. {0}", NetworkErrors.Describe(ex));
         }
     }
 

@@ -433,6 +433,10 @@ static class Screens
             Pump(TimeSpan.FromSeconds(2));
             shell.Navigate(ShellPage.Albums);
             Shot(main, outDir, $"19a-albums-{suffix}", height: 760, settle: TimeSpan.FromSeconds(2));
+            // "Create album" is a dialog over the window.
+            ((PhotosViewModel)Page(shell, ShellPage.Albums)).CreateAlbumCommand.Execute(null);
+            Shot(main, outDir, $"19a2-create-album-{suffix}", height: 760, settle: TimeSpan.FromMilliseconds(600));
+            main.CloseOverlay(main.Overlay);
             if (suffix == "light")
             {
                 // An open album: its header has Download, Share and Delete.

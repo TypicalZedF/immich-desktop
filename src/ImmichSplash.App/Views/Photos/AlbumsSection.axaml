@@ -92,23 +92,6 @@
       </StackPanel>
     </Grid>
 
-    <!-- Create / edit an album -->
-    <Border DockPanel.Dock="Top" Classes="card" Margin="28,0,10,12" Padding="18" CornerRadius="16" IsVisible="{Binding IsEditingAlbum}" MaxWidth="560" HorizontalAlignment="Left">
-      <StackPanel Spacing="10">
-        <TextBlock Classes="h3" Text="{Binding AlbumEditorTitle}" />
-        <TextBox Text="{Binding AlbumEditorName}" l:Tr.Watermark="Album name" AutomationProperties.Name="Album name">
-          <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding SaveAlbumEditorCommand}" /></TextBox.KeyBindings>
-        </TextBox>
-        <TextBox Text="{Binding AlbumEditorDescription}" l:Tr.Watermark="Description (optional)" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" AutomationProperties.Name="Description" />
-        <TextBlock Classes="caption" Foreground="{DynamicResource AppDangerBrush}" Text="{Binding AlbumEditorError}"
-                   IsVisible="{Binding AlbumEditorError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
-          <Button Classes="secondary" l:Tr.Content="Cancel" Command="{Binding CancelAlbumEditorCommand}" />
-          <Button Classes="primary" l:Tr.Content="Save" Command="{Binding SaveAlbumEditorCommand}" />
-        </StackPanel>
-      </StackPanel>
-    </Border>
-
     <TextBlock DockPanel.Dock="Top" Classes="secondary" Margin="28,12,10,0" Text="{Binding AlbumsEmptyText}"
                IsVisible="{Binding AlbumsEmptyText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
