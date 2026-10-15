@@ -24,5 +24,5 @@ cp "$ROOT/src/ImmichDesktop.App/Assets/logo-512.png" "$STAGE/immich-splash.png"
 cp "$ROOT/build/linux-install.sh" "$STAGE/install.sh"
 chmod +x "$STAGE/install.sh"
 
-tar -C "$ROOT/artifacts/stage" -czf "$OUT_DIR/ImmichDesktop-$RUNTIME.tar.gz" immich-splash
-echo "Ready: $OUT_DIR/ImmichDesktop-$RUNTIME.tar.gz"
+tar -C "$ROOT/artifacts/stage" -czf "$OUT_DIR/ImmichSplash-$RUNTIME.tar.gz" immich-splash
+echo "Ready: $OUT_DIR/ImmichSplash-$RUNTIME.tar.gz"

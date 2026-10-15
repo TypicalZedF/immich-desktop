@@ -2,7 +2,7 @@
 # Installs (or updates) Immich Splash from the extracted tarball into ~/.local, with a menu entry.
 #   ./install.sh               install or update
 #   ./install.sh --uninstall   remove it (settings stay in ~/.local/share/immich-splash)
-# Shipped in ImmichDesktop-linux-x64.tar.gz (build/publish.sh) and used by build/dev.ps1 -Linux.
+# Shipped in ImmichSplash-linux-x64.tar.gz (build/publish.sh) and used by build/dev.ps1 -Linux.
 set -euo pipefail
 DEST="$HOME/.local/opt/immich-splash"
 APPS="$HOME/.local/share/applications"
