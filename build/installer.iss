@@ -98,6 +98,10 @@ Type: files; Name: "{app}\ImmichDesktop.*"
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "ImmichDesktop"; Flags: deletevalue
 
+[UninstallDelete]
+; Anything the app created inside its own folder.
+Type: filesandordirs; Name: "{app}"
+
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon

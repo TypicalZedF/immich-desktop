@@ -122,6 +122,10 @@ public static class DesktopNotifications
     public static void Unregister()
     {
         if (OperatingSystem.IsWindows())
+        {
             Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree($@"Software\Classes\AppUserModelId\{WindowsAppId}", throwOnMissingSubKey: false);
+            // Windows adds its own per-app notification settings the first time a toast is shown.
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree($@"Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\{WindowsAppId}", throwOnMissingSubKey: false);
+        }
     }
 }

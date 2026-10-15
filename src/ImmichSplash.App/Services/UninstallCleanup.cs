@@ -5,7 +5,7 @@ namespace ImmichSplash.App.Services;
 
 /// <summary>
 /// Run by the uninstaller (ImmichSplash.exe --uninstall). Removes the autostart entry, the link handler,
-/// the stored sign-in and logs. Whether to keep settings and backup history is asked by the uninstaller itself.
+/// the stored sign-in, logs, downloaded updates and the video cache in the temp folder. Whether to keep settings and backup history is asked by the uninstaller itself.
 /// </summary>
 public static class UninstallCleanup
 {
@@ -17,5 +17,6 @@ public static class UninstallCleanup
         try { DesktopNotifications.Unregister(); } catch { /* best effort */ }
         try { Directory.Delete(AppPaths.LogsDir, recursive: true); } catch { /* best effort */ }
         try { Directory.Delete(UpdateService.DownloadDirectory, recursive: true); } catch { /* best effort */ }
+        try { Directory.Delete(Path.Combine(Path.GetTempPath(), "ImmichSplash"), recursive: true); } catch { /* best effort */ }
     }
 }
