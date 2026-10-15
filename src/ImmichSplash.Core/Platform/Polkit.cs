@@ -47,7 +47,7 @@ public static class Polkit
         try
         {
             using var bus = await LinuxDBus.OpenAsync(system: true);
-            var (authorized, dismissed) = await LinuxDBus.CallAsync(bus, Service, Path, Interface, "CheckAuthorization", "(sa{sv})sa{ss}us", w =>
+            var (authorized, dismissed) = await LinuxDBus.CallAsync(bus, Service, Path, Interface, "CheckAuthorization", "(sa{sv})sa{ss}us", (ref MessageWriter w) =>
             {
                 // The subject is this app's bus connection: polkit finds the session from it, also from inside the Flatpak.
                 w.WriteStructureStart();

@@ -53,16 +53,27 @@ public static class LinuxDBus
         return value.Type == VariantValueType.Variant ? value.GetVariantValue() : value;
     }
 
+    /// <summary>
+    /// Writes a call's arguments. By reference: <see cref="MessageWriter"/> is a struct, and arguments written to a copy
+    /// leave the message saying it has no body, which the bus answers by hanging up ("Connection closed by peer").
+    /// </summary>
+    public delegate void WriteArgs(ref MessageWriter writer);
+
     /// <summary>Calls a method; <paramref name="write"/> writes the arguments, <paramref name="read"/> reads the reply.</summary>
     public static Task<T> CallAsync<T>(Connection bus, string destination, string path, string @interface, string member, string? signature,
-        Action<MessageWriter>? write, MessageValueReader<T> read, TimeSpan? timeout = null)
+        WriteArgs? write, MessageValueReader<T> read, TimeSpan? timeout = null)
     {
         MessageBuffer message;
-        using (var writer = bus.GetMessageWriter())
+        var writer = bus.GetMessageWriter();
+        try
         {
             writer.WriteMethodCallHeader(destination, path, @interface, member, signature, MessageFlags.None);
-            write?.Invoke(writer);
+            write?.Invoke(ref writer);
             message = writer.CreateMessage();
+        }
+        finally
+        {
+            writer.Dispose();
         }
         return bus.CallMethodAsync(message, read, null).WaitAsync(timeout ?? Timeout);
     }

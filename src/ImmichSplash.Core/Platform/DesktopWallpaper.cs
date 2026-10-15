@@ -76,7 +76,7 @@ public static partial class DesktopWallpaper
             });
             """;
         return LinuxDBus.CallAsync(bus, "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "evaluateScript", "s",
-            w => w.WriteString(script), static (_, _) => true);
+            (ref Tmds.DBus.Protocol.MessageWriter w) => w.WriteString(script), static (_, _) => true);
     }
 
     /// <summary>
@@ -85,7 +85,7 @@ public static partial class DesktopWallpaper
     /// </summary>
     static Task<bool> SetThroughPortalAsync(Tmds.DBus.Protocol.Connection bus, string uri) =>
         LinuxDBus.CallAsync(bus, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
-            "org.freedesktop.portal.Wallpaper", "SetWallpaperURI", "ssa{sv}", w =>
+            "org.freedesktop.portal.Wallpaper", "SetWallpaperURI", "ssa{sv}", (ref Tmds.DBus.Protocol.MessageWriter w) =>
             {
                 w.WriteString(""); // no parent window
                 w.WriteString(uri);

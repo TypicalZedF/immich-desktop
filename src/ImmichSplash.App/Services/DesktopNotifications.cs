@@ -93,7 +93,7 @@ public static class DesktopNotifications
     {
         var icon = Core.Platform.Flatpak.AppId ?? IconPath; // the sandbox's files aren't visible to the desktop; its icon is
         var id = await LinuxDBus.CallAsync(bus, "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
-            "org.freedesktop.Notifications", "Notify", "susssasa{sv}i", w =>
+            "org.freedesktop.Notifications", "Notify", "susssasa{sv}i", (ref Tmds.DBus.Protocol.MessageWriter w) =>
             {
                 w.WriteString(AppInfo.Name);
                 w.WriteUInt32(0);
