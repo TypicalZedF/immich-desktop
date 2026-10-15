@@ -103,6 +103,11 @@ public sealed class AppSettings
 
     public bool PauseOnBattery { get; set; }
 
+    /// <summary>Only upload between these times (minutes after midnight; the window may cross midnight).</summary>
+    public bool BackupWindowEnabled { get; set; }
+    public int BackupWindowStartMinutes { get; set; } = 60;
+    public int BackupWindowEndMinutes { get; set; } = 6 * 60;
+
     /// <summary>Data saving: what to do on metered connections.</summary>
     public MeteredBackup MeteredBackup { get; set; } = MeteredBackup.PhotosOnly;
 

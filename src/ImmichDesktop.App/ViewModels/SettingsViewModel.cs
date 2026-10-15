@@ -44,6 +44,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         SelectedSpeedLimit = SpeedLimits.FirstOrDefault(o => o.Value == s.UploadLimitKBps) ?? SpeedLimits[0];
         SelectedRescan = RescanIntervals.FirstOrDefault(o => o.Value == s.RescanIntervalMinutes) ?? RescanIntervals[2];
         PauseOnBattery = s.PauseOnBattery;
+        BackupWindowEnabled = s.BackupWindowEnabled;
+        BackupWindowStart = TimeChoices.FirstOrDefault(o => o.Value == s.BackupWindowStartMinutes) ?? TimeChoices[2];
+        BackupWindowEnd = TimeChoices.FirstOrDefault(o => o.Value == s.BackupWindowEndMinutes) ?? TimeChoices[12];
         CheckForUpdates = s.CheckForUpdates;
         AutoInstallUpdates = s.AutoInstallUpdates;
         _channel = s.UpdateChannel;
@@ -646,6 +649,39 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     public partial bool PauseOnBattery { get; set; }
+
+    // ---- Backup hours ----
+
+    /// <summary>Every half hour of the day, in the PC's time format.</summary>
+    public IReadOnlyList<Option<int>> TimeChoices { get; } =
+        Enumerable.Range(0, 48).Select(i => new Option<int>(Core.Sync.BackupSchedule.Format(i * 30), i * 30)).ToList();
+
+    [ObservableProperty]
+    public partial bool BackupWindowEnabled { get; set; }
+
+    [ObservableProperty]
+    public partial Option<int>? BackupWindowStart { get; set; }
+
+    [ObservableProperty]
+    public partial Option<int>? BackupWindowEnd { get; set; }
+
+    partial void OnBackupWindowEnabledChanged(bool value)
+    {
+        if (!_loading)
+            AppServices.Settings.Update(s => s.BackupWindowEnabled = value);
+    }
+
+    partial void OnBackupWindowStartChanged(Option<int>? value)
+    {
+        if (!_loading && value is not null)
+            AppServices.Settings.Update(s => s.BackupWindowStartMinutes = value.Value);
+    }
+
+    partial void OnBackupWindowEndChanged(Option<int>? value)
+    {
+        if (!_loading && value is not null)
+            AppServices.Settings.Update(s => s.BackupWindowEndMinutes = value.Value);
+    }
 
     partial void OnPauseOnBatteryChanged(bool value)
     {

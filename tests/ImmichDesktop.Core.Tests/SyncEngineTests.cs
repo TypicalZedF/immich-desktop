@@ -317,4 +317,24 @@ public class SyncEngineTests
         await h.RunAsync();
         Assert.Single(runs);
     }
+
+    [Fact]
+    public async Task Uploads_wait_for_the_backup_hours()
+    {
+        await using var h = new Harness();
+        h.Temp.File("Photos/a.jpg");
+        var now = new DateTime(2026, 10, 15, 12, 0, 0);
+        h.Engine.Now = () => now;
+        h.Settings.Update(s => { s.BackupWindowEnabled = true; s.BackupWindowStartMinutes = 1 * 60; s.BackupWindowEndMinutes = 6 * 60; });
+
+        var wait = await h.RunAsync();
+        Assert.Equal(SyncState.WaitingForSchedule, h.Engine.Status.State);
+        Assert.Empty(h.Server.UploadedFileNames);
+        Assert.InRange(wait!.Value, TimeSpan.FromHours(13), TimeSpan.FromHours(13).Add(TimeSpan.FromSeconds(2))); // until 01:00
+
+        now = new DateTime(2026, 10, 16, 1, 30, 0);
+        h.Engine.SyncNow();
+        await h.RunAsync();
+        Assert.Equal(["a.jpg"], h.Server.UploadedFileNames);
+    }
 }

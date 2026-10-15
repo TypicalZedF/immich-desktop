@@ -18,6 +18,9 @@ public enum SyncState
     Paused,
     WaitingForPower,
 
+    /// <summary>Outside the hours chosen for backing up.</summary>
+    WaitingForSchedule,
+
     /// <summary>Data saving: paused on a metered connection.</summary>
     WaitingForNetwork,
     Offline,

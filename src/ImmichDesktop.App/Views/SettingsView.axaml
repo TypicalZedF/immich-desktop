@@ -396,6 +396,20 @@
           <Border Classes="divider" />
           <Grid Classes="row" ColumnDefinitions="*,Auto">
             <StackPanel>
+              <TextBlock Classes="title" l:Tr.Text="Only back up during certain hours" />
+              <TextBlock Classes="caption" l:Tr.Text="For example overnight. New photos are still noticed; they upload when the time comes." TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding BackupWindowEnabled}" />
+          </Grid>
+          <StackPanel Classes="row" Orientation="Horizontal" Spacing="10" Margin="20,0,0,0" IsVisible="{Binding BackupWindowEnabled}">
+            <TextBlock l:Tr.Text="From" VerticalAlignment="Center" />
+            <ComboBox ItemsSource="{Binding TimeChoices}" SelectedItem="{Binding BackupWindowStart}" MinWidth="110" />
+            <TextBlock l:Tr.Text="to" VerticalAlignment="Center" />
+            <ComboBox ItemsSource="{Binding TimeChoices}" SelectedItem="{Binding BackupWindowEnd}" MinWidth="110" />
+          </StackPanel>
+          <Border Classes="divider" />
+          <Grid Classes="row" ColumnDefinitions="*,Auto">
+            <StackPanel>
               <TextBlock Classes="title" l:Tr.Text="Full folder check" />
               <TextBlock Classes="caption" TextWrapping="Wrap"
                          l:Tr.Text="New files are noticed instantly. A full check also runs periodically to catch anything missed." />

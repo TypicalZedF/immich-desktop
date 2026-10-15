@@ -33,6 +33,8 @@ public sealed partial class SyncEngine
                     throw new WaitForPowerException();
                 if (PausedForData(settings))
                     throw new WaitForNetworkException();
+                if (OutsideWindow(settings))
+                    throw new WaitForScheduleException(); // the window closed: stop between batches
 
                 folderIds = _rules.Keys.ToList(); // folders turned off mid-run stop after this batch
                 RecountRemaining(folderIds);
@@ -306,6 +308,17 @@ public sealed partial class SyncEngine
     }
 
     sealed class WaitForPowerException : Exception;
+
+    sealed class WaitForScheduleException : Exception;
+
+    /// <summary>Outside the backup hours: wait until they start (or until the settings change).</summary>
+    TimeSpan WaitForWindow(AppSettings settings)
+    {
+        RefreshCounts(settings);
+        SetState(SyncState.WaitingForSchedule);
+        var now = Now();
+        return BackupSchedule.NextOpen(settings, now) - now + TimeSpan.FromSeconds(1);
+    }
 
     sealed class WaitForNetworkException : Exception;
 

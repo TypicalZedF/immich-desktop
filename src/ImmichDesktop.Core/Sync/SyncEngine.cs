@@ -91,6 +91,11 @@ public sealed partial class SyncEngine : IAsyncDisposable
     /// <summary>Whether the current connection is metered (for data saving). Set by the app.</summary>
     public Func<bool> IsMetered { get; set; } = () => false;
 
+    /// <summary>The time of day, for the backup window. Replaceable for tests.</summary>
+    public Func<DateTime> Now { get; set; } = () => DateTime.Now;
+
+    bool OutsideWindow(AppSettings settings) => !BackupSchedule.IsOpen(settings, Now());
+
     /// <summary>Whether the PC is running on battery (or a UPS). Replaceable for tests.</summary>
     public Func<bool> IsOnBattery { get; set; } = PowerStatus.IsOnBattery;
 
@@ -176,11 +181,11 @@ public sealed partial class SyncEngine : IAsyncDisposable
         try
         {
             var settings = _settings.Current;
-            var hold = (settings.PauseOnBattery && IsOnBattery()) || PausedForData(settings);
+            var hold = (settings.PauseOnBattery && IsOnBattery()) || PausedForData(settings) || OutsideWindow(settings);
             if (hold == _lastHold)
                 return;
             _lastHold = hold;
-            Log.Info(hold ? "On battery or a metered connection: holding backup" : "Power or network is back: resuming backup");
+            Log.Info(hold ? "On battery, a metered connection or outside the backup hours: holding backup" : "Resuming backup");
             if (hold)
                 _runCts?.Cancel();
             Wake();
@@ -447,6 +452,8 @@ public sealed partial class SyncEngine : IAsyncDisposable
             SetState(SyncState.WaitingForNetwork);
             return TimeSpan.FromMinutes(1);
         }
+        if (OutsideWindow(settings))
+            return WaitForWindow(settings);
 
         using var run = CancellationTokenSource.CreateLinkedTokenSource(shutdown);
         _runCts = run;
@@ -469,6 +476,10 @@ public sealed partial class SyncEngine : IAsyncDisposable
         {
             // Paused, signed out or folders changed: re-evaluate immediately.
             return TimeSpan.Zero;
+        }
+        catch (WaitForScheduleException)
+        {
+            return WaitForWindow(settings);
         }
         catch (WaitForPowerException)
         {

@@ -95,6 +95,8 @@ public sealed class SettingsStore
         s.RescanIntervalMinutes = Math.Clamp(s.RescanIntervalMinutes, 5, 24 * 60);
         s.Folders ??= [];
         s.PrivacyHomeNetworks ??= [];
+        s.BackupWindowStartMinutes = Math.Clamp(s.BackupWindowStartMinutes, 0, 24 * 60 - 1);
+        s.BackupWindowEndMinutes = Math.Clamp(s.BackupWindowEndMinutes, 0, 24 * 60 - 1);
         foreach (var folder in s.Folders)
         {
             folder.ExcludePatterns ??= [];

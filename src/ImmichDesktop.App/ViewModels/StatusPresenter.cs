@@ -59,6 +59,14 @@ public static class StatusPresenter
             case SyncState.WaitingForPower:
                 return new(Tr.T("Waiting for power"), Tr.T("Backup continues when your PC is plugged in."), Tr.T("Waiting for the charger"), MaterialIconKind.PowerPlugOutline, StatusTone.Paused);
 
+            case SyncState.WaitingForSchedule:
+            {
+                var from = Core.Sync.BackupSchedule.Format(settings.BackupWindowStartMinutes);
+                var to = Core.Sync.BackupSchedule.Format(settings.BackupWindowEndMinutes);
+                return new(Tr.T("Waiting until {0}", from), Tr.T("You chose to back up between {0} and {1}. Change this in Settings → Backup.", from, to),
+                    Tr.T("Backs up from {0}", from), MaterialIconKind.ClockOutline, StatusTone.Paused);
+            }
+
             case SyncState.WaitingForNetwork:
                 return new(Tr.T("Saving data"), Tr.T("Backup is paused on this metered connection. Change this in Settings → Network."),
                     Tr.T("Paused on a metered connection"), MaterialIconKind.WifiStrengthAlertOutline, StatusTone.Paused);
