@@ -367,7 +367,7 @@ sealed class DemoServer : HttpMessageHandler
             id = ids,
             isImage = ids.Select((_, i) => i % 7 != 3).ToList(),
             isFavorite = ids.Select((_, i) => i % 9 == 2).ToList(),
-            ratio = ids.Select(_ => 1.5).ToList(),
+            ratio = ids.Select((_, i) => (i % 6) switch { 0 => 1.5, 1 => 0.75, 2 => 1.0, 3 => 1.78, 4 => 0.56, _ => 1.33 }).ToList(),
             duration = ids.Select((_, i) => i % 7 == 3 ? (long?)(12_000 + i * 3_100) : null).ToList(),
             // Local wall-clock times, so photos fall on the same days in every time zone (the harness checks them).
             fileCreatedAt = ids.Select((_, i) => DateTime.SpecifyKind(month.AddDays(27 - i % 27).AddHours(-i), DateTimeKind.Local)

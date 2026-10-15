@@ -51,6 +51,7 @@ public sealed partial class PhotoViewerViewModel
 
     /// <summary>The bar is being dragged: it shows where the pointer is, and the video's own time is ignored.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowVideoControlsNow))]
     public partial bool IsScrubbing { get; set; }
 
     double _scrubTarget;
@@ -95,7 +96,7 @@ public sealed partial class PhotoViewerViewModel
         VideoTimeText = $"{AssetCellViewModel.FormatDuration((long)(video.Length * fraction).TotalMilliseconds)} / {AssetCellViewModel.FormatDuration((long)video.Length.TotalMilliseconds)}";
     }
 
-    /// <summary>While dragging, jump to the nearest keyframe at most every 70 ms (the newest position wins): quick, and the picture follows the pointer.</summary>
+    /// <summary>While dragging, jump to the nearest keyframe at most every 160 ms (the newest position wins): quick, and the picture follows the pointer.</summary>
     void QueueScrubSeek()
     {
         if (_scrubSeekQueued)
@@ -106,7 +107,7 @@ public sealed partial class PhotoViewerViewModel
             _scrubSeekQueued = false;
             if (IsScrubbing)
                 _video?.Seek(_scrubTarget, exact: false);
-        }, TimeSpan.FromMilliseconds(70));
+        }, TimeSpan.FromMilliseconds(160));
     }
 
     /// <summary>True while the bar should ignore the video's reported time (dragging, or just dropped).</summary>
@@ -153,7 +154,7 @@ public sealed partial class PhotoViewerViewModel
         PreviewTimeText = AssetCellViewModel.FormatDuration((long)(length * f).TotalMilliseconds);
         _previewTarget = f;
         // Not on every pixel of movement: about every 90 ms, the newest position.
-        _previewTimer ??= new DispatcherTimer(TimeSpan.FromMilliseconds(90), DispatcherPriority.Background, (_, _) => RequestPreviewFrame());
+        _previewTimer ??= new DispatcherTimer(TimeSpan.FromMilliseconds(120), DispatcherPriority.Background, (_, _) => RequestPreviewFrame());
         if (!_previewTimer.IsEnabled)
         {
             RequestPreviewFrame();

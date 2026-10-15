@@ -56,7 +56,7 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:AssetCellViewModel">
-            <Button Classes="tile" Classes.selected="{Binding IsSelected}" Width="{Binding TileSize}" Height="{Binding TileSize}" VerticalAlignment="Top"
+            <Button Classes="tile" Classes.selected="{Binding IsSelected}" Width="{Binding TileWidth}" Height="{Binding TileHeight}" VerticalAlignment="Top"
                     AutomationProperties.Name="{Binding AccessibleName}"
                     Command="{Binding OpenCommand}" IsVisible="{Binding !IsMissing}" IsEnabled="{Binding CanOpen}">
               <Panel>
@@ -674,14 +674,14 @@
             </StackPanel>
           </Border>
           <!-- Video: controls -->
-          <Border HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="80,0,80,48" Padding="12,4,12,8" CornerRadius="14" Background="#B3000000"
-                  MaxWidth="900" IsVisible="{Binding ShowVideoControls}">
+          <Border Name="VideoControls" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="40,0,40,14" Padding="10,0,10,2" CornerRadius="12" Background="#B3000000"
+                  MaxWidth="560" IsVisible="{Binding ShowVideoControlsNow}">
             <StackPanel Spacing="0">
               <!-- Progress bar: press and drag; pictures from the video where you point -->
               <Panel>
                 <c:VideoSeekBar Name="VideoSeek" Value="{Binding VideoPosition}" />
                 <Border Name="VideoPreview" IsVisible="{Binding ShowPreview}" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top"
-                        Margin="0,-122,0,0" Padding="4" CornerRadius="10" Background="#E6000000">
+                        Margin="0,-142,0,0" Padding="4" CornerRadius="10" Background="#E6000000">
                   <StackPanel Spacing="4">
                     <Border Name="VideoPreviewBox" Width="176" Height="99" CornerRadius="6" ClipToBounds="True" Background="#FF101010">
                       <Image Name="VideoPreviewImage" Source="{Binding PreviewFrame}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="MediumQuality" />
@@ -709,7 +709,7 @@
                 <Button Grid.Column="5" Classes="videoControl" Command="{Binding ToggleMuteCommand}" l:Tr.Tip="Mute (M)" AutomationProperties.Name="Mute">
                   <mi:MaterialIcon Kind="{Binding VolumeIcon}" />
                 </Button>
-                <Slider Grid.Column="6" Classes="videoSeek" Width="96" Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
+                <Slider Grid.Column="6" Classes="videoSeek" Width="80" Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
                         Value="{Binding Volume}" VerticalAlignment="Center" Margin="2,0,6,0" l:Tr.Tip="Volume (Up and Down arrows)" AutomationProperties.Name="Volume" />
               </Grid>
             </StackPanel>

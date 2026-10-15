@@ -46,7 +46,7 @@ public sealed class VideoSeekBar : Control
 
     public VideoSeekBar()
     {
-        Height = 30;
+        Height = 24;
     }
 
     public bool IsScrubbing => _scrubbing;

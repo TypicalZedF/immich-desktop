@@ -83,6 +83,14 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
 
     public bool ShowVideoControls => IsVideoStarted && !IsLiveMotion;
 
+    /// <summary>The pointer moved lately (set by the view); while a video plays, the controls fade away when it didn't.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowVideoControlsNow))]
+    public partial bool ControlsAwake { get; set; } = true;
+
+    /// <summary>The controls are on screen: always while paused or dragging, and while the pointer is active during playback.</summary>
+    public bool ShowVideoControlsNow => ShowVideoControls && (ControlsAwake || !IsVideoPlaying || IsScrubbing);
+
     [RelayCommand]
     void PlayLivePhoto()
     {
@@ -323,6 +331,7 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
 
     public bool HasMpvVideo => MpvVideo is not null;
     bool _updatingPosition;
+    long _lastTimeUpdate;
 
     /// <summary>The playing video's picture (null until the first frame, while the photo preview shows).</summary>
     [ObservableProperty]
@@ -337,12 +346,12 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     public event Action? VideoFrameUpdated;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowBigPlay))]
+    [NotifyPropertyChangedFor(nameof(ShowBigPlay), nameof(ShowVideoControlsNow))]
     public partial bool IsVideoPlaying { get; set; }
 
     /// <summary>A player is open for this video (controls show).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowBigPlay), nameof(ShowVideoControls))]
+    [NotifyPropertyChangedFor(nameof(ShowBigPlay), nameof(ShowVideoControls), nameof(ShowVideoControlsNow))]
     public partial bool IsVideoStarted { get; set; }
 
     public bool ShowBigPlay => IsVideo && !IsVideoPlaying && !IsVideoLoading;
@@ -529,6 +538,12 @@ public sealed partial class PhotoViewerViewModel : ViewModelBase
     {
         if (HoldingPosition(player))
             return; // dragging the bar (or just dropped): the bar follows you, not the video
+        // mpv reports the time on every picture; the bar and the clock only need ~8 updates a second
+        // (redrawing and re-measuring them 30-60 times a second is what made playback feel laggy).
+        var now = Environment.TickCount64;
+        if (now - _lastTimeUpdate < 120 && player.IsPlaying)
+            return;
+        _lastTimeUpdate = now;
         var length = player.Length;
         _updatingPosition = true;
         VideoPosition = length > TimeSpan.Zero ? player.Time / length : 0;

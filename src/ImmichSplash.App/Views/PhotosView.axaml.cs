@@ -80,6 +80,12 @@ public partial class PhotosView : UserControl
                 _vm.MapPanelWidth = e.NewSize.Width - 14; // room for the scrollbar
         };
 
+        // While a video plays, the controls (and the mouse pointer) go away when the pointer rests, like in any player.
+        var layer = this.FindControl<Panel>("ViewerLayer")!;
+        layer.AddHandler(PointerMovedEvent, (_, _) => WakeVideoControls(), RoutingStrategies.Tunnel, handledEventsToo: true);
+        layer.AddHandler(PointerPressedEvent, (_, _) => WakeVideoControls(), RoutingStrategies.Tunnel, handledEventsToo: true);
+        _controlsIdle = new Avalonia.Threading.DispatcherTimer(TimeSpan.FromMilliseconds(2500), Avalonia.Threading.DispatcherPriority.Background, (_, _) => HideVideoControls());
+
         // The video's progress bar: drag it, and see pictures from the video where you point.
         var seek = this.FindControl<VideoSeekBar>("VideoSeek")!;
         seek.ScrubStarted += f => _viewer?.ScrubStarted(f);
@@ -92,7 +98,9 @@ public partial class PhotosView : UserControl
             {
                 // Centred over the pointer, but inside the bar.
                 var width = 176 + 8;
-                preview.Margin = new Thickness(Math.Clamp(x - width / 2, 0, Math.Max(0, seek.Bounds.Width - width)), -122, 0, 0);
+                // Sits just above the bar whatever shape the video is (tall or wide).
+                var height = (this.FindControl<Border>("VideoPreviewBox")?.Height ?? 99) + 30; // picture + time + padding
+                preview.Margin = new Thickness(Math.Clamp(x - width / 2, 0, Math.Max(0, seek.Bounds.Width - width)), -(height + 8), 0, 0);
             }
         };
 
@@ -477,6 +485,28 @@ public partial class PhotosView : UserControl
     /// <summary>The video bitmap is redrawn in place; tell the image to repaint.</summary>
     void OnVideoFrame() => _videoSurface.InvalidateVisual();
 
+    Avalonia.Threading.DispatcherTimer? _controlsIdle;
+
+    void WakeVideoControls()
+    {
+        if (_viewer is null)
+            return;
+        _viewer.ControlsAwake = true;
+        this.FindControl<Panel>("ViewerLayer")!.Cursor = null;
+        _controlsIdle?.Stop();
+        _controlsIdle?.Start();
+    }
+
+    void HideVideoControls()
+    {
+        _controlsIdle?.Stop();
+        // Not while the pointer is on the controls or the bar is being dragged.
+        if (_viewer is null || !_viewer.IsVideoPlaying || _viewer.IsScrubbing || this.FindControl<Border>("VideoControls")?.IsPointerOver == true)
+            return;
+        _viewer.ControlsAwake = false;
+        this.FindControl<Panel>("ViewerLayer")!.Cursor = new Cursor(StandardCursorType.None);
+    }
+
     /// <summary>The seek bar's preview picture was redrawn in place: repaint it.</summary>
     void OnPreviewFrame() => this.FindControl<Image>("VideoPreviewImage")?.InvalidateVisual();
 
@@ -489,6 +519,8 @@ public partial class PhotosView : UserControl
         var height = Math.Min(132, 176 / aspect);
         box.Height = Math.Round(height);
         box.Width = Math.Round(Math.Min(176, height * aspect));
+        if (this.FindControl<Border>("VideoPreview") is { } preview)
+            preview.Margin = new Thickness(preview.Margin.Left, -(box.Height + 38), 0, 0);
     }
 
     void OnViewerChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

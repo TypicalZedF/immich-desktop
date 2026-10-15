@@ -5,6 +5,7 @@ using ImmichSplash.App.Controls;
 using ImmichSplash.App.Services;
 using ImmichSplash.Core;
 using ImmichSplash.Core.Api;
+using ImmichSplash.Core.Layout;
 
 namespace ImmichSplash.App.ViewModels;
 
@@ -83,6 +84,9 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
 
     /// <summary>Pixels to decode thumbnails at (tile size × display scaling).</summary>
     internal int DecodeWidth { get; private set; } = 256;
+
+    /// <summary>Pixels to decode a tile of this width at (its width × display scaling).</summary>
+    internal int DecodeWidthFor(double tileWidth) => (int)Math.Ceiling(Math.Max(48, tileWidth) * Math.Max(1, _scaling));
 
     /// <summary>Long side, in pixels, the viewer needs to look sharp (set by the view from its size and scaling).</summary>
     internal int ViewerPixels { get; set; } = 2048;
@@ -269,18 +273,10 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             value = Math.Clamp(value, MinTile, MaxTile);
             if (Math.Abs(value - _targetTile) < 0.5)
                 return;
-            var anchor = GetTopAnchor?.Invoke();
             _targetTile = value;
             OnPropertyChanged();
-            var columnsBefore = _columns;
             if (_width > 0)
-                SetLayout(_width, _scaling);
-            if (anchor is { } a && _columns != columnsBefore)
-            {
-                var index = Rows.ToList().FindIndex(r => r is AssetRowViewModel row && row.Bucket == a.Bucket && a.Index >= row.Start && a.Index < row.Start + row.Cells.Count);
-                if (index >= 0)
-                    ScrollToRowRequested?.Invoke(index);
-            }
+                ApplyLayout(immediate: true);
             // Save once the slider settles, not on every step.
             _saveTileSize?.Cancel();
             var cts = _saveTileSize = new CancellationTokenSource();
@@ -300,31 +296,42 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             return;
         _width = width;
         _scaling = scaling;
-        var columns = Math.Max(2, (int)((width + Gap) / (_targetTile + Gap)));
-        var tile = TileSize(columns);
-        DecodeWidth = (int)Math.Ceiling(tile * Math.Max(1, scaling));
-        if (columns != _columns)
-        {
-            _columns = columns;
-            _builtTile = tile;
-            RebuildRows();
-        }
-        else if (tile != _builtTile)
-        {
-            // Same columns, different width (the window was resized, or the date rail appeared):
-            // resize the tiles in place so the scroll position and loaded thumbnails stay.
-            _builtTile = tile;
-            foreach (var row in Rows.OfType<AssetRowViewModel>())
-                row.Resize(tile);
-            UpdateOffsets(Rows);
-        }
+        ApplyLayout(immediate: false);
     }
 
-    double _builtTile;
+    /// <summary>
+    /// Works out the tile size for the current width and rebuilds the rows if it changed. Dragging the
+    /// window's edge changes the width many times a second, so those rebuilds wait for it to settle.
+    /// </summary>
+    void ApplyLayout(bool immediate)
+    {
+        var columns = Math.Max(2, (int)((_width + Gap) / (_targetTile + Gap)));
+        var tile = TileSize(columns);
+        DecodeWidth = (int)Math.Ceiling(tile * Math.Max(1, _scaling));
+        if (_columns == columns && tile == _builtTile && _width == _builtWidth)
+            return;
+        var first = _columns == 0;
+        _columns = columns;
+        if (first || immediate || Rows.Count == 0)
+        {
+            RebuildRows(keepPlace: !first);
+            return;
+        }
+        _resizeRebuild?.Cancel();
+        var cts = _resizeRebuild = new CancellationTokenSource();
+        _ = Task.Delay(140, cts.Token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled)
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => RebuildRows(keepPlace: true));
+        }, TaskScheduler.Default);
+    }
+
+    CancellationTokenSource? _resizeRebuild;
+    double _builtTile, _builtWidth;
 
     double TileSize(int columns) => Math.Floor((_width - Gap * (columns - 1)) / columns);
 
-    void RebuildRows()
+    void RebuildRows(bool keepPlace = false)
     {
         if (_columns == 0 || _buckets.Count == 0)
         {
@@ -334,42 +341,135 @@ public sealed partial class PhotosViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        // Keep the photo at the top of the screen where it is, whatever happens to the rows around it.
+        var anchor = keepPlace ? GetTopAnchor?.Invoke() : null;
         var tile = TileSize(_columns);
+        _builtTile = tile;
+        _builtWidth = _width;
+        foreach (var old in Rows.OfType<AssetRowViewModel>())
+            old.Unrealize();
         var rows = new List<object>();
         foreach (var bucket in _buckets)
         {
             rows.Add(new MonthHeaderViewModel(bucket.Label, Format.Plural(bucket.Count, "item")));
-            for (var start = 0; start < bucket.Count; start += _columns)
-                rows.Add(new AssetRowViewModel(this, bucket, start, Math.Min(_columns, bucket.Count - start), tile));
+            rows.AddRange(BuildBucketRows(bucket, tile));
         }
         if (ShowsMemories && _memoryCards.Count > 0)
             rows.Insert(0, new MemoriesRowViewModel(_memoryCards));
         UpdateOffsets(rows);
         Rows = new ObservableCollection<object>(rows);
+        if (anchor is { } a && RowIndexOf(a) is >= 0 and var index)
+            ScrollToRowRequested?.Invoke(index);
+    }
+
+    /// <summary>
+    /// The rows of one group: in the photos' own shapes once they're known, or equal squares as an
+    /// estimate until then (a month is only fetched when it comes into view).
+    /// </summary>
+    List<AssetRowViewModel> BuildBucketRows(BucketState bucket, double tile)
+    {
+        var rows = new List<AssetRowViewModel>();
+        if (bucket.TryGetLoaded(out var assets) && assets.Count > 0)
+        {
+            bucket.LaidOutFor = (_width, tile);
+            foreach (var row in JustifiedLayout.Compute(assets.Select(a => a.Ratio).ToList(), _width, tile, Gap))
+                rows.Add(new AssetRowViewModel(this, bucket, row.Start, row.Widths, row.Height));
+            return rows;
+        }
+        bucket.LaidOutFor = null;
+        for (var start = 0; start < bucket.Count; start += _columns)
+            rows.Add(new AssetRowViewModel(this, bucket, start, Math.Min(_columns, bucket.Count - start), tile));
+        return rows;
+    }
+
+    int RowIndexOf((BucketState Bucket, int Index) place) =>
+        Rows.ToList().FindIndex(r => r is AssetRowViewModel row && row.Bucket == place.Bucket && place.Index >= row.Start && place.Index < row.Start + row.Cells.Count);
+
+    readonly HashSet<BucketState> _layoutQueued = [];
+
+    /// <summary>A group's photos have arrived: lay it out in their shapes (soon, not in the middle of drawing).</summary>
+    internal void QueueBucketLayout(BucketState bucket)
+    {
+        if (!_layoutQueued.Add(bucket))
+            return;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            _layoutQueued.Remove(bucket);
+            RelayoutBucket(bucket);
+        }, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
+    void RelayoutBucket(BucketState bucket)
+    {
+        if (_columns == 0 || !bucket.TryGetLoaded(out _))
+            return;
+        var tile = TileSize(_columns);
+        if (bucket.LaidOutFor is { } laid && laid.Width == _width && laid.Tile == tile)
+            return;
+        var first = -1;
+        var count = 0;
+        for (var i = 0; i < Rows.Count; i++)
+        {
+            if (Rows[i] is AssetRowViewModel row && row.Bucket == bucket)
+            {
+                if (first < 0)
+                    first = i;
+                count++;
+            }
+        }
+        if (first < 0)
+            return; // not in the grid any more
+
+        // If this group is above (or is) the one on screen, putting its rows right moves everything below
+        // it: remember the photo at the top and bring it back there.
+        var anchor = GetTopAnchor?.Invoke();
+        var keepPlace = anchor is { } a && _buckets.IndexOf(bucket) <= _buckets.IndexOf(a.Bucket);
+
+        var replacement = BuildBucketRows(bucket, tile);
+        for (var k = 0; k < count; k++)
+        {
+            (Rows[first] as AssetRowViewModel)?.Unrealize();
+            Rows.RemoveAt(first);
+        }
+        for (var j = 0; j < replacement.Count; j++)
+            Rows.Insert(first + j, replacement[j]);
+        UpdateOffsets(Rows);
+        if (keepPlace && anchor is { } place && RowIndexOf(place) is >= 0 and var index)
+            ScrollToRowRequested?.Invoke(index);
     }
 
     /// <summary>Works out where every row and month starts (for the date rail).</summary>
     void UpdateOffsets(IReadOnlyList<object> rows)
     {
-        var tile = TileSize(_columns);
+        // Every group's height comes from its actual rows (they differ once photos have their own shapes).
         var sections = new List<TimelineSection>();
-        double offset = rows.Count > 0 && rows[0] is MemoriesRowViewModel ? MemoriesHeight : 0;
-        foreach (var bucket in _buckets)
-        {
-            var rowCount = (bucket.Count + _columns - 1) / _columns;
-            var height = HeaderHeight + rowCount * (tile + Gap);
-            var shortLabel = bucket.Day is null && bucket.Month is { } month ? month.ToString("MMM yyyy", System.Globalization.CultureInfo.CurrentCulture) : bucket.Label;
-            sections.Add(new TimelineSection(shortLabel, bucket.Month?.Year, offset, height));
-            offset += height;
-        }
         _rowOffsets = new double[rows.Count + 1];
+        var group = -1;
+        double groupStart = 0;
+        void CloseGroup(double end)
+        {
+            if (group < 0 || group >= _buckets.Count)
+                return;
+            var bucket = _buckets[group];
+            var shortLabel = bucket.Day is null && bucket.Month is { } month ? month.ToString("MMM yyyy", System.Globalization.CultureInfo.CurrentCulture) : bucket.Label;
+            sections.Add(new TimelineSection(shortLabel, bucket.Month?.Year, groupStart, end - groupStart));
+        }
         for (var i = 0; i < rows.Count; i++)
+        {
+            if (rows[i] is MonthHeaderViewModel)
+            {
+                CloseGroup(_rowOffsets[i]);
+                group++;
+                groupStart = _rowOffsets[i];
+            }
             _rowOffsets[i + 1] = _rowOffsets[i] + rows[i] switch
             {
                 AssetRowViewModel row => row.RowHeight,
                 MemoriesRowViewModel => MemoriesHeight,
                 _ => HeaderHeight,
             };
+        }
+        CloseGroup(_rowOffsets[rows.Count]);
         // The rail is for the timeline; one big group (e.g. search results) has no dates to show.
         Sections = sections.Count > 1 && sections.Any(s => s.Year is not null) ? sections : [];
     }

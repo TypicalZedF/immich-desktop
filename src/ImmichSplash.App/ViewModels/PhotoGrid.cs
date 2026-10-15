@@ -113,6 +113,21 @@ public sealed class BucketState
         };
     }
 
+    /// <summary>The photos, if they've been loaded already (their shapes are needed to lay the group out).</summary>
+    public bool TryGetLoaded(out IReadOnlyList<TimelineAsset> assets)
+    {
+        if (_assets is { IsCompletedSuccessfully: true } done)
+        {
+            assets = done.Result;
+            return true;
+        }
+        assets = [];
+        return false;
+    }
+
+    /// <summary>The layout this group's rows were built for (null: not yet, still the estimate made before its photos were known).</summary>
+    internal (double Width, double Tile)? LaidOutFor { get; set; }
+
     public Task<IReadOnlyList<TimelineAsset>> GetAssetsAsync(CancellationToken ct)
     {
         // Shared by every row of the group; a failed load is retried next time.
@@ -170,35 +185,32 @@ public sealed class MonthHeaderViewModel(string title, string count)
     public string Count { get; } = count;
 }
 
-/// <summary>A row of square tiles. Realized only while visible.</summary>
+/// <summary>A row of tiles, each in its photo's shape. Realized only while visible.</summary>
 public sealed class AssetRowViewModel : ViewModelBase
 {
     readonly PhotosViewModel _owner;
     CancellationTokenSource? _cts;
 
+    /// <summary>A row of equal squares (the map's side panel, and groups whose photos aren't known yet).</summary>
     public AssetRowViewModel(PhotosViewModel owner, BucketState bucket, int start, int count, double tile)
+        : this(owner, bucket, start, Enumerable.Repeat(tile, count).ToArray(), tile)
+    {
+    }
+
+    public AssetRowViewModel(PhotosViewModel owner, BucketState bucket, int start, IReadOnlyList<double> widths, double height)
     {
         _owner = owner;
         Bucket = bucket;
         Start = start;
-        TileSize = tile;
-        for (var i = 0; i < count; i++)
-            Cells.Add(new AssetCellViewModel(owner, bucket, start + i, tile));
+        TileHeight = height;
+        for (var i = 0; i < widths.Count; i++)
+            Cells.Add(new AssetCellViewModel(owner, bucket, start + i, widths[i], height));
     }
 
     public BucketState Bucket { get; }
     public int Start { get; }
-    public double TileSize { get; private set; }
-    public double RowHeight => TileSize + PhotosViewModel.Gap;
-
-    internal void Resize(double tile)
-    {
-        TileSize = tile;
-        foreach (var cell in Cells)
-            cell.TileSize = tile;
-        OnPropertyChanged(nameof(TileSize));
-        OnPropertyChanged(nameof(RowHeight));
-    }
+    public double TileHeight { get; }
+    public double RowHeight => TileHeight + PhotosViewModel.Gap;
     public ObservableCollection<AssetCellViewModel> Cells { get; } = [];
 
     public async void Realize()
@@ -208,6 +220,8 @@ public sealed class AssetRowViewModel : ViewModelBase
         try
         {
             var assets = await Bucket.GetAssetsAsync(cts.Token);
+            // Now the photos' shapes are known: lay the group out in them (queued, not during this layout pass).
+            _owner.QueueBucketLayout(Bucket);
             foreach (var cell in Cells)
             {
                 if (cts.IsCancellationRequested)
@@ -234,12 +248,14 @@ public sealed class AssetRowViewModel : ViewModelBase
     }
 }
 
-public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketState bucket, int index, double tile) : ViewModelBase
+public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketState bucket, int index, double width, double height) : ViewModelBase
 {
     public BucketState Bucket { get; } = bucket;
     public int Index { get; } = index;
-    [ObservableProperty]
-    public partial double TileSize { get; set; } = tile;
+
+    /// <summary>The tile's size: its photo's shape (a bit cropped when it's extreme).</summary>
+    public double TileWidth { get; } = width;
+    public double TileHeight { get; } = height;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsVideo), nameof(IsFavorite), nameof(DurationText), nameof(IsMissing), nameof(CanOpen),
@@ -359,7 +375,7 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
         {
             if (asset.LocalPath is { } path)
             {
-                var local = await loader.LoadLocalAsync(path, asset.IsImage, owner.DecodeWidth, ct);
+                var local = await loader.LoadLocalAsync(path, asset.IsImage, owner.DecodeWidthFor(TileWidth), ct);
                 if (ct.IsCancellationRequested)
                     local?.Dispose();
                 else
@@ -371,7 +387,7 @@ public sealed partial class AssetCellViewModel(PhotosViewModel owner, BucketStat
             else
             {
                 // Shared, decoded thumbnails: scrolling back shows them instantly (the cache owns them).
-                var bitmap = await loader.LoadGridThumbnailAsync(asset.Id, owner.DecodeWidth, ct);
+                var bitmap = await loader.LoadGridThumbnailAsync(asset.Id, owner.DecodeWidthFor(TileWidth), ct);
                 if (bitmap is not null && (ct.IsCancellationRequested || Thumbnail is not null))
                     loader.ReturnGridThumbnail(bitmap); // scrolled away (or already has one): give it back
                 else if (bitmap is not null)
