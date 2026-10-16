@@ -24,11 +24,8 @@ param(
 Require-Gh
 $ErrorActionPreference = "Continue"
 
-# The run is started from main (GitHub Pages only takes the Flatpak repository from main); what gets shipped is decided
-# inside the run. Until ship.yml is on main (before the first stable release made with it), start it from beta.
-GitRun fetch --quiet origin | Out-Null
-git -C $script:Root cat-file -e origin/main:.github/workflows/ship.yml 2>$null
-$ref = if ($LASTEXITCODE -eq 0) { "main" } else { "beta" }
+# Started from main, like the button (GitHub only runs it from there); what gets shipped is decided inside the run.
+$ref = "main"
 $inputs = @("-f", "channel=$Channel")
 if ($Version) { $inputs += @("-f", "version=$Version") }
 
