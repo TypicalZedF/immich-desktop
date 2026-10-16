@@ -93,16 +93,24 @@ Installed copies check this repository's **latest GitHub Release** every few hou
 
 ## Releasing a new version
 
-```bash
-git tag v1.2.0
-git push origin v1.2.0
-```
+Everything ships from one button: **Actions → Ship → Run workflow**, then pick **Beta** or **Stable**.
 
-GitHub Actions tests, builds `ImmichSplash-Setup.exe`, the portable zip and the Linux tarball, and publishes the release.
+| Choice | What you get |
+|---|---|
+| **Beta** | A pre-release such as `1.6.4-beta.12`. Only installs on the Beta update channel get it. |
+| **Stable** | A release for everyone, such as `1.6.3`: Windows installs update themselves, Flatpak installs through Discover or `flatpak update`. Optionally type a version (e.g. `1.7.0`); empty means the next one. |
 
-A release doesn't need a beta first: `./build/release.ps1` tests the current commit, moves `main` to it, waits for CI and tags it.
+It ships the newest tested work (the `beta` branch, or `main` when there's no beta) through numbered steps, and each step writes a short report on the run's page:
 
-**Betas (optional):** push to the `beta` branch. Each push publishes a pre-release numbered after the latest stable version (e.g. `v1.3.1-beta.42` after `v1.3.0`), which Beta-channel installs pick up. Beta-channel installs always take the newest version there is, so a stable release newer than the last beta reaches them too. Every push also runs CI, which installs, launches, quits and uninstalls the app on a clean Windows machine, and renders every screen against a demo server to catch broken pages.
+1. **Prepare**: picks the code and version; brings in anything new on `main`.
+2. **Test**: builds and runs every test. Nothing is published if they fail.
+3. **Windows app** and **Linux app**: the installer and portable zip (really installed, started, quit and uninstalled on a clean machine), and the Linux tarball.
+4. **Flatpak**: the Flatpak (signed for Stable).
+5. **Publish**: the GitHub release with every download. Stable also moves `main` to this code.
+6. **Flatpak repository** (Stable): updates the repository Flatpak installs update from.
+7. **Tidy up**: removes older betas. Stable also removes the `beta` branch once everything on it is released.
+
+If a step fails, fix it and press the button again: it carries on with the same version. Pushes to branches never publish anything; CI just checks them (tests, a real install on Windows, and every screen rendered against a demo server). From a terminal, `./build/ship.ps1 [-Channel Stable]` presses the same button and follows the run.
 
 ## Build from source
 

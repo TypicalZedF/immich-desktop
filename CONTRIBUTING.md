@@ -44,20 +44,19 @@ Without SSH, `-Linux` leaves `artifacts/dev/ImmichSplash-dev-linux-x64.tar.gz`; 
 
 ### For maintainers: betas and releases
 
-The flow: changes are tried with dev builds (`build/dev.ps1`) until they're ready for testers, then pushed as a beta. A stable release can come from a beta or straight from the current commit. Once it's out, the betas are removed (releases and the `beta` branch), so only `main` is left until the next beta.
+The flow: changes are tried with dev builds (`build/dev.ps1`). When they're ready for testers they go to the `beta` branch, and **Actions → Ship → Run workflow** publishes them: **Beta** for the Beta update channel, **Stable** for everyone (with or without a beta first). Ship is described step by step at the top of `.github/workflows/ship.yml` and in the README. A stable release removes the betas (releases and the `beta` branch), so only `main` is left until the next beta.
 
-| Branch / tag | What it is | Pushing to it |
+| Branch | What it is | Pushing to it |
 |---|---|---|
 | `main` | What's been released, plus Dependabot updates waiting for the next release | Runs CI only |
-| `beta` | Only exists while there's a beta out | Publishes a pre-release `vX.Y.Z-beta.N` |
-| `vX.Y.Z` tag | A stable release | Publishes the release and the Flatpak repository |
+| `beta` | The next version's work; only exists between a beta and the stable release | Runs CI only (Ship publishes it) |
 
-These need the [GitHub CLI](https://cli.github.com) (`gh auth login`). Each prints a few lines; if a check fails, it shows the failed step and its errors.
+These need the [GitHub CLI](https://cli.github.com) (`gh auth login`). Each prints a few lines; if something fails, it shows the failed step and its errors.
 
 - `./build/status.ps1`: where `beta` and `main` are, the latest releases, and the latest checks.
-- `./build/beta.ps1`: pushes the current commit as a beta. It brings in other pushes to `beta` and anything new on `main`, runs the tests, pushes (starting `beta` again if the last release removed it), then waits for CI and the beta release (`-NoWait` to skip waiting, `-Message "..."` to commit everything first).
-- `./build/watch.ps1 [-Ref vX.Y.Z]`: waits for the checks on `beta` or on a release tag.
-- `./build/release.ps1`: makes a stable release of the current commit, with or without a beta first. It merges in anything new on `main`, runs the tests, moves `main` up, waits for CI, tags the next version (`-Minor`, `-Major`, `-Version`), and waits for the release and the Flatpak repository. Run it with `-DryRun` first to see what would ship.
+- `./build/beta.ps1`: pushes the current commit to `beta` (bringing in other pushes to `beta` and anything new on `main`, after running the tests), then presses Ship → Beta (`-NoWait` to return straight away, `-Message "..."` to commit everything first).
+- `./build/ship.ps1 [-Channel Beta|Stable] [-Version X.Y.Z]`: presses Ship from the terminal and prints one line per step.
+- `./build/watch.ps1 [-Ref main]`: waits for CI on `beta` or `main`.
 
 Dependabot opens one PR a month for NuGet packages and one for GitHub Actions, against `main`, with minor and patch updates only. Merging one ships nothing by itself; it goes out with the next release. Major updates are done by hand.
 

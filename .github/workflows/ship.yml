@@ -1,0 +1,461 @@
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+#  Ship: the one button that releases Immich Splash.
+#
+#  Actions tab → "Ship" → "Run workflow" → pick Beta or Stable → Run.
+#
+#  What it ships: the newest tested work. That's the `beta` branch when there is one, else `main`.
+#  It runs as a chain of numbered steps; each one writes a short report on the run's page:
+#
+#    1. Prepare       picks the code and the version number, brings in anything new on main
+#    2. Test          builds everything and runs all the tests; nothing is published if they fail
+#    3. Windows app   the installer + portable zip, then really installs, starts, quits and uninstalls it
+#    3. Linux app     the Linux download (tarball with install.sh)
+#    4. Flatpak       the Flatpak (signed for Stable)
+#    5. Publish       the GitHub release with every download. Stable also moves `main` to this code
+#    6. Flatpak repo  (Stable) updates the Flatpak repository, so Discover / `flatpak update` see it
+#    7. Tidy up       removes older betas; Stable also removes the `beta` branch once it's all released
+#
+#  Beta:   a pre-release (e.g. 1.6.4-beta.12) for installs on the Beta update channel.
+#  Stable: a release for everyone (e.g. 1.6.3), with the Flatpak repository updated too.
+#
+#  Safe to run again: if something fails half way, press the button again and it carries on with the same
+#  version instead of making a new one. Pushes to branches don't publish anything (CI just checks them).
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+name: Ship
+run-name: "Ship ${{ inputs.channel }}${{ inputs.version != '' && format(' {0}', inputs.version) || '' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Beta = a test version for the Beta update channel. Stable = a release for everyone."
+        type: choice
+        options: [Beta, Stable]
+        default: Beta
+      version:
+        description: "Stable only, optional: a version number like 1.7.0. Leave empty for the next one (1.6.2 → 1.6.3)."
+        required: false
+        default: ""
+
+# One ship at a time; a second press waits for the first.
+concurrency:
+  group: ship
+  cancel-in-progress: false
+
+# Read-only unless a step says otherwise.
+permissions:
+  contents: read
+
+env:
+  APP_ID: io.github.TypicalZedF.ImmichSplash
+  FLATPAK_REPO_URL: https://typicalzedf.github.io/immich-splash/repo/
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  # ── 1 ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  prepare:
+    name: "1. Prepare"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to bring main's new commits into beta
+    outputs:
+      sha: ${{ steps.pick.outputs.sha }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      stable: ${{ steps.version.outputs.stable }}
+      previous: ${{ steps.version.outputs.previous }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pick the code to ship
+        id: pick
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin beta > /dev/null; then source=beta; else source=main; fi
+          git checkout --quiet -B ship "origin/$source"
+          # Anything merged into main since (e.g. a Dependabot update) comes along, so nothing is lost.
+          if ! git merge-base --is-ancestor origin/main HEAD; then
+            if ! git merge --no-edit origin/main; then
+              echo "::error title=main and beta conflict::main has changes that clash with beta. Merge main into beta by hand (or ask Claude), then press Ship again."
+              exit 1
+            fi
+            git push --quiet origin HEAD:beta
+            echo "Brought main's new commits into beta."
+          fi
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Work out the version
+        id: version
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          WANTED: ${{ inputs.version }}
+        run: |
+          stable_tags() { git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V; }
+          previous=$(stable_tags | tail -1); previous=${previous:-v0.0.0}
+          IFS=. read -r major minor patch <<< "${previous#v}"
+          next="$major.$minor.$((patch + 1))"
+          if [[ "$CHANNEL" == "Stable" ]]; then
+            already=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+            if [[ -n "$already" ]]; then
+              version=${already#v}   # a run that stopped half way: finish it
+              previous=$(stable_tags | grep -vx "$already" | tail -1); previous=${previous:-v0.0.0}
+              echo "::notice title=Carrying on::This code is already tagged $already, so this run finishes that release."
+            elif [[ -n "$WANTED" ]]; then
+              version=${WANTED#v}
+              [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::\"$WANTED\" isn't a version like 1.7.0."; exit 1; }
+              if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then
+                echo "::error::v$version is already used by other code. Pick another number."; exit 1
+              fi
+            else
+              version=$next
+            fi
+            stable=true
+          else
+            version="$next-beta.${{ github.run_number }}"
+            stable=false
+          fi
+          {
+            echo "version=$version"; echo "tag=v$version"; echo "stable=$stable"; echo "previous=$previous"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Report
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          SOURCE: ${{ steps.pick.outputs.source }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PREVIOUS: ${{ steps.version.outputs.previous }}
+        run: |
+          {
+            echo "## Shipping Immich Splash $VERSION ($CHANNEL)"
+            echo
+            if [[ "$CHANNEL" == "Stable" ]]; then
+              echo "A release for **everyone**: Windows installs update themselves, Flatpak installs update through Discover or \`flatpak update\`."
+            else
+              echo "A **beta**: installs on the Beta update channel (Settings → Updates) get it. Nobody else does."
+            fi
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | **$VERSION** |"
+            echo "| Code | \`$SOURCE\` at \`$(git rev-parse --short HEAD)\`: $(git log -1 --format=%s) |"
+            echo "| Since $PREVIOUS | $(git rev-list --count --no-merges "$PREVIOUS"..HEAD 2>/dev/null || echo "?") changes |"
+            echo
+            echo "<details><summary>The changes</summary>"
+            echo
+            git log --no-merges --format='- %s' "$PREVIOUS"..HEAD 2>/dev/null | head -50
+            echo
+            echo "</details>"
+            echo
+            echo "**Next:** test → build Windows, Linux and Flatpak → publish → tidy up. Each step adds its report below."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 2 ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  test:
+    name: "2. Test"
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: Build
+        run: dotnet build ImmichSplash.slnx -c Release
+      - name: Run the tests
+        run: |
+          set -o pipefail
+          dotnet test tests/ImmichSplash.Core.Tests -c Release --no-build 2>&1 | tee "$RUNNER_TEMP/tests.log"
+      - name: Report
+        if: always()
+        run: |
+          line=$(grep -E 'Passed!|Failed!' "$RUNNER_TEMP/tests.log" 2>/dev/null | tail -1 | sed 's/^ *//')
+          {
+            echo "### 2. Test"
+            if [[ "$line" == Passed!* ]]; then echo "✅ All tests passed. ($line)"
+            else echo "❌ Tests failed, so nothing will be published. Open **2. Test** to see which. ${line:+($line)}"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 3 ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  windows:
+    name: "3. Windows app"
+    needs: [prepare, test]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: Build the installer and portable zip
+        shell: pwsh
+        run: ./build/publish.ps1 -Version "${{ needs.prepare.outputs.version }}" -SkipTests
+      - name: Install, start, quit and uninstall it
+        shell: pwsh
+        run: ./build/smoke-test.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: artifacts/installer/*
+      - name: Report
+        shell: pwsh
+        run: |
+          "### 3. Windows app`n✅ Installer and portable zip built; a real install started, quit and uninstalled cleanly." >> $env:GITHUB_STEP_SUMMARY
+
+  linux:
+    name: "3. Linux app"
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: Build the Linux download
+        run: SKIP_TESTS=1 bash ./build/publish.sh "${{ needs.prepare.outputs.version }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: artifacts/installer/ImmichSplash-linux-x64.tar.gz
+      - name: Report
+        run: |
+          echo -e "### 3. Linux app\n✅ Linux download built." >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 4 ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  flatpak:
+    name: "4. Flatpak"
+    needs: [prepare, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: dist
+      - name: Use the Linux app from step 3
+        # The tarball keeps file permissions; the Flatpak packs exactly the app that was just built.
+        run: |
+          tar -xzf dist/ImmichSplash-linux-x64.tar.gz -C "$RUNNER_TEMP"
+          mkdir -p artifacts/publish && mv "$RUNNER_TEMP/immich-splash/app" artifacts/publish/linux-x64
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      # FFmpeg, libmpv and friends are reused until their recipe changes.
+      - uses: actions/cache@v4
+        with:
+          path: .flatpak-builder
+          key: flatpak-builder-${{ hashFiles('build/flatpak/*.yaml') }}
+          restore-keys: flatpak-builder-
+      - name: Signing key (Stable)
+        if: needs.prepare.outputs.stable == 'true'
+        env:
+          KEY: ${{ secrets.FLATPAK_GPG_KEY }}
+        run: |
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"; mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
+          echo "$KEY" | gpg --batch --import
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+          echo "GPG_KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^fpr/{print $10; exit}')" >> "$GITHUB_ENV"
+      - name: Build the Flatpak
+        run: |
+          SIGN=(); BRANCH=master
+          if [[ -n "${GPG_KEY_ID:-}" ]]; then SIGN=(--gpg-sign="$GPG_KEY_ID" --gpg-homedir="$GNUPGHOME"); BRANCH=stable; fi
+          flatpak-builder --user --install-deps-from=flathub --force-clean --disable-rofiles-fuse \
+            --default-branch="$BRANCH" "${SIGN[@]}" --repo=repo build-dir "build/flatpak/$APP_ID.yaml"
+      - name: Pack the download
+        run: |
+          EXTRA=()
+          if [[ -n "${GPG_KEY_ID:-}" ]]; then
+            flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" --gpg-homedir="$GNUPGHOME" --title="Immich Splash" repo
+            EXTRA=(--repo-url="$FLATPAK_REPO_URL" --gpg-keys=build/flatpak/repo-key.gpg stable)
+          fi
+          mkdir -p artifacts
+          flatpak build-bundle repo artifacts/ImmichSplash.flatpak "$APP_ID" "${EXTRA[@]}" \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Repository site (Stable)
+        if: needs.prepare.outputs.stable == 'true'
+        run: |
+          KEY=$(base64 -w0 build/flatpak/repo-key.gpg)
+          mkdir -p site && cp -r repo site/repo
+          printf '%s\n' "[Flatpak Repo]" "Title=Immich Splash" "Url=$FLATPAK_REPO_URL" "Homepage=https://github.com/TypicalZedF/immich-splash" \
+            "Comment=Unofficial desktop companion for Immich" "GPGKey=$KEY" > site/immich-splash.flatpakrepo
+          printf '%s\n' "[Flatpak Ref]" "Name=$APP_ID" "Branch=stable" "Title=Immich Splash" "Url=$FLATPAK_REPO_URL" "IsRuntime=false" \
+            "SuggestRemoteName=immich-splash" "RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo" "GPGKey=$KEY" > "site/$APP_ID.flatpakref"
+          cp build/flatpak/index.html site/index.html
+          cp "site/$APP_ID.flatpakref" artifacts/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak
+          path: artifacts/*.flatpak*
+      - uses: actions/upload-pages-artifact@v3
+        if: needs.prepare.outputs.stable == 'true'
+        with:
+          path: site
+      - name: Report
+        run: |
+          if [[ "${{ needs.prepare.outputs.stable }}" == "true" ]]; then what="signed, for the Flatpak repository"; else what="unsigned beta bundle"; fi
+          echo -e "### 4. Flatpak\n✅ Flatpak built ($what, $(du -h artifacts/ImmichSplash.flatpak | cut -f1))." >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 5 ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  publish:
+    name: "5. Publish"
+    needs: [prepare, windows, linux, flatpak]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # main, the tag and the release
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SHA: ${{ needs.prepare.outputs.sha }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      PREVIOUS: ${{ needs.prepare.outputs.previous }}
+      STABLE: ${{ needs.prepare.outputs.stable }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Move main to this code (Stable)
+        if: env.STABLE == 'true'
+        run: |
+          git push origin "$SHA:refs/heads/main" || {
+            echo "::error title=Couldn't update main::main changed while shipping. Press Ship again."; exit 1; }
+      - name: Tag it
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "$TAG is already there."
+          else
+            git tag "$TAG" "$SHA" && git push --quiet origin "$TAG"
+          fi
+      - name: Create the release
+        run: |
+          {
+            if [[ "$STABLE" != "true" ]]; then
+              echo "**Beta.** Installs on the Beta update channel (Settings → Updates) get this automatically."
+              echo
+            fi
+            echo "## Install"
+            echo "- **Windows:** download **ImmichSplash-Setup.exe** and run it. Already installed? It updates itself. No install: **ImmichSplash-Portable.zip**."
+            if [[ "$STABLE" == "true" ]]; then
+              echo "- **Linux (Flatpak):** \`flatpak install --user https://typicalzedf.github.io/immich-splash/$APP_ID.flatpakref\`, or open **$APP_ID.flatpakref** in Discover. Updates come through Discover / \`flatpak update\`."
+            else
+              echo "- **Linux (Flatpak):** download **ImmichSplash.flatpak**, then \`flatpak install --user --reinstall ./ImmichSplash.flatpak\` (beta bundles aren't signed; add \`--no-gpg-verify\` if asked)."
+            fi
+            echo "- **Linux (other):** download **ImmichSplash-linux-x64.tar.gz**, extract it and run \`install.sh\`."
+            echo
+            echo "## What's new"
+            git log --no-merges --format='- %s' "$PREVIOUS".."$SHA" 2>/dev/null | head -60
+          } > notes.md
+          files=(dist/ImmichSplash-Setup.exe dist/ImmichSplash-Portable.zip dist/ImmichSplash-linux-x64.tar.gz dist/ImmichSplash.flatpak)
+          [[ -f "dist/$APP_ID.flatpakref" ]] && files+=("dist/$APP_ID.flatpakref")
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "${files[@]}" --clobber   # carrying on after a stop: refresh the downloads
+          else
+            extra=(); [[ "$STABLE" != "true" ]] && extra=(--prerelease)
+            gh release create "$TAG" "${files[@]}" --title "Immich Splash $VERSION" --notes-file notes.md --verify-tag "${extra[@]}"
+          fi
+      - name: Report
+        run: |
+          url="https://github.com/${{ github.repository }}/releases/tag/$TAG"
+          {
+            echo "### 5. Publish"
+            echo "✅ Released **[$TAG]($url)** with the Windows installer, portable zip, Linux download and Flatpak."
+            [[ "$STABLE" == "true" ]] && echo "main now points at this code."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 6 ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  flatpak-repo:
+    name: "6. Flatpak repository"
+    needs: [prepare, publish]
+    if: needs.prepare.outputs.stable == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+      - name: Report
+        run: |
+          echo -e "### 6. Flatpak repository\n✅ Updated: Flatpak installs see the new version in Discover or with \`flatpak update\`." >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 7 ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  tidy:
+    name: "7. Tidy up"
+    needs: [prepare, publish, flatpak-repo]
+    if: always() && needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # remove old betas and the beta branch
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      SHA: ${{ needs.prepare.outputs.sha }}
+      STABLE: ${{ needs.prepare.outputs.stable }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remove older betas
+        # A new beta replaces the old ones; a stable release replaces them all (it's newer).
+        run: |
+          gh release list --limit 200 --json tagName,isPrerelease --jq '.[] | select(.isPrerelease) | .tagName' |
+            grep -vx "$TAG" | while read -r old; do
+              echo "Removing $old"; gh release delete "$old" --cleanup-tag --yes
+            done || true
+      - name: Remove the beta branch (Stable)
+        if: env.STABLE == 'true'
+        run: |
+          if ! git ls-remote --exit-code --heads origin beta > /dev/null; then echo "No beta branch."; exit 0; fi
+          git fetch --quiet origin beta
+          if git merge-base --is-ancestor FETCH_HEAD "$SHA"; then
+            git push --quiet origin --delete beta && echo "Removed the beta branch: everything on it is released."
+          else
+            echo "::warning title=beta kept::beta has new commits since this release started, so it was kept."
+          fi
+      - name: Report
+        run: |
+          url="https://github.com/${{ github.repository }}/releases/tag/$TAG"
+          {
+            echo "### 7. Tidy up"
+            echo "✅ Older betas removed."
+            [[ "$STABLE" == "true" ]] && echo "The beta branch is gone (it's all in this release); the next beta starts it again."
+            echo
+            echo "---"
+            echo "## 🎉 Done: [$TAG]($url)"
+          } >> "$GITHUB_STEP_SUMMARY"
