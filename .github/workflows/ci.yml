@@ -41,28 +41,7 @@ jobs:
 
       - name: Smoke test - silent install, launch, uninstall
         shell: pwsh
-        run: |
-          $setup = "artifacts/installer/ImmichSplash-Setup.exe"
-          Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CURRENTUSER", "/NORESTART" -Wait
-          $dir = "$env:LOCALAPPDATA\Programs\Immich Splash"
-          if (-not (Test-Path "$dir\ImmichSplash.exe")) { throw "App was not installed to $dir" }
-          if (-not (Test-Path "$dir\unins000.exe")) { throw "Uninstaller missing" }
-          Write-Host "Installed OK"
-
-          $env:IMMICH_SPLASH_DATA_DIR = "$env:RUNNER_TEMP\immich-splash-smoke"
-          $app = Start-Process "$dir\ImmichSplash.exe" -ArgumentList "--background" -PassThru
-          Start-Sleep -Seconds 10
-          if ($app.HasExited) { throw "App exited during startup (code $($app.ExitCode))" }
-          Write-Host "App running OK"
-          Start-Process "$dir\ImmichSplash.exe" -ArgumentList "--quit" -Wait
-          Start-Sleep -Seconds 3
-          if (-not $app.HasExited) { throw "App did not quit when asked" }
-          Write-Host "Quit OK"
-
-          Start-Process "$dir\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -Wait
-          Start-Sleep -Seconds 3
-          if (Test-Path "$dir\ImmichSplash.exe") { throw "Uninstall left the app behind" }
-          Write-Host "Uninstalled OK"
+        run: ./build/smoke-test.ps1
 
       - name: UI checks - render every screen against a demo server
         # The harness drives the real pages headlessly and fails on broken behaviour (grouping, Select all, …).

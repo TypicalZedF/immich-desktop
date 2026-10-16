@@ -1,18 +1,18 @@
 <#
 .SYNOPSIS
-  Ships this PC's current commit as a beta release (only when the user says "push to beta"; until then changes are
-  tried with ./build/dev.ps1): syncs with origin, runs the tests, pushes to the beta branch, then waits for CI and
-  the beta release and reports in a few lines.
+  Ships this PC's current commit as a beta (only when the user says "push to beta"; until then changes are
+  tried with ./build/dev.ps1): syncs with origin, runs the tests, pushes to the beta branch, then presses
+  Ship → Beta (./build/ship.ps1) and follows it.
 
 .DESCRIPTION
-  Every push to beta becomes a pre-release (vX.Y.Z-beta.N); installed apps on the Beta channel update to it.
-  A stable release removes the beta branch, so the first push after one starts it again from this commit.
+  Pushing alone only runs CI; the Ship workflow publishes the pre-release (vX.Y.Z-beta.N) that installed apps on the
+  Beta channel update to. A stable release removes the beta branch, so the first push after one starts it again.
   Works from any local branch. Uncommitted changes stop the script unless you pass -Message (then everything is committed with it).
 
 .EXAMPLE
   ./build/beta.ps1                         # push the commits you have
   ./build/beta.ps1 -Message "Fix the map"  # commit everything first
-  ./build/beta.ps1 -NoWait                 # push and return; check later with ./build/watch.ps1
+  ./build/beta.ps1 -NoWait                 # push, press Ship and return (the run's link is printed)
 #>
 param(
     [string]$Message,
@@ -72,11 +72,5 @@ GitRun push --quiet origin HEAD:beta | Out-Null
 $sha = GitRun rev-parse HEAD
 Ok (GitRun log -1 --format="%h %s")
 
-if ($NoWait) { Note "Check on it later: ./build/watch.ps1"; exit 0 }
-Start-Sleep -Seconds 10
-if (Wait-Workflows $sha @("CI", "Release") "beta") {
-    $ErrorActionPreference = "Continue"
-    $tag = gh release list --repo $script:Repo --limit 5 --json tagName,isPrerelease --jq '[.[] | select(.isPrerelease)][0].tagName' 2>$null
-    Ok "Beta $tag is out; apps on the Beta channel pick it up within a few hours (or Settings > Updates > Check now)."
-}
-else { exit 1 }
+& "$PSScriptRoot/ship.ps1" -Channel Beta -NoWait:$NoWait
+exit $LASTEXITCODE

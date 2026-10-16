@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds a Linux release as a tarball with an install script.
 #   ./build/publish.sh 1.2.0
+#   SKIP_TESTS=1 ./build/publish.sh 1.2.0   (the tests already ran, e.g. in Ship)
 # Output: artifacts/installer/ImmichSplash-linux-x64.tar.gz
 # Users extract it and run ./install.sh (installs to ~/.local, adds a menu entry; ./install.sh --uninstall removes it).
 set -euo pipefail
@@ -12,7 +13,7 @@ PUBLISH_DIR="$ROOT/artifacts/publish/$RUNTIME"
 OUT_DIR="$ROOT/artifacts/installer"
 STAGE="$ROOT/artifacts/stage/immich-splash"
 
-dotnet test "$ROOT/tests/ImmichSplash.Core.Tests" -c Release --nologo
+if [[ -z "${SKIP_TESTS:-}" ]]; then dotnet test "$ROOT/tests/ImmichSplash.Core.Tests" -c Release --nologo; fi
 
 rm -rf "$PUBLISH_DIR" "$STAGE"
 dotnet publish "$ROOT/src/ImmichSplash.App/ImmichSplash.App.csproj" -c Release -r "$RUNTIME" --self-contained true \
